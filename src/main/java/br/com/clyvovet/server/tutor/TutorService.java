@@ -4,6 +4,7 @@ import br.com.clyvovet.server.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 public class TutorService {
 
     private final TutorRepository repository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
     public Page<TutorResponse> findAll(Pageable pageable) {
@@ -39,7 +41,7 @@ public class TutorService {
         t.setEmail(request.email());
         t.setTelefone(request.telefone());
         t.setTelefoneEmergencia(request.telefoneEmergencia());
-        t.setSenhaHash(request.senhaHash());
+        t.setSenhaHash(passwordEncoder.encode(request.senha()));
         t.setCanalPreferencial(request.canalPreferencial());
         t.setDtCadastro(LocalDate.now());
         return TutorResponse.from(repository.save(t));
@@ -53,7 +55,7 @@ public class TutorService {
         t.setEmail(request.email());
         t.setTelefone(request.telefone());
         t.setTelefoneEmergencia(request.telefoneEmergencia());
-        t.setSenhaHash(request.senhaHash());
+        t.setSenhaHash(passwordEncoder.encode(request.senha()));
         t.setCanalPreferencial(request.canalPreferencial());
         return TutorResponse.from(repository.save(t));
     }

@@ -25,6 +25,12 @@ public class Veterinario {
     @Column(name = "ds_especialidade", length = 100)
     private String especialidade;
 
+    @Column(name = "ds_email", nullable = false, unique = true, length = 150)
+    private String email;
+
+    @Column(name = "ds_senha_hash", nullable = false, length = 255)
+    private String senhaHash;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_clinica", nullable = false)
     private Clinica clinica;
