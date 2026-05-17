@@ -5,6 +5,7 @@ import br.com.clyvovet.server.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ public class VeterinarioService {
 
     private final VeterinarioRepository repository;
     private final ClinicaService clinicaService;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
     public Page<VeterinarioResponse> findAll(Pageable pageable) {
@@ -43,6 +45,8 @@ public class VeterinarioService {
         v.setNome(request.nome());
         v.setCrmv(request.crmv());
         v.setEspecialidade(request.especialidade());
+        v.setEmail(request.email());
+        v.setSenhaHash(passwordEncoder.encode(request.senha()));
         v.setClinica(clinicaService.findEntityById(request.clinicaId()));
         return VeterinarioResponse.from(repository.save(v));
     }
@@ -54,6 +58,8 @@ public class VeterinarioService {
         v.setNome(request.nome());
         v.setCrmv(request.crmv());
         v.setEspecialidade(request.especialidade());
+        v.setEmail(request.email());
+        v.setSenhaHash(passwordEncoder.encode(request.senha()));
         v.setClinica(clinicaService.findEntityById(request.clinicaId()));
         return VeterinarioResponse.from(repository.save(v));
     }
