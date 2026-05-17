@@ -9,14 +9,28 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.Set;
+
 @Component
 @RequiredArgsConstructor
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final JwtService jwtService;
 
+    // POST público — cadastro sem autenticação prévia
+    private static final Set<String> PUBLIC_POST_PATHS = Set.of(
+            "/tutores",
+            "/clinicas",
+            "/veterinarios"
+    );
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if ("POST".equalsIgnoreCase(request.getMethod())
+                && PUBLIC_POST_PATHS.contains(request.getRequestURI())) {
+            return true;
+        }
+
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
