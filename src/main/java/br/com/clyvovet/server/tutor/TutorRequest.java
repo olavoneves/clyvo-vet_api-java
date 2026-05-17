@@ -10,6 +10,6 @@ public record TutorRequest(
         @NotBlank @Email @Size(max = 150) String email,
         @Size(max = 20) String telefone,
         @Size(max = 20) String telefoneEmergencia,
-        @NotBlank @Size(max = 255) String senhaHash,
+        @NotBlank @Size(min = 6, max = 100) String senha,
         CanalPreferencial canalPreferencial
 ) {}

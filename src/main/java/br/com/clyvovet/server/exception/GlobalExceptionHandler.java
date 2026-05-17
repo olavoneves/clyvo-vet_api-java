@@ -1,5 +1,7 @@
 package br.com.clyvovet.server.exception;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -54,6 +56,33 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
         pd.setType(URI.create("https://clinicavet.com/errors/business"));
         pd.setTitle("Business Rule Violation");
+        return pd;
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ProblemDetail handleUnauthorized(UnauthorizedException ex) {
+        log.warn("Unauthorized: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+        pd.setType(URI.create("https://clinicavet.com/errors/unauthorized"));
+        pd.setTitle("Unauthorized");
+        return pd;
+    }
+
+    @ExceptionHandler(ExpiredJwtException.class)
+    public ProblemDetail handleExpiredJwt(ExpiredJwtException ex) {
+        log.warn("Expired JWT: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Token expirado");
+        pd.setType(URI.create("https://clinicavet.com/errors/unauthorized"));
+        pd.setTitle("Token Expirado");
+        return pd;
+    }
+
+    @ExceptionHandler(JwtException.class)
+    public ProblemDetail handleJwt(JwtException ex) {
+        log.warn("Invalid JWT: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Token inválido");
+        pd.setType(URI.create("https://clinicavet.com/errors/unauthorized"));
+        pd.setTitle("Token Inválido");
         return pd;
     }
 }
