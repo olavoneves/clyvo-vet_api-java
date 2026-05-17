@@ -1,0 +1,67 @@
+# ============================================================
+#  CLYVO VET - Docker Compose
+#  Servicos: Oracle DB + API Java Spring Boot
+# ============================================================
+
+services:
+
+  # --------------------------------------------------------
+  #  BANCO DE DADOS ORACLE
+  # --------------------------------------------------------
+  oracle-db:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: oracle-clyvovet
+    environment:
+      - ORACLE_PASSWORD=PetFlow2026
+      - APP_USER=petflow
+      - APP_USER_PASSWORD=PetFlow2026
+      - ORACLE_DATABASE=PETFLOWDB
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    networks:
+      - clyvovet-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
+  # --------------------------------------------------------
+  #  API JAVA SPRING BOOT
+  # --------------------------------------------------------
+  api-java:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-clyvovet
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-db:1521/PETFLOWDB
+      - SPRING_DATASOURCE_USERNAME=petflow
+      - SPRING_DATASOURCE_PASSWORD=PetFlow2026
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=none
+      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.OracleDialect
+      - APP_JWT_SECRET=clyvovet-2026-local-dev-secret-key-docker!!
+    ports:
+      - "8080:8080"
+    networks:
+      - clyvovet-network
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+# --------------------------------------------------------
+#  VOLUME NOMEADO (persistencia dos dados do Oracle)
+# --------------------------------------------------------
+volumes:
+  oracle-data:
+
+# --------------------------------------------------------
+#  REDE DOCKER
+# --------------------------------------------------------
+networks:
+  clyvovet-network:
