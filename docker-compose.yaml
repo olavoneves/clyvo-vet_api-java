@@ -39,6 +39,7 @@ services:
       dockerfile: Dockerfile
     container_name: api-clyvovet
     environment:
+      - PORT=8080   
       - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-db:1521/PETFLOWDB
       - SPRING_DATASOURCE_USERNAME=petflow
       - SPRING_DATASOURCE_PASSWORD=PetFlow2026
