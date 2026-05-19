@@ -1,5 +1,7 @@
 package br.com.clyvovet.server.auth;
 
+import br.com.clyvovet.server.colaborador.Colaborador;
+import br.com.clyvovet.server.colaborador.ColaboradorRepository;
 import br.com.clyvovet.server.enums.TipoUsuario;
 import br.com.clyvovet.server.exception.UnauthorizedException;
 import br.com.clyvovet.server.tutor.Tutor;
@@ -21,6 +23,7 @@ public class AuthService {
 
     private final TutorRepository tutorRepository;
     private final VeterinarioRepository veterinarioRepository;
+    private final ColaboradorRepository colaboradorRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
@@ -40,12 +43,18 @@ public class AuthService {
             senhaHash = tutor.getSenhaHash();
             id = tutor.getId();
             nome = tutor.getNome();
-        } else {
+        } else if (request.tipo() == TipoUsuario.VETERINARIO) {
             Veterinario vet = veterinarioRepository.findByEmail(request.email())
                     .orElseThrow(() -> new UnauthorizedException("Credenciais inválidas"));
             senhaHash = vet.getSenhaHash();
             id = vet.getId();
             nome = vet.getNome();
+        } else {
+            Colaborador colaborador = colaboradorRepository.findByEmail(request.email())
+                    .orElseThrow(() -> new UnauthorizedException("Credenciais inválidas"));
+            senhaHash = colaborador.getSenhaHash();
+            id = colaborador.getId();
+            nome = colaborador.getNome();
         }
 
         if (!passwordEncoder.matches(request.senha(), senhaHash)) {
@@ -85,11 +94,16 @@ public class AuthService {
                     .orElseThrow(() -> new UnauthorizedException("Usuário não encontrado"));
             nome = tutor.getNome();
             email = tutor.getEmail();
-        } else {
+        } else if (stored.getTipoUsuario() == TipoUsuario.VETERINARIO) {
             Veterinario vet = veterinarioRepository.findById(stored.getIdUsuario())
                     .orElseThrow(() -> new UnauthorizedException("Usuário não encontrado"));
             nome = vet.getNome();
             email = vet.getEmail();
+        } else {
+            Colaborador colaborador = colaboradorRepository.findById(stored.getIdUsuario())
+                    .orElseThrow(() -> new UnauthorizedException("Usuário não encontrado"));
+            nome = colaborador.getNome();
+            email = colaborador.getEmail();
         }
 
         String newAccessToken = jwtService.generateAccessToken(
