@@ -62,6 +62,12 @@ public class AuthService {
         }
 
         String accessToken = jwtService.generateAccessToken(id, request.email(), nome, request.tipo());
+
+        // COLABORADOR não persiste refresh token — constraint do banco só aceita TUTOR/VETERINARIO
+        if (request.tipo() == TipoUsuario.COLABORADOR) {
+            return new LoginResponse(accessToken, null, request.tipo(), id, nome, request.email());
+        }
+
         String refreshTokenValue = UUID.randomUUID().toString();
 
         RefreshToken refreshToken = new RefreshToken();
