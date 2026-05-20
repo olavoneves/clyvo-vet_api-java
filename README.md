@@ -306,16 +306,35 @@ GET /pets/1/condicoes
 
 ## Deploy
 
-### Render
+### Render (produção)
 
-1. Conecte o repo no [render.com](https://render.com)
-2. Configure o runtime como **Docker**
-3. Branch de deploy: `main`
-4. Configure as 4 variáveis obrigatórias no dashboard da Render:
-   - `SPRING_DATASOURCE_URL`
-   - `SPRING_DATASOURCE_USERNAME`
-   - `SPRING_DATASOURCE_PASSWORD`
-   - `APP_JWT_SECRET`
+**API em produção:** `https://<seu-servico>.onrender.com`
+> Substitua pelo link gerado no dashboard da Render após o primeiro deploy.
+
+**Swagger em produção:** `https://<seu-servico>.onrender.com/swagger-ui.html`
+
+#### Configuração inicial
+
+1. Conecte o repositório no [render.com](https://render.com)
+2. Crie um novo serviço do tipo **Web Service**
+3. Selecione **Docker** como runtime (Render detecta o `Dockerfile` automaticamente)
+4. Branch de deploy: `main`
+5. Configure as variáveis de ambiente no dashboard:
+
+| Variável | Valor |
+|---|---|
+| `SPRING_DATASOURCE_URL` | `jdbc:oracle:thin:@oracle.fiap.com.br:1521:ORCL` |
+| `SPRING_DATASOURCE_USERNAME` | `rm563558` |
+| `SPRING_DATASOURCE_PASSWORD` | sua senha Oracle |
+| `APP_JWT_SECRET` | string aleatória com mínimo 32 caracteres |
+
+> A variável `PORT` **não precisa ser configurada** — a Render injeta automaticamente.
+
+#### Observações
+
+- O primeiro deploy demora ~5 min (build da imagem Docker)
+- A Render faz novo deploy automaticamente a cada push na `main`
+- Plano gratuito hiberna após 15 min de inatividade — a primeira requisição pode demorar ~30 s para "acordar" o serviço
 
 ### Azure VM
 
@@ -341,23 +360,21 @@ develop   ← desenvolvimento
 
 ## Screenshots
 
-> Adicione os prints na pasta `docs/images/` e referencie abaixo.
-
 ### Swagger UI
 
 ![Swagger UI](docs/images/swagger-ui.png)
 
 ### Login — POST /auth/login
 
-![Login](docs/images/auth-login.png)
+![Login](docs/images/login.png)
 
 ### Exemplo de listagem paginada
 
-![Listagem](docs/images/listagem-paginada.png)
+![Listagem](docs/images/listagem.png)
 
 ### Exemplo de erro (401 Unauthorized)
 
-![401](docs/images/erro-401.png)
+![401](docs/images/401.png)
 
 ---
 
