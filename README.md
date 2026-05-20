@@ -308,10 +308,10 @@ GET /pets/1/condicoes
 
 ### Render (produção)
 
-**API em produção:** `https://<seu-servico>.onrender.com`
+**API em produção:** `https://clyvo-vet-api-java.onrender.com`
 > Substitua pelo link gerado no dashboard da Render após o primeiro deploy.
 
-**Swagger em produção:** `https://<seu-servico>.onrender.com/swagger-ui.html`
+**Swagger em produção:** `https://clyvo-vet-api-java.onrender.com/swagger-ui.html`
 
 #### Configuração inicial
 
