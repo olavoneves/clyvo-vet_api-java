@@ -101,7 +101,8 @@ CREATE TABLE TB_CLV_LOG_ERRO (
     CONSTRAINT chk_log_ambiente CHECK (ds_ambiente IN ('DEV','HOM','PRD'))
 );
 
--- Sem FK (nr_id_usuario é polimórfico: pode referenciar TUTOR ou VETERINARIO)
+-- Sem FK (nr_id_usuario é polimórfico: pode referenciar TUTOR, VETERINARIO ou COLABORADOR)
+-- Nota: COLABORADOR não persiste refresh token via código (sessão sem refresh)
 CREATE TABLE TB_CLV_REFRESH_TOKEN (
     id_refresh_token NUMBER(19)    GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     ds_token         VARCHAR2(512) NOT NULL,
@@ -111,7 +112,7 @@ CREATE TABLE TB_CLV_REFRESH_TOKEN (
     fl_revogado      CHAR(1)       NOT NULL,
     dt_criacao       TIMESTAMP     NOT NULL,
     CONSTRAINT uk_refresh_token       UNIQUE (ds_token),
-    CONSTRAINT chk_refresh_tipo       CHECK  (ds_tipo_usuario IN ('TUTOR','VETERINARIO')),
+    CONSTRAINT chk_refresh_tipo       CHECK  (ds_tipo_usuario IN ('TUTOR','VETERINARIO','COLABORADOR')),
     CONSTRAINT chk_refresh_revogado   CHECK  (fl_revogado     IN ('S','N'))
 );
 
@@ -326,7 +327,18 @@ CREATE TABLE TB_CLV_ALERTA_IOT (
 );
 
 
+CREATE TABLE TB_CLV_COLABORADOR (
+    id_colaborador  NUMBER          GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nm_colaborador  VARCHAR2(100)   NOT NULL,
+    ds_email        VARCHAR2(150)   NOT NULL,
+    ds_senha_hash   VARCHAR2(255)   NOT NULL,
+    ds_cargo        VARCHAR2(100)
+);
+
+CREATE UNIQUE INDEX UQ_CLV_COLABORADOR_EMAIL ON TB_CLV_COLABORADOR (ds_email);
+
+
 -- ============================================================
 -- FIM DO SCRIPT
--- Total: 24 tabelas criadas
+-- Total: 25 tabelas criadas
 -- ============================================================

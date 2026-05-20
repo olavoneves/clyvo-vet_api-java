@@ -17,11 +17,11 @@ public class DataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (colaboradorRepository.findByEmail("master").isPresent()) return;
+        if (colaboradorRepository.findByEmail("master@clyvovet.com").isPresent()) return;
 
         Colaborador master = new Colaborador();
         master.setNome("master");
-        master.setEmail("master");
+        master.setEmail("master@clyvovet.com");
         master.setSenhaHash(passwordEncoder.encode("master"));
         master.setCargo("master");
         colaboradorRepository.save(master);
