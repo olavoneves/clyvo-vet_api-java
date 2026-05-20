@@ -339,6 +339,28 @@ develop   ← desenvolvimento
 
 ---
 
+## Screenshots
+
+> Adicione os prints na pasta `docs/images/` e referencie abaixo.
+
+### Swagger UI
+
+![Swagger UI](docs/images/swagger-ui.png)
+
+### Login — POST /auth/login
+
+![Login](docs/images/auth-login.png)
+
+### Exemplo de listagem paginada
+
+![Listagem](docs/images/listagem-paginada.png)
+
+### Exemplo de erro (401 Unauthorized)
+
+![401](docs/images/erro-401.png)
+
+---
+
 ## Documentação completa
 
 Acesse o Swagger após subir a aplicação:
