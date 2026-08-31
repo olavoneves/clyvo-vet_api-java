@@ -1,9 +1,12 @@
 package br.com.clyvovet.server.tutor;
 
+import br.com.clyvovet.server.clinica.Clinica;
 import br.com.clyvovet.server.enums.CanalPreferencial;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDate;
 
@@ -11,6 +14,7 @@ import java.time.LocalDate;
 @Table(name = "TB_CLV_TUTOR")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO)
 public class Tutor {
 
     @Id
@@ -39,4 +43,8 @@ public class Tutor {
 
     @Column(name = "dt_cadastro")
     private LocalDate dtCadastro;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_clinica", nullable = false)
+    private Clinica clinica;
 }

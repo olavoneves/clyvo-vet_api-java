@@ -11,11 +11,13 @@ public record TutorResponse(
         String telefone,
         String telefoneEmergencia,
         CanalPreferencial canalPreferencial,
-        LocalDate dtCadastro
+        LocalDate dtCadastro,
+        Long clinicaId
 ) {
     public static TutorResponse from(Tutor t) {
         return new TutorResponse(
                 t.getId(), t.getNome(), t.getEmail(), t.getTelefone(),
-                t.getTelefoneEmergencia(), t.getCanalPreferencial(), t.getDtCadastro());
+                t.getTelefoneEmergencia(), t.getCanalPreferencial(), t.getDtCadastro(),
+                t.getClinica().getId());
     }
 }

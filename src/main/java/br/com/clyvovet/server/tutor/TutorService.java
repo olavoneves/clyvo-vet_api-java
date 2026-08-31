@@ -1,5 +1,6 @@
 package br.com.clyvovet.server.tutor;
 
+import br.com.clyvovet.server.clinica.ClinicaService;
 import br.com.clyvovet.server.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,6 +16,7 @@ import java.time.LocalDate;
 public class TutorService {
 
     private final TutorRepository repository;
+    private final ClinicaService clinicaService;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
@@ -44,6 +46,8 @@ public class TutorService {
         t.setSenhaHash(passwordEncoder.encode(request.senha()));
         t.setCanalPreferencial(request.canalPreferencial());
         t.setDtCadastro(LocalDate.now());
+        // rota pública, sem token: a clínica vem do corpo porque não há tenant ainda
+        t.setClinica(clinicaService.findEntityById(request.clinicaId()));
         return TutorResponse.from(repository.save(t));
     }
 
@@ -57,6 +61,8 @@ public class TutorService {
         t.setTelefoneEmergencia(request.telefoneEmergencia());
         t.setSenhaHash(passwordEncoder.encode(request.senha()));
         t.setCanalPreferencial(request.canalPreferencial());
+        // clinicaId é ignorado de propósito: mover um tutor entre clínicas
+        // não é um PUT de cadastro, e o filtro de tenant já barra o cross-clinic
         return TutorResponse.from(repository.save(t));
     }
 

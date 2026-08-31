@@ -2,10 +2,12 @@ package br.com.clyvovet.server.iot.sensor;
 
 import br.com.clyvovet.server.converter.SimNaoConverter;
 import br.com.clyvovet.server.pet.Pet;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import br.com.clyvovet.server.tiposensor.TipoSensor;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDate;
 
@@ -13,6 +15,7 @@ import java.time.LocalDate;
 @Table(name = "TB_CLV_SENSOR_IOT")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO_VIA_PET)
 public class SensorIot {
 
     @Id
@@ -38,6 +41,6 @@ public class SensorIot {
     private LocalDate dtUltimaGalibracao;
 
     @Convert(converter = SimNaoConverter.class)
-    @Column(name = "fl_ativo", length = 1)
+    @Column(name = "fl_ativo", columnDefinition = "CHAR(1)")
     private Boolean ativo;
 }

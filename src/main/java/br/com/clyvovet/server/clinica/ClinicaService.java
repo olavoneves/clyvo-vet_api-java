@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 @Service
 @RequiredArgsConstructor
 public class ClinicaService {
@@ -61,5 +63,7 @@ public class ClinicaService {
         c.setEstado(r.estado());
         c.setCep(r.cep());
         c.setTelefone(r.telefone());
+        // NOT NULL no banco: clinica sem historico entra com zero
+        c.setNrTicketMedio(r.nrTicketMedio() != null ? r.nrTicketMedio() : BigDecimal.ZERO);
     }
 }

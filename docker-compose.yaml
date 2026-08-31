@@ -43,7 +43,6 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle-db:1521/PETFLOWDB
       - SPRING_DATASOURCE_USERNAME=petflow
       - SPRING_DATASOURCE_PASSWORD=PetFlow2026
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.OracleDialect
       - APP_JWT_SECRET=clyvovet-2026-local-dev-secret-key-docker!!
     ports:

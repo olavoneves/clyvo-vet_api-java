@@ -1,9 +1,11 @@
 package br.com.clyvovet.server.iot.leitura;
 
 import br.com.clyvovet.server.iot.sensor.SensorIot;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 @Table(name = "TB_CLV_LEITURA_IOT")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO_VIA_SENSOR)
 public class LeituraIot {
 
     @Id

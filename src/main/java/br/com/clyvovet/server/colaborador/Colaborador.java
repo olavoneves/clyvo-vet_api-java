@@ -1,13 +1,17 @@
 package br.com.clyvovet.server.colaborador;
 
+import br.com.clyvovet.server.clinica.Clinica;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "TB_CLV_COLABORADOR")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO)
 public class Colaborador {
 
     @Id
@@ -26,4 +30,8 @@ public class Colaborador {
 
     @Column(name = "ds_cargo", length = 100)
     private String cargo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_clinica", nullable = false)
+    private Clinica clinica;
 }

@@ -2,9 +2,11 @@ package br.com.clyvovet.server.anamnese;
 
 import br.com.clyvovet.server.consulta.Consulta;
 import br.com.clyvovet.server.enums.CondicaoCorporal;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.math.BigDecimal;
 
@@ -12,6 +14,7 @@ import java.math.BigDecimal;
 @Table(name = "TB_CLV_ANAMNESE")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO_VIA_CONSULTA)
 public class Anamnese {
 
     @Id

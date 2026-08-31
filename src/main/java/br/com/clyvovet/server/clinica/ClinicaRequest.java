@@ -2,7 +2,10 @@ package br.com.clyvovet.server.clinica;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+
+import java.math.BigDecimal;
 
 public record ClinicaRequest(
         @NotBlank @Size(max = 120) String nome,
@@ -13,5 +16,7 @@ public record ClinicaRequest(
         @NotBlank @Size(max = 80) String cidade,
         @NotBlank @Size(min = 2, max = 2) String estado,
         @Pattern(regexp = "\\d{8}", message = "CEP deve ter 8 dígitos") String cep,
-        @Size(max = 20) String telefone
+        @Size(max = 20) String telefone,
+        // opcional no cadastro: clínica nova ainda não tem histórico para calcular
+        @PositiveOrZero BigDecimal nrTicketMedio
 ) {}
