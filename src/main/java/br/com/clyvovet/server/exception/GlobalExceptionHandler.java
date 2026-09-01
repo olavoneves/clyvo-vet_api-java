@@ -59,6 +59,15 @@ public class GlobalExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(ConflitoDeEstadoException.class)
+    public ProblemDetail handleConflitoDeEstado(ConflitoDeEstadoException ex) {
+        log.warn("Conflito de estado: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setType(URI.create("https://clinicavet.com/errors/conflito-de-estado"));
+        pd.setTitle("State Conflict");
+        return pd;
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ProblemDetail handleUnauthorized(UnauthorizedException ex) {
         log.warn("Unauthorized: {}", ex.getMessage());

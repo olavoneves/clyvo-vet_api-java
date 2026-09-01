@@ -5,6 +5,9 @@ import br.com.clyvovet.server.anamnese.AnamneseService;
 import br.com.clyvovet.server.enums.ConsultaStatus;
 import br.com.clyvovet.server.exame.ExameResponse;
 import br.com.clyvovet.server.exame.ExameService;
+import br.com.clyvovet.server.obrigacao.GerarObrigacoesRequest;
+import br.com.clyvovet.server.obrigacao.GerarObrigacoesResponse;
+import br.com.clyvovet.server.obrigacao.ObrigacaoService;
 import br.com.clyvovet.server.prescricao.PrescricaoResponse;
 import br.com.clyvovet.server.prescricao.PrescricaoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +17,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -28,6 +32,7 @@ import java.util.List;
 public class ConsultaController {
 
     private final ConsultaService service;
+    private final ObrigacaoService obrigacaoService;
     private final AnamneseService anamneseService;
     private final PrescricaoService prescricaoService;
     private final ExameService exameService;
@@ -92,5 +97,14 @@ public class ConsultaController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/obrigacoes")
+    @Operation(summary = "Gerar obrigacoes a partir do gatilho desta consulta")
+    @ApiResponse(responseCode = "201", description = "Obrigacoes materializadas pelo motor")
+    @ResponseStatus(HttpStatus.CREATED)
+    public GerarObrigacoesResponse gerarObrigacoes(@PathVariable Long id,
+                                                   @Valid @RequestBody GerarObrigacoesRequest request) {
+        return obrigacaoService.gerarParaConsulta(id, request);
     }
 }

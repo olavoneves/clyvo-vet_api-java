@@ -20,6 +20,14 @@ public final class TenantFilters {
     /** Tabelas que carregam id_clinica: pet, tutor, colaborador, veterinario. */
     public static final String CONDICAO = "id_clinica = :idClinica";
 
+    /**
+     * Catalogo de protocolo: id_clinica NULL significa protocolo global, valido
+     * para todas as clinicas. Filtrar sem tolerar o NULL esconderia justamente
+     * os protocolos padrao — e quebraria a obrigacao que aponta para eles.
+     */
+    public static final String CONDICAO_CATALOGO =
+            "(id_clinica is null or id_clinica = :idClinica)";
+
     /** Filhos diretos do pet: consulta, agendamento, vacina, alergia, condicao, sensor. */
     public static final String CONDICAO_VIA_PET =
             "id_pet in (select p.id_pet from TB_CLV_PET p where p.id_clinica = :idClinica)";

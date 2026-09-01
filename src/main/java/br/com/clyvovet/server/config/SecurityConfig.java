@@ -60,7 +60,10 @@ public class SecurityConfig {
             "/exames/**",
             "/vacinas/**",
             "/alergias-pet/**",
-            "/condicoes-pet/**"
+            "/condicoes-pet/**",
+            // motor de protocolo: obrigacao e receita sao gestao da clinica
+            "/obrigacoes/**",
+            "/painel/**"
     };
 
     private final JwtService jwtService;
