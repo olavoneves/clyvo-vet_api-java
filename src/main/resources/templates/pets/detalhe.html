@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: pagina('Ficha do pet', ~{::main}, ~{})}">
+<head><title>Ficha do pet</title></head>
+<body>
+
+<main class="conteudo">
+
+    <div class="cabecalho-tela">
+        <div>
+            <p class="migalha"><a th:href="@{/pets}">Pets</a> / ficha</p>
+            <h1 th:text="${pet.nome}">Nome do pet</h1>
+            <p class="subtitulo"
+               th:text="|${pet.especieNome} · ${pet.racaNome} · ${pet.porte}|">Espécie · raça</p>
+        </div>
+        <span class="etiqueta etiqueta-grande"
+              th:classappend="'etiqueta-' + ${#strings.toLowerCase(pet.status)}"
+              th:text="${pet.status}">STATUS</span>
+    </div>
+
+    <section class="bloco">
+        <h2 class="titulo-bloco">Dados</h2>
+        <dl class="ficha">
+            <div><dt>Nascimento</dt>
+                <dd th:text="${pet.dtNascimento != null} ? ${#temporals.format(pet.dtNascimento, 'dd/MM/yyyy')} : 'não informado'">—</dd></div>
+            <div><dt>Sexo</dt><dd th:text="${pet.sexo}">—</dd></div>
+            <div><dt>Castrado</dt><dd th:text="${pet.castrado} ? 'Sim' : 'Não'">—</dd></div>
+            <div><dt>Pelagem</dt><dd th:text="${pet.pelagem} ?: 'não informada'">—</dd></div>
+            <div><dt>Microchip</dt><dd th:text="${pet.microchip} ?: 'sem microchip'">—</dd></div>
+            <div><dt>RGA</dt><dd th:text="${pet.rga} ?: 'sem RGA'">—</dd></div>
+        </dl>
+    </section>
+
+    <section class="bloco">
+        <h2 class="titulo-bloco">Tutor</h2>
+        <dl class="ficha">
+            <div><dt>Nome</dt><dd th:text="${pet.tutorNome}">—</dd></div>
+            <div><dt>E-mail</dt><dd th:text="${pet.tutorEmail}">—</dd></div>
+            <div><dt>Telefone</dt><dd th:text="${pet.tutorTelefone} ?: 'não informado'">—</dd></div>
+        </dl>
+    </section>
+
+    <section class="bloco" th:if="${pet.observacaoGeral}">
+        <h2 class="titulo-bloco">Observação geral</h2>
+        <p class="observacao" th:text="${pet.observacaoGeral}">—</p>
+    </section>
+
+    <section class="bloco">
+        <h2 class="titulo-bloco">Obrigações do protocolo</h2>
+        <p class="ajuda">
+            Compromissos de cuidado que o motor gerou para este pet, do mais recente ao mais antigo.
+        </p>
+
+        <div class="tabela-rolagem">
+            <table class="tabela">
+                <thead>
+                <tr>
+                    <th>Prevista</th>
+                    <th>Etapa</th>
+                    <th>Protocolo</th>
+                    <th>Janela</th>
+                    <th>Grupo</th>
+                    <th>Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="o : ${obrigacoes}">
+                    <td th:text="${#temporals.format(o.dtPrevista, 'dd/MM/yyyy')}">—</td>
+                    <td><strong th:text="${o.etapaNome}">Etapa</strong></td>
+                    <td th:text="${o.protocoloNome}">Protocolo</td>
+                    <td th:text="|${#temporals.format(o.dtJanelaInicio, 'dd/MM')} a ${#temporals.format(o.dtJanelaFim, 'dd/MM')}|">—</td>
+                    <td th:text="${o.grupoControle} ? 'Controle' : 'Tratado'">—</td>
+                    <td>
+                        <span class="etiqueta"
+                              th:classappend="'etiqueta-' + ${#strings.toLowerCase(o.status)}"
+                              th:text="${o.status}">STATUS</span>
+                    </td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(obrigacoes)}">
+                    <td colspan="6" class="tabela-vazia">
+                        Nenhuma obrigação gerada para este pet ainda.
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+
+</body>
+</html>

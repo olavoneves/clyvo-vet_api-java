@@ -21,12 +21,24 @@ public record AuthenticatedUser(
         Long idClinica
 ) {
 
-    /** Usuario da requisicao em curso, quando ha uma autenticada. */
+    /**
+     * Usuario da requisicao em curso, quando ha uma autenticada.
+     *
+     * <p>Aceita as duas portas de entrada: o JWT da API guarda este record como
+     * principal, e o login por formulario guarda um {@link ClinicaUserDetails}
+     * que o embrulha. Quem consome a identidade — tenant, auditoria — nao
+     * precisa saber a diferenca.
+     */
     public static Optional<AuthenticatedUser> atual() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser usuario
-                ? Optional.of(usuario)
-                : Optional.empty();
+        if (authentication == null) {
+            return Optional.empty();
+        }
+        return switch (authentication.getPrincipal()) {
+            case AuthenticatedUser usuario -> Optional.of(usuario);
+            case ClinicaUserDetails detalhes -> Optional.of(detalhes.usuario());
+            case null, default -> Optional.empty();
+        };
     }
 
     /** Como o usuario aparece na trilha de auditoria do motor. */
