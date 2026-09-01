@@ -1,14 +1,19 @@
 -- ============================================================
--- CLYVO VET — DDL COMPLETO (Oracle)
--- Criação de todas as tabelas com constraints e FKs inline
--- Ordem respeita dependências entre tabelas
+-- MIGRATION V0 - Schema base (Oracle)
+-- ============================================================
+-- Primeiro degrau da cadeia de migrations. Cria as 23 tabelas do
+-- modelo inicial SEM foreign keys: elas vem na V0.1, para que a ordem
+-- de criacao das tabelas nao importe.
 --
--- Executar como: rm564495
--- Ambiente local: Oracle XE / Oracle Developer
+-- Este arquivo representa o schema ANTES da V1. Por isso NAO cria
+-- TB_CLV_REFRESH_TOKEN nem TB_CLV_COLABORADOR, e TB_CLV_VETERINARIO
+-- nasce sem ds_email/ds_senha_hash: essas mudancas sao das V1 e V2.
+-- Duplicar aqui faria a V1 e a V2 falharem com ORA-00955 / ORA-01430
+-- num banco vazio.
 --
--- NOTA: Este script é para uso em ambiente LOCAL (fresh install).
---       Para o banco FIAP (oracle.fiap.com.br), usar os scripts
---       individuais: V0__foreign_keys.sql e V1__veterinario_auth_e_refresh_token.sql
+-- No Oracle da FIAP nada disto executa: o schema ja existe e o Flyway
+-- esta com baseline acima desta versao. Num banco limpo (o container do
+-- docker-compose, por exemplo) a cadeia V0 -> V0.1 -> V1 ... roda inteira.
 -- ============================================================
 
 
@@ -101,20 +106,6 @@ CREATE TABLE TB_CLV_LOG_ERRO (
     CONSTRAINT chk_log_ambiente CHECK (ds_ambiente IN ('DEV','HOM','PRD'))
 );
 
--- Sem FK (nr_id_usuario é polimórfico: pode referenciar TUTOR, VETERINARIO ou COLABORADOR)
--- Nota: COLABORADOR não persiste refresh token via código (sessão sem refresh)
-CREATE TABLE TB_CLV_REFRESH_TOKEN (
-    id_refresh_token NUMBER(19)    GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    ds_token         VARCHAR2(512) NOT NULL,
-    ds_tipo_usuario  VARCHAR2(15)  NOT NULL,
-    nr_id_usuario    NUMBER(19)    NOT NULL,
-    dt_expiracao     TIMESTAMP     NOT NULL,
-    fl_revogado      CHAR(1)       NOT NULL,
-    dt_criacao       TIMESTAMP     NOT NULL,
-    CONSTRAINT uk_refresh_token       UNIQUE (ds_token),
-    CONSTRAINT chk_refresh_tipo       CHECK  (ds_tipo_usuario IN ('TUTOR','VETERINARIO','COLABORADOR')),
-    CONSTRAINT chk_refresh_revogado   CHECK  (fl_revogado     IN ('S','N'))
-);
 
 
 -- ============================================================
@@ -125,8 +116,7 @@ CREATE TABLE TB_CLV_REFRESH_TOKEN (
 CREATE TABLE TB_CLV_RACA (
     id_raca    NUMBER(19)   GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nm_raca    VARCHAR2(80) NOT NULL,
-    id_especie NUMBER(19)   NOT NULL,
-    CONSTRAINT fk_raca_especie FOREIGN KEY (id_especie) REFERENCES TB_CLV_ESPECIE (id_especie)
+    id_especie NUMBER(19)   NOT NULL
 );
 
 -- Depende: TB_CLV_CLINICA
@@ -135,12 +125,8 @@ CREATE TABLE TB_CLV_VETERINARIO (
     nm_veterinario   VARCHAR2(100) NOT NULL,
     nr_crmv          VARCHAR2(20)  NOT NULL,
     ds_especialidade VARCHAR2(100),
-    ds_email         VARCHAR2(150) NOT NULL,
-    ds_senha_hash    VARCHAR2(255) NOT NULL,
     id_clinica       NUMBER(19)    NOT NULL,
-    CONSTRAINT uk_veterinario_crmv  UNIQUE (nr_crmv),
-    CONSTRAINT uk_veterinario_email UNIQUE (ds_email),
-    CONSTRAINT fk_vet_clinica FOREIGN KEY (id_clinica) REFERENCES TB_CLV_CLINICA (id_clinica)
+    CONSTRAINT uk_veterinario_crmv  UNIQUE (nr_crmv)
 );
 
 -- Depende: TB_CLV_TUTOR, TB_CLV_RACA
@@ -162,9 +148,7 @@ CREATE TABLE TB_CLV_PET (
     CONSTRAINT chk_pet_sexo      CHECK  (ds_sexo      IN ('M','F','I')),
     CONSTRAINT chk_pet_porte     CHECK  (ds_porte     IN ('MINI','PEQUENO','MEDIO','GRANDE','GIGANTE')),
     CONSTRAINT chk_pet_castrado  CHECK  (fl_castrado  IN ('S','N')),
-    CONSTRAINT chk_pet_status    CHECK  (ds_status_pet IN ('ATIVO','EM_TRATAMENTO','OBITO','PERDIDO')),
-    CONSTRAINT fk_pet_tutor FOREIGN KEY (id_tutor) REFERENCES TB_CLV_TUTOR (id_tutor),
-    CONSTRAINT fk_pet_raca  FOREIGN KEY (id_raca)  REFERENCES TB_CLV_RACA  (id_raca)
+    CONSTRAINT chk_pet_status    CHECK  (ds_status_pet IN ('ATIVO','EM_TRATAMENTO','OBITO','PERDIDO'))
 );
 
 -- Depende: TB_CLV_PET, TB_CLV_VETERINARIO
@@ -176,9 +160,7 @@ CREATE TABLE TB_CLV_CONSULTA (
     ds_status      VARCHAR2(20),
     id_pet         NUMBER(19)     NOT NULL,
     id_veterinario NUMBER(19)     NOT NULL,
-    CONSTRAINT chk_consulta_status CHECK  (ds_status IN ('AGENDADA','REALIZADA','CANCELADA','EM_ATENDIMENTO')),
-    CONSTRAINT fk_consulta_pet FOREIGN KEY (id_pet)         REFERENCES TB_CLV_PET        (id_pet),
-    CONSTRAINT fk_consulta_vet FOREIGN KEY (id_veterinario) REFERENCES TB_CLV_VETERINARIO (id_veterinario)
+    CONSTRAINT chk_consulta_status CHECK  (ds_status IN ('AGENDADA','REALIZADA','CANCELADA','EM_ATENDIMENTO'))
 );
 
 -- Depende: TB_CLV_PET, TB_CLV_VETERINARIO, TB_CLV_CONSULTA (nullable)
@@ -193,10 +175,7 @@ CREATE TABLE TB_CLV_AGENDAMENTO (
     id_veterinario         NUMBER(19)    NOT NULL,
     id_consulta            NUMBER(19),               -- nullable: agendamento ainda não convertido
     CONSTRAINT chk_agend_status  CHECK  (ds_status      IN ('SOLICITADO','CONFIRMADO','CANCELADO','REALIZADO')),
-    CONSTRAINT chk_agend_canal   CHECK  (ds_canal_origem IN ('APP','WEB','WHATSAPP')),
-    CONSTRAINT fk_agend_pet      FOREIGN KEY (id_pet)         REFERENCES TB_CLV_PET        (id_pet),
-    CONSTRAINT fk_agend_vet      FOREIGN KEY (id_veterinario) REFERENCES TB_CLV_VETERINARIO (id_veterinario),
-    CONSTRAINT fk_agend_consulta FOREIGN KEY (id_consulta)    REFERENCES TB_CLV_CONSULTA    (id_consulta)
+    CONSTRAINT chk_agend_canal   CHECK  (ds_canal_origem IN ('APP','WEB','WHATSAPP'))
 );
 
 -- Depende: TB_CLV_CONSULTA (1:1 — unique na coluna)
@@ -214,8 +193,7 @@ CREATE TABLE TB_CLV_ANAMNESE (
     ds_linfonodos           VARCHAR2(100),
     ds_observacoes_clinicas VARCHAR2(2000),
     CONSTRAINT uk_anamnese_consulta  UNIQUE (id_consulta),
-    CONSTRAINT chk_anamnese_condicao CHECK  (ds_condicao_corporal IN ('CAQUEXIA','MAGRO','IDEAL','SOBREPESO','OBESO')),
-    CONSTRAINT fk_anamnese_consulta  FOREIGN KEY (id_consulta) REFERENCES TB_CLV_CONSULTA (id_consulta)
+    CONSTRAINT chk_anamnese_condicao CHECK  (ds_condicao_corporal IN ('CAQUEXIA','MAGRO','IDEAL','SOBREPESO','OBESO'))
 );
 
 -- Depende: TB_CLV_CONSULTA, TB_CLV_MEDICAMENTO
@@ -225,9 +203,7 @@ CREATE TABLE TB_CLV_PRESCRICAO (
     id_medicamento  NUMBER(19)    NOT NULL,
     ds_dosagem      VARCHAR2(100) NOT NULL,
     ds_frequencia   VARCHAR2(100),
-    nr_duracao_dias NUMBER(10),
-    CONSTRAINT fk_prescricao_consulta    FOREIGN KEY (id_consulta)    REFERENCES TB_CLV_CONSULTA   (id_consulta),
-    CONSTRAINT fk_prescricao_medicamento FOREIGN KEY (id_medicamento) REFERENCES TB_CLV_MEDICAMENTO (id_medicamento)
+    nr_duracao_dias NUMBER(10)
 );
 
 -- Depende: TB_CLV_CONSULTA, TB_CLV_VETERINARIO (nullable)
@@ -238,8 +214,6 @@ CREATE TABLE TB_CLV_EXAME (
     ds_resultado       VARCHAR2(2000),
     id_consulta        NUMBER(19)     NOT NULL,
     id_vet_solicitante NUMBER(19),                    -- nullable
-    CONSTRAINT fk_exame_consulta        FOREIGN KEY (id_consulta)        REFERENCES TB_CLV_CONSULTA    (id_consulta),
-    CONSTRAINT fk_exame_vet_solicitante FOREIGN KEY (id_vet_solicitante) REFERENCES TB_CLV_VETERINARIO (id_veterinario)
 );
 
 -- Depende: TB_CLV_PET, TB_CLV_TIPO_VACINA, TB_CLV_VETERINARIO, TB_CLV_CONSULTA (nullable)
@@ -251,11 +225,7 @@ CREATE TABLE TB_CLV_APLICACAO_VACINA (
     id_consulta    NUMBER(19),                        -- nullable: vacina pode ser fora de consulta
     dt_aplicacao   DATE        NOT NULL,
     nr_dose        NUMBER(10),
-    nr_lote        VARCHAR2(30),
-    CONSTRAINT fk_vacina_pet      FOREIGN KEY (id_pet)         REFERENCES TB_CLV_PET        (id_pet),
-    CONSTRAINT fk_vacina_tipo     FOREIGN KEY (id_tipo_vacina) REFERENCES TB_CLV_TIPO_VACINA (id_tipo_vacina),
-    CONSTRAINT fk_vacina_vet      FOREIGN KEY (id_veterinario) REFERENCES TB_CLV_VETERINARIO (id_veterinario),
-    CONSTRAINT fk_vacina_consulta FOREIGN KEY (id_consulta)    REFERENCES TB_CLV_CONSULTA    (id_consulta)
+    nr_lote        VARCHAR2(30)
 );
 
 -- Depende: TB_CLV_PET, TB_CLV_TIPO_ALERGIA, TB_CLV_CONSULTA (nullable)
@@ -267,10 +237,7 @@ CREATE TABLE TB_CLV_ALERGIA_PET (
     ds_severidade      VARCHAR2(10),
     dt_identificacao   DATE          NOT NULL,
     id_consulta_origem NUMBER(19),                    -- nullable
-    CONSTRAINT chk_alergia_severidade     CHECK  (ds_severidade IN ('LEVE','MODERADA','GRAVE','ANAFILAXIA')),
-    CONSTRAINT fk_alergia_pet             FOREIGN KEY (id_pet)              REFERENCES TB_CLV_PET          (id_pet),
-    CONSTRAINT fk_alergia_tipo            FOREIGN KEY (id_tipo_alergia)     REFERENCES TB_CLV_TIPO_ALERGIA  (id_tipo_alergia),
-    CONSTRAINT fk_alergia_consulta_origem FOREIGN KEY (id_consulta_origem)  REFERENCES TB_CLV_CONSULTA      (id_consulta)
+    CONSTRAINT chk_alergia_severidade     CHECK  (ds_severidade IN ('LEVE','MODERADA','GRAVE','ANAFILAXIA'))
 );
 
 -- Depende: TB_CLV_PET, TB_CLV_TIPO_CONDICAO, TB_CLV_CONSULTA (nullable)
@@ -282,10 +249,7 @@ CREATE TABLE TB_CLV_CONDICAO_PET (
     ds_observacao      VARCHAR2(500),
     fl_ativo           CHAR(1),
     id_consulta_origem NUMBER(19),                    -- nullable
-    CONSTRAINT chk_condicao_ativo          CHECK  (fl_ativo IN ('S','N')),
-    CONSTRAINT fk_condicao_pet             FOREIGN KEY (id_pet)             REFERENCES TB_CLV_PET           (id_pet),
-    CONSTRAINT fk_condicao_tipo            FOREIGN KEY (id_tipo_condicao)   REFERENCES TB_CLV_TIPO_CONDICAO  (id_tipo_condicao),
-    CONSTRAINT fk_condicao_consulta_origem FOREIGN KEY (id_consulta_origem) REFERENCES TB_CLV_CONSULTA       (id_consulta)
+    CONSTRAINT chk_condicao_ativo          CHECK  (fl_ativo IN ('S','N'))
 );
 
 -- Depende: TB_CLV_TIPO_SENSOR, TB_CLV_PET
@@ -297,9 +261,7 @@ CREATE TABLE TB_CLV_SENSOR_IOT (
     dt_instalacao        DATE          NOT NULL,
     dt_ultima_calibracao DATE,
     fl_ativo             CHAR(1),
-    CONSTRAINT chk_sensor_ativo CHECK  (fl_ativo IN ('S','N')),
-    CONSTRAINT fk_sensor_tipo   FOREIGN KEY (id_tipo_sensor) REFERENCES TB_CLV_TIPO_SENSOR (id_tipo_sensor),
-    CONSTRAINT fk_sensor_pet    FOREIGN KEY (id_pet)         REFERENCES TB_CLV_PET          (id_pet)
+    CONSTRAINT chk_sensor_ativo CHECK  (fl_ativo IN ('S','N'))
 );
 
 -- Depende: TB_CLV_SENSOR_IOT
@@ -307,8 +269,7 @@ CREATE TABLE TB_CLV_LEITURA_IOT (
     id_leitura NUMBER(19)    GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     id_sensor  NUMBER(19)    NOT NULL,
     dt_leitura TIMESTAMP     NOT NULL,
-    nr_valor   NUMBER(10,4)  NOT NULL,
-    CONSTRAINT fk_leitura_sensor FOREIGN KEY (id_sensor) REFERENCES TB_CLV_SENSOR_IOT (id_sensor)
+    nr_valor   NUMBER(10,4)  NOT NULL
 );
 
 -- Depende: TB_CLV_LEITURA_IOT, TB_CLV_CONSULTA (nullable)
@@ -321,21 +282,11 @@ CREATE TABLE TB_CLV_ALERTA_IOT (
     fl_resolvido  CHAR(1),
     id_consulta   NUMBER(19),                         -- nullable
     CONSTRAINT chk_alerta_severidade CHECK  (ds_severidade IN ('BAIXA','MEDIA','ALTA','CRITICA')),
-    CONSTRAINT chk_alerta_resolvido  CHECK  (fl_resolvido  IN ('S','N')),
-    CONSTRAINT fk_alerta_leitura     FOREIGN KEY (id_leitura)  REFERENCES TB_CLV_LEITURA_IOT (id_leitura),
-    CONSTRAINT fk_alerta_consulta    FOREIGN KEY (id_consulta) REFERENCES TB_CLV_CONSULTA     (id_consulta)
+    CONSTRAINT chk_alerta_resolvido  CHECK  (fl_resolvido  IN ('S','N'))
 );
 
 
-CREATE TABLE TB_CLV_COLABORADOR (
-    id_colaborador  NUMBER          GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nm_colaborador  VARCHAR2(100)   NOT NULL,
-    ds_email        VARCHAR2(150)   NOT NULL,
-    ds_senha_hash   VARCHAR2(255)   NOT NULL,
-    ds_cargo        VARCHAR2(100)
-);
 
-CREATE UNIQUE INDEX UQ_CLV_COLABORADOR_EMAIL ON TB_CLV_COLABORADOR (ds_email);
 
 
 -- ============================================================

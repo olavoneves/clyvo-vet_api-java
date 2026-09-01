@@ -38,15 +38,18 @@ public class SecurityConfig {
             "/auth/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
-            "/v3/api-docs/**",
-            "/actuator/**"
+            "/v3/api-docs/**"
     };
 
-    /** Cadastro inicial: quem chama ainda nao tem token para apresentar. */
+    /**
+     * Os dois unicos cadastros abertos. A clinica se cadastra na plataforma e o
+     * tutor se cadastra na clinica: nenhum dos dois tem token para apresentar.
+     * Veterinario nao entra aqui — quem contrata veterinario e a clinica, que
+     * a essa altura ja esta autenticada.
+     */
     private static final String[] CADASTROS_PUBLICOS = {
-            "/tutores",
             "/clinicas",
-            "/veterinarios"
+            "/tutores"
     };
 
     /** Prontuario, consulta e anamnese: tutor le pelo /pets/**, mas nao escreve aqui. */
@@ -78,6 +81,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(ROTAS_PUBLICAS).permitAll()
                         .requestMatchers(HttpMethod.POST, CADASTROS_PUBLICOS).permitAll()
+                        // contratar veterinario e ato administrativo da clinica
+                        .requestMatchers(HttpMethod.POST, "/veterinarios")
+                                .hasRole(TipoUsuario.COLABORADOR.name())
                         .requestMatchers(ROTAS_CLINICAS).hasAnyRole(
                                 TipoUsuario.VETERINARIO.name(), TipoUsuario.COLABORADOR.name())
                         .anyRequest().authenticated())
