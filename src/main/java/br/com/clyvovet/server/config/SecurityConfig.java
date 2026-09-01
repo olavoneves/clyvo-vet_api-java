@@ -6,6 +6,8 @@ import br.com.clyvovet.server.enums.TipoUsuario;
 import br.com.clyvovet.server.tenant.TenantFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -13,18 +15,26 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Duas cadeias que nao se misturam.
@@ -43,6 +53,7 @@ import java.util.Arrays;
  * <p>Nas duas cadeias o {@code TenantFilter} entra logo depois de quem
  * autentica: o isolamento por clinica vale igual na tela e na API.
  */
+@Slf4j
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -101,8 +112,23 @@ public class SecurityConfig {
             "/agenda/**"
     };
 
+    /** HSTS de um ano: abaixo disso os navegadores ignoram o cabecalho. */
+    private static final long HSTS_SEGUNDOS = Duration.ofDays(365).toSeconds();
+
     private final JwtService jwtService;
     private final ObjectMapper objectMapper;
+
+    /**
+     * Origens autorizadas a chamar a API de dentro de um navegador.
+     *
+     * <p>Lista explicita, nunca {@code *}: com {@code allowCredentials} ligado o
+     * curinga e recusado pelo proprio navegador, e sem credenciais ele
+     * autorizaria qualquer site a falar com a API em nome de quem estiver logado.
+     * Vazio significa nenhuma origem cruzada — que e o certo para uma API
+     * consumida so por aplicativo nativo.
+     */
+    @Value("${app.cors.allowed-origins:}")
+    private List<String> origensPermitidas;
 
     /**
      * Cadeia da API. Vem primeiro: o {@code securityMatcher} restringe seu
@@ -119,8 +145,10 @@ public class SecurityConfig {
                 .securityMatcher(WebMvcConfig.PREFIXO_API + "/**")
                 // API com JWT: nao ha cookie de sessao para um ataque CSRF explorar
                 .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
+                .headers(SecurityConfig::cabecalhosDeSeguranca)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(api(API_PUBLICA)).permitAll()
@@ -148,15 +176,21 @@ public class SecurityConfig {
      * Cadeia das paginas. Sessao de verdade: o cookie e a credencial, entao o
      * CSRF fica ligado — o Thymeleaf injeta o token em todo formulario com
      * {@code th:action}.
+     *
+     * <p>Cobre tambem o actuator: {@code /actuator/health} aberto para o health
+     * check do container, o resto atras de autenticacao.
      */
     @Bean
     @Order(2)
     public SecurityFilterChain paginasFilterChain(HttpSecurity http) throws Exception {
         return http
+                .headers(SecurityConfig::cabecalhosDeSeguranca)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/error").permitAll()
                         .requestMatchers(ESTATICOS).permitAll()
                         .requestMatchers(DOCUMENTACAO).permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").authenticated()
                         .requestMatchers(PAGINAS_DA_CLINICA).hasAnyRole(
                                 TipoUsuario.VETERINARIO.name(), TipoUsuario.COLABORADOR.name())
                         .anyRequest().authenticated())
@@ -178,6 +212,45 @@ public class SecurityConfig {
                 // o SecurityContext ja veio da sessao neste ponto da cadeia
                 .addFilterAfter(new TenantFilter(), SecurityContextHolderFilter.class)
                 .build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuracao = new CorsConfiguration();
+        configuracao.setAllowedOrigins(origensPermitidas);
+        configuracao.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuracao.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuracao.setAllowCredentials(true);
+        configuracao.setMaxAge(Duration.ofHours(1));
+
+        if (origensPermitidas.isEmpty()) {
+            log.info("CORS sem origens configuradas: nenhuma chamada cruzada sera aceita. "
+                    + "Defina app.cors.allowed-origins se um front-end web precisar da API.");
+        }
+
+        UrlBasedCorsConfigurationSource fonte = new UrlBasedCorsConfigurationSource();
+        fonte.registerCorsConfiguration(WebMvcConfig.PREFIXO_API + "/**", configuracao);
+        return fonte;
+    }
+
+    /**
+     * Cabecalhos identicos nas duas cadeias.
+     *
+     * <p>{@code nosniff} impede o navegador de reinterpretar o tipo declarado;
+     * {@code DENY} tira a aplicacao de qualquer iframe, o que fecha clickjacking;
+     * {@code same-origin} evita vazar a URL interna — que carrega id de pet e de
+     * clinica — no Referer de um link externo. HSTS so tem efeito sobre HTTPS,
+     * entao nao atrapalha o ambiente local em http.
+     */
+    private static void cabecalhosDeSeguranca(HeadersConfigurer<HttpSecurity> headers) {
+        headers
+                .contentTypeOptions(Customizer.withDefaults())
+                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                .referrerPolicy(referrer -> referrer
+                        .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))
+                .httpStrictTransportSecurity(hsts -> hsts
+                        .includeSubDomains(true)
+                        .maxAgeInSeconds(HSTS_SEGUNDOS));
     }
 
     /** Rota como o controller a declara -> rota como o servidor a expoe. */

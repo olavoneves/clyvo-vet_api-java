@@ -10,6 +10,7 @@ import br.com.clyvovet.server.enums.PetPorte;
 import br.com.clyvovet.server.enums.PetSexo;
 import br.com.clyvovet.server.enums.PetStatus;
 import br.com.clyvovet.server.enums.TipoUsuario;
+import br.com.clyvovet.server.exception.EntityNotFoundException;
 import br.com.clyvovet.server.obrigacao.ObrigacaoResponse;
 import br.com.clyvovet.server.obrigacao.ObrigacaoService;
 import br.com.clyvovet.server.obrigacao.web.AgendaWebController;
@@ -170,6 +171,24 @@ class PaginasRenderizamTest {
                 .andExpect(content().string(org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.containsString("Hoje"),
                         org.hamcrest.Matchers.containsString("Próximos dias"))));
+    }
+
+    /**
+     * Pet inexistente — ou de outra clinica, que da no mesmo para quem pergunta —
+     * tem que virar 404, nao 500.
+     *
+     * <p>Regressao real: ao restringir o GlobalExceptionHandler aos
+     * @RestController, as paginas ficaram sem tradutor de excecao e passaram a
+     * devolver 500. Quem responde por elas agora e o @ResponseStatus na propria
+     * excecao de dominio.
+     */
+    @Test
+    void petInexistenteNaTelaVira404() throws Exception {
+        given(petService.getFichaTecnica(9999L))
+                .willThrow(new EntityNotFoundException("Pet", 9999L));
+
+        mockMvc.perform(get("/pets/9999").with(user(COLABORADOR)))
+                .andExpect(status().isNotFound());
     }
 
     /** Tutor autentica na API, mas nao nas telas de gestao da clinica. */
