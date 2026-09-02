@@ -5,211 +5,2444 @@
     "_postman_id": "clv-api-2026"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
+      "name": "Autenticacao",
+      "item": [
+        {
+          "name": "Login (captura o token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"master@clyvovet.com\",\n  \"senha\": \"master\",\n  \"tipo\": \"COLABORADOR\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// guarda o access token na variavel da colecao: os demais requests o usam",
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('token', pm.response.json().accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Espécies",
       "item": [
-        { "name": "Listar espécies", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/especies?page=0&size=10&sort=nome,asc", "host": ["{{baseUrl}}"], "path": ["especies"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"},{"key":"sort","value":"nome,asc"}] } } },
-        { "name": "Buscar espécie por ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/especies/1", "host": ["{{baseUrl}}"], "path": ["especies","1"] } } },
-        { "name": "Criar espécie", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/especies", "host": ["{{baseUrl}}"], "path": ["especies"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Canino\", \"descricao\": \"Cães domésticos\"}" } } },
-        { "name": "Atualizar espécie", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/especies/1", "host": ["{{baseUrl}}"], "path": ["especies","1"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Canino\", \"descricao\": \"Cães domésticos - atualizado\"}" } } },
-        { "name": "Excluir espécie", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/especies/1", "host": ["{{baseUrl}}"], "path": ["especies","1"] } } }
+        {
+          "name": "Listar espécies",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/especies?page=0&size=10&sort=nome,asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "especies"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "nome,asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar espécie por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/especies/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "especies",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar espécie",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/especies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "especies"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Canino\", \"descricao\": \"Cães domésticos\"}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar espécie",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/especies/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "especies",
+                "1"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Canino\", \"descricao\": \"Cães domésticos - atualizado\"}"
+            }
+          }
+        },
+        {
+          "name": "Excluir espécie",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/especies/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "especies",
+                "1"
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Tipos de Vacina",
       "item": [
-        { "name": "Listar tipos de vacina", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/tipos-vacina?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["tipos-vacina"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar tipo de vacina", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/tipos-vacina/1", "host": ["{{baseUrl}}"], "path": ["tipos-vacina","1"] } } },
-        { "name": "Criar tipo de vacina", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/tipos-vacina", "host": ["{{baseUrl}}"], "path": ["tipos-vacina"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"V10\", \"fabricante\": \"Zoetis\", \"doseIntervaloDias\": 365}" } } },
-        { "name": "Atualizar tipo de vacina", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/tipos-vacina/1", "host": ["{{baseUrl}}"], "path": ["tipos-vacina","1"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"V10\", \"fabricante\": \"Zoetis\", \"doseIntervaloDias\": 365}" } } },
-        { "name": "Excluir tipo de vacina", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/tipos-vacina/1", "host": ["{{baseUrl}}"], "path": ["tipos-vacina","1"] } } }
+        {
+          "name": "Listar tipos de vacina",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-vacina?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-vacina"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar tipo de vacina",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-vacina/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-vacina",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar tipo de vacina",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-vacina",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-vacina"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"V10\", \"fabricante\": \"Zoetis\", \"doseIntervaloDias\": 365}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar tipo de vacina",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-vacina/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-vacina",
+                "1"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"V10\", \"fabricante\": \"Zoetis\", \"doseIntervaloDias\": 365}"
+            }
+          }
+        },
+        {
+          "name": "Excluir tipo de vacina",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-vacina/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-vacina",
+                "1"
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Medicamentos",
       "item": [
-        { "name": "Listar medicamentos", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/medicamentos?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["medicamentos"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar medicamento", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/medicamentos/1", "host": ["{{baseUrl}}"], "path": ["medicamentos","1"] } } },
-        { "name": "Criar medicamento", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/medicamentos", "host": ["{{baseUrl}}"], "path": ["medicamentos"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Amoxicilina\", \"principioAtivo\": \"Amoxicilina triidratada\", \"classeTerapeutica\": \"Antibiótico\"}" } } },
-        { "name": "Atualizar medicamento", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/medicamentos/1", "host": ["{{baseUrl}}"], "path": ["medicamentos","1"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Amoxicilina\", \"principioAtivo\": \"Amoxicilina triidratada\", \"classeTerapeutica\": \"Antibiótico\"}" } } },
-        { "name": "Excluir medicamento", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/medicamentos/1", "host": ["{{baseUrl}}"], "path": ["medicamentos","1"] } } }
+        {
+          "name": "Listar medicamentos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar medicamento",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar medicamento",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Amoxicilina\", \"principioAtivo\": \"Amoxicilina triidratada\", \"classeTerapeutica\": \"Antibiótico\"}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar medicamento",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos",
+                "1"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Amoxicilina\", \"principioAtivo\": \"Amoxicilina triidratada\", \"classeTerapeutica\": \"Antibiótico\"}"
+            }
+          }
+        },
+        {
+          "name": "Excluir medicamento",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/medicamentos/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicamentos",
+                "1"
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Tipos de Sensor IoT",
       "item": [
-        { "name": "Listar tipos de sensor", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/tipos-sensor?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["tipos-sensor"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar tipo de sensor", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/tipos-sensor", "host": ["{{baseUrl}}"], "path": ["tipos-sensor"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Temperatura\", \"unidade\": \"°C\", \"valorMin\": 36.0, \"valorMax\": 42.0}" } } }
+        {
+          "name": "Listar tipos de sensor",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-sensor?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-sensor"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar tipo de sensor",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-sensor",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-sensor"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Temperatura\", \"unidade\": \"°C\", \"valorMin\": 36.0, \"valorMax\": 42.0}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Tipos de Condição",
       "item": [
-        { "name": "Listar tipos de condição", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/tipos-condicao?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["tipos-condicao"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar tipo de condição", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/tipos-condicao", "host": ["{{baseUrl}}"], "path": ["tipos-condicao"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Diabetes Mellitus\", \"categoria\": \"Endócrino\"}" } } }
+        {
+          "name": "Listar tipos de condição",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-condicao?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-condicao"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar tipo de condição",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-condicao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-condicao"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Diabetes Mellitus\", \"categoria\": \"Endócrino\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Tipos de Alergia",
       "item": [
-        { "name": "Listar tipos de alergia", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/tipos-alergia?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["tipos-alergia"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar tipo de alergia", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/tipos-alergia", "host": ["{{baseUrl}}"], "path": ["tipos-alergia"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Alergia à penicilina\", \"categoria\": \"MEDICAMENTO\"}" } } }
+        {
+          "name": "Listar tipos de alergia",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-alergia?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-alergia"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar tipo de alergia",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/tipos-alergia",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tipos-alergia"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Alergia à penicilina\", \"categoria\": \"MEDICAMENTO\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Tutores",
       "item": [
-        { "name": "Listar tutores", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/tutores?page=0&size=10&sort=nome,asc", "host": ["{{baseUrl}}"], "path": ["tutores"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"},{"key":"sort","value":"nome,asc"}] } } },
-        { "name": "Buscar tutor por ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/tutores/1", "host": ["{{baseUrl}}"], "path": ["tutores","1"] } } },
-        { "name": "Criar tutor", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/tutores", "host": ["{{baseUrl}}"], "path": ["tutores"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"João Silva\", \"email\": \"joao@email.com\", \"telefone\": \"11999999999\", \"senhaHash\": \"hash123\", \"canalPreferencial\": \"APP\"}" } } },
-        { "name": "Atualizar tutor", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/tutores/1", "host": ["{{baseUrl}}"], "path": ["tutores","1"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"João Silva\", \"email\": \"joao@email.com\", \"telefone\": \"11888888888\", \"senhaHash\": \"hash123\", \"canalPreferencial\": \"WEB\"}" } } },
-        { "name": "Excluir tutor", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/tutores/1", "host": ["{{baseUrl}}"], "path": ["tutores","1"] } } }
+        {
+          "name": "Listar tutores",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tutores?page=0&size=10&sort=nome,asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutores"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "nome,asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar tutor por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/tutores/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutores",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar tutor",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/tutores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutores"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"João Silva\", \"email\": \"joao@email.com\", \"telefone\": \"11999999999\", \"senhaHash\": \"hash123\", \"canalPreferencial\": \"APP\"}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar tutor",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/tutores/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutores",
+                "1"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"João Silva\", \"email\": \"joao@email.com\", \"telefone\": \"11888888888\", \"senhaHash\": \"hash123\", \"canalPreferencial\": \"WEB\"}"
+            }
+          }
+        },
+        {
+          "name": "Excluir tutor",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/tutores/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tutores",
+                "1"
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Clínicas",
       "item": [
-        { "name": "Listar clínicas", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/clinicas?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["clinicas"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar clínica", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/clinicas/1", "host": ["{{baseUrl}}"], "path": ["clinicas","1"] } } },
-        { "name": "Criar clínica", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/clinicas", "host": ["{{baseUrl}}"], "path": ["clinicas"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Clínica Pet Saúde\", \"cnpj\": \"12345678000195\", \"logradouro\": \"Rua das Flores\", \"numero\": \"100\", \"bairro\": \"Centro\", \"cidade\": \"São Paulo\", \"estado\": \"SP\", \"cep\": \"01001000\", \"telefone\": \"1133333333\"}" } } }
+        {
+          "name": "Listar clínicas",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/clinicas?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clinicas"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar clínica",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/clinicas/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clinicas",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar clínica",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/clinicas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "clinicas"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Clínica Pet Saúde\", \"cnpj\": \"12345678000195\", \"logradouro\": \"Rua das Flores\", \"numero\": \"100\", \"bairro\": \"Centro\", \"cidade\": \"São Paulo\", \"estado\": \"SP\", \"cep\": \"01001000\", \"telefone\": \"1133333333\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Veterinários",
       "item": [
-        { "name": "Listar veterinários", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/veterinarios?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["veterinarios"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar veterinário", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/veterinarios/1", "host": ["{{baseUrl}}"], "path": ["veterinarios","1"] } } },
-        { "name": "Listar por clínica", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/veterinarios/clinica/1?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["veterinarios","clinica","1"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar veterinário", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/veterinarios", "host": ["{{baseUrl}}"], "path": ["veterinarios"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Dra. Ana Lima\", \"crmv\": \"CRMV-SP-12345\", \"especialidade\": \"Clínica Geral\", \"clinicaId\": 1}" } } }
+        {
+          "name": "Listar veterinários",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/veterinarios?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "veterinarios"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar veterinário",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/veterinarios/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "veterinarios",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar por clínica",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/veterinarios/clinica/1?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "veterinarios",
+                "clinica",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar veterinário",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/veterinarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "veterinarios"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Dra. Ana Lima\", \"crmv\": \"CRMV-SP-12345\", \"especialidade\": \"Clínica Geral\", \"clinicaId\": 1}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Raças",
       "item": [
-        { "name": "Listar raças", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/racas?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["racas"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Listar por espécie", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/racas/especie/1?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["racas","especie","1"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar raça", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/racas", "host": ["{{baseUrl}}"], "path": ["racas"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Labrador Retriever\", \"especieId\": 1}" } } }
+        {
+          "name": "Listar raças",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/racas?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "racas"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar por espécie",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/racas/especie/1?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "racas",
+                "especie",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar raça",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/racas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "racas"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Labrador Retriever\", \"especieId\": 1}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Pets",
       "item": [
-        { "name": "Listar pets", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets?page=0&size=10&sort=nome,asc", "host": ["{{baseUrl}}"], "path": ["pets"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"},{"key":"sort","value":"nome,asc"}] } } },
-        { "name": "Filtrar por status", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/status/ATIVO?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["pets","status","ATIVO"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Listar por tutor", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/tutor/1?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["pets","tutor","1"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar pet por ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/1", "host": ["{{baseUrl}}"], "path": ["pets","1"] } } },
-        { "name": "Ficha técnica do pet", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/1/ficha-tecnica", "host": ["{{baseUrl}}"], "path": ["pets","1","ficha-tecnica"] } } },
-        { "name": "Consultas do pet", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/1/consultas?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["pets","1","consultas"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Vacinas do pet (com próximo reforço)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/1/vacinas?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["pets","1","vacinas"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Alertas IoT do pet", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/1/alertas-iot?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["pets","1","alertas-iot"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Condições médicas do pet", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/1/condicoes", "host": ["{{baseUrl}}"], "path": ["pets","1","condicoes"] } } },
-        { "name": "Alergias do pet", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/pets/1/alergias", "host": ["{{baseUrl}}"], "path": ["pets","1","alergias"] } } },
-        { "name": "Criar pet", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/pets", "host": ["{{baseUrl}}"], "path": ["pets"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Rex\", \"dtNascimento\": \"2020-03-15\", \"sexo\": \"M\", \"porte\": \"GRANDE\", \"castrado\": true, \"status\": \"ATIVO\", \"tutorId\": 1, \"racaId\": 1}" } } },
-        { "name": "Atualizar pet", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/pets/1", "host": ["{{baseUrl}}"], "path": ["pets","1"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Rex\", \"dtNascimento\": \"2020-03-15\", \"sexo\": \"M\", \"porte\": \"GRANDE\", \"castrado\": true, \"status\": \"EM_TRATAMENTO\", \"tutorId\": 1, \"racaId\": 1}" } } },
-        { "name": "Excluir pet", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/pets/1", "host": ["{{baseUrl}}"], "path": ["pets","1"] } } }
+        {
+          "name": "Listar pets",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets?page=0&size=10&sort=nome,asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "nome,asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/status/ATIVO?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "status",
+                "ATIVO"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar por tutor",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/tutor/1?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "tutor",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar pet por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ficha técnica do pet",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1/ficha-tecnica",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1",
+                "ficha-tecnica"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Consultas do pet",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1/consultas?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1",
+                "consultas"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Vacinas do pet (com próximo reforço)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1/vacinas?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1",
+                "vacinas"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Alertas IoT do pet",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1/alertas-iot?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1",
+                "alertas-iot"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Condições médicas do pet",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1/condicoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1",
+                "condicoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Alergias do pet",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1/alergias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1",
+                "alergias"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar pet",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/pets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Rex\", \"dtNascimento\": \"2020-03-15\", \"sexo\": \"M\", \"porte\": \"GRANDE\", \"castrado\": true, \"status\": \"ATIVO\", \"tutorId\": 1, \"racaId\": 1}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar pet",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Rex\", \"dtNascimento\": \"2020-03-15\", \"sexo\": \"M\", \"porte\": \"GRANDE\", \"castrado\": true, \"status\": \"EM_TRATAMENTO\", \"tutorId\": 1, \"racaId\": 1}"
+            }
+          }
+        },
+        {
+          "name": "Excluir pet",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/pets/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pets",
+                "1"
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Agendamentos",
       "item": [
-        { "name": "Listar agendamentos", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/agendamentos?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["agendamentos"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Filtrar por status", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/agendamentos/status/CONFIRMADO?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["agendamentos","status","CONFIRMADO"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar agendamento", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/agendamentos/1", "host": ["{{baseUrl}}"], "path": ["agendamentos","1"] } } },
-        { "name": "Criar agendamento", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/agendamentos", "host": ["{{baseUrl}}"], "path": ["agendamentos"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"dtAgendamento\": \"2026-06-01\", \"hrAgendamento\": \"14:30\", \"status\": \"SOLICITADO\", \"canalOrigem\": \"APP\", \"petId\": 1, \"veterinarioId\": 1}" } } },
-        { "name": "Atualizar status (PATCH)", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/agendamentos/1/status", "host": ["{{baseUrl}}"], "path": ["agendamentos","1","status"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"status\": \"CONFIRMADO\"}" } } },
-        { "name": "Cancelar agendamento (PATCH)", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/agendamentos/1/status", "host": ["{{baseUrl}}"], "path": ["agendamentos","1","status"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"status\": \"CANCELADO\", \"motivoCancelamento\": \"Tutor solicitou cancelamento\"}" } } }
+        {
+          "name": "Listar agendamentos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/agendamentos?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendamentos"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/agendamentos/status/CONFIRMADO?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendamentos",
+                "status",
+                "CONFIRMADO"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar agendamento",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/agendamentos/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendamentos",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar agendamento",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/agendamentos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendamentos"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dtAgendamento\": \"2026-06-01\", \"hrAgendamento\": \"14:30\", \"status\": \"SOLICITADO\", \"canalOrigem\": \"APP\", \"petId\": 1, \"veterinarioId\": 1}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar status (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/agendamentos/1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendamentos",
+                "1",
+                "status"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"CONFIRMADO\"}"
+            }
+          }
+        },
+        {
+          "name": "Cancelar agendamento (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/agendamentos/1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendamentos",
+                "1",
+                "status"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"CANCELADO\", \"motivoCancelamento\": \"Tutor solicitou cancelamento\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Consultas",
       "item": [
-        { "name": "Listar consultas", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/consultas?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["consultas"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Filtrar por status", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/consultas/status/REALIZADA?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["consultas","status","REALIZADA"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar consulta", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/consultas/1", "host": ["{{baseUrl}}"], "path": ["consultas","1"] } } },
-        { "name": "Anamnese da consulta", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/consultas/1/anamnese", "host": ["{{baseUrl}}"], "path": ["consultas","1","anamnese"] } } },
-        { "name": "Prescrições da consulta", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/consultas/1/prescricoes", "host": ["{{baseUrl}}"], "path": ["consultas","1","prescricoes"] } } },
-        { "name": "Exames da consulta", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/consultas/1/exames", "host": ["{{baseUrl}}"], "path": ["consultas","1","exames"] } } },
-        { "name": "Criar consulta", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/consultas", "host": ["{{baseUrl}}"], "path": ["consultas"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"dtConsulta\": \"2026-06-01\", \"motivo\": \"Vômito e prostração\", \"status\": \"EM_ATENDIMENTO\", \"petId\": 1, \"veterinarioId\": 1}" } } }
+        {
+          "name": "Listar consultas",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/consultas?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/consultas/status/REALIZADA?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "status",
+                "REALIZADA"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar consulta",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/consultas/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Anamnese da consulta",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/consultas/1/anamnese",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "1",
+                "anamnese"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Prescrições da consulta",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/consultas/1/prescricoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "1",
+                "prescricoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Exames da consulta",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/consultas/1/exames",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "1",
+                "exames"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar consulta",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/consultas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"dtConsulta\": \"2026-06-01\", \"motivo\": \"Vômito e prostração\", \"status\": \"EM_ATENDIMENTO\", \"petId\": 1, \"veterinarioId\": 1}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Anamneses",
       "item": [
-        { "name": "Listar anamneses", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/anamneses?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["anamneses"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar anamnese", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/anamneses", "host": ["{{baseUrl}}"], "path": ["anamneses"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"consultaId\": 1, \"queixaPrincipal\": \"Vômito há 2 dias\", \"pesoKg\": 28.5, \"temperaturaC\": 39.2, \"freqCardiaca\": 95, \"freqRespiratoria\": 22, \"condicaoCorporal\": \"IDEAL\"}" } } }
+        {
+          "name": "Listar anamneses",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/anamneses?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "anamneses"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar anamnese",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/anamneses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "anamneses"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"consultaId\": 1, \"queixaPrincipal\": \"Vômito há 2 dias\", \"pesoKg\": 28.5, \"temperaturaC\": 39.2, \"freqCardiaca\": 95, \"freqRespiratoria\": 22, \"condicaoCorporal\": \"IDEAL\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Prescrições",
       "item": [
-        { "name": "Listar prescrições", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/prescricoes?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["prescricoes"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar prescrição", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/prescricoes", "host": ["{{baseUrl}}"], "path": ["prescricoes"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"consultaId\": 1, \"medicamentoId\": 1, \"dosagem\": \"500mg\", \"frequencia\": \"12 em 12 horas\", \"duracaoDias\": 7}" } } }
+        {
+          "name": "Listar prescrições",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/prescricoes?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescricoes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar prescrição",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/prescricoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescricoes"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"consultaId\": 1, \"medicamentoId\": 1, \"dosagem\": \"500mg\", \"frequencia\": \"12 em 12 horas\", \"duracaoDias\": 7}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Exames",
       "item": [
-        { "name": "Listar exames", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/exames?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["exames"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar exame", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/exames", "host": ["{{baseUrl}}"], "path": ["exames"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Hemograma Completo\", \"dtRealizacao\": \"2026-06-01\", \"consultaId\": 1, \"vetSolicitanteId\": 1}" } } }
+        {
+          "name": "Listar exames",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/exames?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exames"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar exame",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/exames",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exames"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Hemograma Completo\", \"dtRealizacao\": \"2026-06-01\", \"consultaId\": 1, \"vetSolicitanteId\": 1}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Vacinação",
       "item": [
-        { "name": "Listar aplicações de vacina", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/vacinas?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["vacinas"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Registrar aplicação de vacina", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/vacinas", "host": ["{{baseUrl}}"], "path": ["vacinas"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"petId\": 1, \"tipoVacinaId\": 1, \"veterinarioId\": 1, \"dtAplicacao\": \"2026-06-01\", \"numeroDose\": 1, \"lote\": \"LOT2026-001\"}" } } }
+        {
+          "name": "Listar aplicações de vacina",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/vacinas?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vacinas"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Registrar aplicação de vacina",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/vacinas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "vacinas"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"petId\": 1, \"tipoVacinaId\": 1, \"veterinarioId\": 1, \"dtAplicacao\": \"2026-06-01\", \"numeroDose\": 1, \"lote\": \"LOT2026-001\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Condições do Pet",
       "item": [
-        { "name": "Listar condições", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/condicoes-pet?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["condicoes-pet"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar condição", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/condicoes-pet", "host": ["{{baseUrl}}"], "path": ["condicoes-pet"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"petId\": 1, \"tipoCondicaoId\": 1, \"dtDiagnostico\": \"2026-06-01\", \"observacao\": \"Diabetes tipo 1\", \"ativo\": true}" } } }
+        {
+          "name": "Listar condições",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/condicoes-pet?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "condicoes-pet"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar condição",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/condicoes-pet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "condicoes-pet"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"petId\": 1, \"tipoCondicaoId\": 1, \"dtDiagnostico\": \"2026-06-01\", \"observacao\": \"Diabetes tipo 1\", \"ativo\": true}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Alergias do Pet",
       "item": [
-        { "name": "Listar alergias", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/alergias-pet?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["alergias-pet"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Criar alergia", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/alergias-pet", "host": ["{{baseUrl}}"], "path": ["alergias-pet"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"petId\": 1, \"tipoAlergiaId\": 1, \"reacao\": \"Urticária e prurido\", \"severidade\": \"MODERADA\", \"dtIdentificacao\": \"2026-06-01\"}" } } }
+        {
+          "name": "Listar alergias",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/alergias-pet?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alergias-pet"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar alergia",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/alergias-pet",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alergias-pet"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"petId\": 1, \"tipoAlergiaId\": 1, \"reacao\": \"Urticária e prurido\", \"severidade\": \"MODERADA\", \"dtIdentificacao\": \"2026-06-01\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Sensores IoT",
       "item": [
-        { "name": "Listar sensores", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/sensores-iot?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["sensores-iot"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Listar por pet", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/sensores-iot/pet/1?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["sensores-iot","pet","1"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Instalar sensor", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/sensores-iot", "host": ["{{baseUrl}}"], "path": ["sensores-iot"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"nome\": \"Sensor Temp Rex\", \"tipoSensorId\": 1, \"petId\": 1, \"dtInstalacao\": \"2026-06-01\", \"ativo\": true}" } } }
+        {
+          "name": "Listar sensores",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/sensores-iot?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sensores-iot"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar por pet",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/sensores-iot/pet/1?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sensores-iot",
+                "pet",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Instalar sensor",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/sensores-iot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sensores-iot"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nome\": \"Sensor Temp Rex\", \"tipoSensorId\": 1, \"petId\": 1, \"dtInstalacao\": \"2026-06-01\", \"ativo\": true}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Leituras IoT",
       "item": [
-        { "name": "Listar leituras", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/leituras-iot?page=0&size=10&sort=dtLeitura,desc", "host": ["{{baseUrl}}"], "path": ["leituras-iot"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"},{"key":"sort","value":"dtLeitura,desc"}] } } },
-        { "name": "Listar por sensor", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/leituras-iot/sensor/1?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["leituras-iot","sensor","1"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Registrar leitura", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/leituras-iot", "host": ["{{baseUrl}}"], "path": ["leituras-iot"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"sensorId\": 1, \"dtLeitura\": \"2026-06-01T14:30:00\", \"valor\": 39.5}" } } }
+        {
+          "name": "Listar leituras",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/leituras-iot?page=0&size=10&sort=dtLeitura,desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leituras-iot"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "dtLeitura,desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar por sensor",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/leituras-iot/sensor/1?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leituras-iot",
+                "sensor",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Registrar leitura",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/leituras-iot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leituras-iot"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sensorId\": 1, \"dtLeitura\": \"2026-06-01T14:30:00\", \"valor\": 39.5}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "Alertas IoT",
       "item": [
-        { "name": "Listar alertas", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/alertas-iot?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["alertas-iot"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Listar não resolvidos", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/alertas-iot/nao-resolvidos?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["alertas-iot","nao-resolvidos"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } },
-        { "name": "Buscar alerta", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/alertas-iot/1", "host": ["{{baseUrl}}"], "path": ["alertas-iot","1"] } } },
-        { "name": "Criar alerta", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/alertas-iot", "host": ["{{baseUrl}}"], "path": ["alertas-iot"] }, "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"leituraId\": 1, \"descricao\": \"Temperatura acima do limite máximo\", \"severidade\": \"ALTA\", \"dtAlerta\": \"2026-06-01T14:35:00\", \"resolvido\": false}" } } },
-        { "name": "Resolver alerta (PATCH)", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/alertas-iot/1/resolver", "host": ["{{baseUrl}}"], "path": ["alertas-iot","1","resolver"] } } }
+        {
+          "name": "Listar alertas",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/alertas-iot?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas-iot"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Listar não resolvidos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/alertas-iot/nao-resolvidos?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas-iot",
+                "nao-resolvidos"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar alerta",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/alertas-iot/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas-iot",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar alerta",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/alertas-iot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas-iot"
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"leituraId\": 1, \"descricao\": \"Temperatura acima do limite máximo\", \"severidade\": \"ALTA\", \"dtAlerta\": \"2026-06-01T14:35:00\", \"resolvido\": false}"
+            }
+          }
+        },
+        {
+          "name": "Resolver alerta (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/alertas-iot/1/resolver",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "alertas-iot",
+                "1",
+                "resolver"
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "Auditoria - Logs de Erro",
       "item": [
-        { "name": "Listar logs", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/logs-erro?page=0&size=10&sort=dtOcorrencia,desc", "host": ["{{baseUrl}}"], "path": ["logs-erro"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"},{"key":"sort","value":"dtOcorrencia,desc"}] } } },
-        { "name": "Buscar log por ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/logs-erro/1", "host": ["{{baseUrl}}"], "path": ["logs-erro","1"] } } },
-        { "name": "Filtrar por ambiente", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/logs-erro/ambiente/PRD?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["logs-erro","ambiente","PRD"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] } } }
+        {
+          "name": "Listar logs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/logs-erro?page=0&size=10&sort=dtOcorrencia,desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-erro"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "dtOcorrencia,desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar log por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/logs-erro/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-erro",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtrar por ambiente",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/logs-erro/ambiente/PRD?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-erro",
+                "ambiente",
+                "PRD"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Motor de protocolo",
+      "item": [
+        {
+          "name": "Listar protocolos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/protocolos?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "protocolos?page=0&size=10"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalhe do protocolo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/protocolos/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "protocolos",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Gerar obrigacoes a partir da consulta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/consultas/1/obrigacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "consultas",
+                "1",
+                "obrigacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventoGatilho\": \"CONSULTA_REGISTRADA\",\n  \"contexto\": \"retorno de rotina\",\n  \"horizonteDias\": 365\n}"
+            }
+          }
+        },
+        {
+          "name": "Listar obrigacoes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/obrigacoes?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "obrigacoes?page=0&size=10"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalhe da obrigacao",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/obrigacoes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "obrigacoes",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Transitar obrigacao",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/obrigacoes/1/transicoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "obrigacoes",
+                "1",
+                "transicoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"novoStatus\": \"NOTIFICADA\",\n  \"motivo\": \"lembrete enviado\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Painel de receita",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/painel/receita",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "painel",
+                "receita"
+              ]
+            }
+          }
+        }
       ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

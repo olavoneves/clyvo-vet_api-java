@@ -113,8 +113,13 @@ class PaginasRenderizamTest {
                         org.hamcrest.Matchers.containsString("Receita recuperada este mês"),
                         org.hamcrest.Matchers.containsString("graficoFunil"),
                         org.hamcrest.Matchers.containsString("graficoComparacao"),
-                        // o lift precisa chegar formatado na tela, nao so no JSON do grafico
-                        org.hamcrest.Matchers.containsString("p.p."))));
+                        // o delta precisa chegar formatado na tela, nao so no JSON do grafico
+                        org.hamcrest.Matchers.containsString("p.p."),
+                        // base amostral visivel: delta sem denominador ao lado nao se defende
+                        org.hamcrest.Matchers.containsString("833 de 1411"),
+                        org.hamcrest.Matchers.containsString("66 de 202"),
+                        // e a origem do numero declarada na propria tela
+                        org.hamcrest.Matchers.containsString("sorteio determinístico por pet"))));
     }
 
     /** Painel de mes sem movimento: as divisoes do funil nao podem estourar. */
@@ -208,11 +213,14 @@ class PaginasRenderizamTest {
                 new PainelReceitaResponse.Funil(120, 96, 54, 41, 33, 12),
                 new BigDecimal("18450.00"),
                 new BigDecimal("6200.00"),
-                new PainelReceitaResponse.Grupo(96, 30, new BigDecimal("31.3"),
-                        new BigDecimal("16800.00"), new BigDecimal("4900.00")),
-                new PainelReceitaResponse.Grupo(24, 3, new BigDecimal("12.5"),
-                        new BigDecimal("1650.00"), new BigDecimal("1300.00")),
-                new BigDecimal("18.8"));
+                // comparacao sobre a janela inteira: bases bem maiores que as do mes
+                new PainelReceitaResponse.Comparacao(
+                        LocalDate.of(2026, 2, 1), LocalDate.of(2026, 8, 1),
+                        new PainelReceitaResponse.Grupo(1411, 833, new BigDecimal("59.0"),
+                                new BigDecimal("116800.00"), new BigDecimal("34900.00")),
+                        new PainelReceitaResponse.Grupo(202, 66, new BigDecimal("32.7"),
+                                new BigDecimal("11650.00"), new BigDecimal("9300.00")),
+                        new BigDecimal("26.3")));
     }
 
     private static PainelReceitaResponse painelVazio() {
@@ -220,9 +228,10 @@ class PaginasRenderizamTest {
                 LocalDate.of(2026, 9, 1),
                 new PainelReceitaResponse.Funil(0, 0, 0, 0, 0, 0),
                 BigDecimal.ZERO, BigDecimal.ZERO,
-                new PainelReceitaResponse.Grupo(0, 0, null, BigDecimal.ZERO, BigDecimal.ZERO),
-                new PainelReceitaResponse.Grupo(0, 0, null, BigDecimal.ZERO, BigDecimal.ZERO),
-                null);
+                new PainelReceitaResponse.Comparacao(null, null,
+                        new PainelReceitaResponse.Grupo(0, 0, null, BigDecimal.ZERO, BigDecimal.ZERO),
+                        new PainelReceitaResponse.Grupo(0, 0, null, BigDecimal.ZERO, BigDecimal.ZERO),
+                        null));
     }
 
     private static PetResponse petDeExemplo() {

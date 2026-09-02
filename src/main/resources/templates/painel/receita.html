@@ -68,34 +68,37 @@
             O grupo de controle é sorteado para não receber lembrete. A diferença entre as
             duas taxas é a parte do resultado que o produto causou — o resto teria acontecido
             de qualquer forma.
+            <strong th:if="${painel.comparacao.janelaInicio != null}"
+                    th:text="|Recorte: toda a janela disponível, de ${#temporals.format(painel.comparacao.janelaInicio, 'MM/yyyy')} a ${#temporals.format(painel.comparacao.janelaFim, 'MM/yyyy')} — não apenas o mês acima.|">Recorte</strong>
         </p>
 
         <div class="comparacao">
             <div class="comparacao-numeros">
                 <div class="grupo-cartao">
                     <span class="grupo-nome">Tratado</span>
-                    <span class="grupo-taxa" th:if="${painel.tratado.pcComparecimento != null}"
-                          th:text="${#numbers.formatDecimal(painel.tratado.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
-                    <span class="grupo-taxa vazio" th:if="${painel.tratado.pcComparecimento == null}">sem dados</span>
+                    <span class="grupo-taxa" th:if="${painel.comparacao.tratado.pcComparecimento != null}"
+                          th:text="${#numbers.formatDecimal(painel.comparacao.tratado.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
+                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.tratado.pcComparecimento == null}">sem dados</span>
                     <span class="grupo-detalhe"
-                          th:text="|${painel.tratado.cumpridas} de ${painel.tratado.obrigacoes} cumpridas|">0 de 0</span>
+                          th:text="|${painel.comparacao.tratado.cumpridas} de ${painel.comparacao.tratado.obrigacoes} obrigações cumpridas|">0 de 0</span>
                 </div>
 
                 <div class="grupo-cartao">
                     <span class="grupo-nome">Controle</span>
-                    <span class="grupo-taxa" th:if="${painel.controle.pcComparecimento != null}"
-                          th:text="${#numbers.formatDecimal(painel.controle.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
-                    <span class="grupo-taxa vazio" th:if="${painel.controle.pcComparecimento == null}">sem dados</span>
+                    <span class="grupo-taxa" th:if="${painel.comparacao.controle.pcComparecimento != null}"
+                          th:text="${#numbers.formatDecimal(painel.comparacao.controle.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
+                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.controle.pcComparecimento == null}">sem dados</span>
                     <span class="grupo-detalhe"
-                          th:text="|${painel.controle.cumpridas} de ${painel.controle.obrigacoes} cumpridas|">0 de 0</span>
+                          th:text="|${painel.comparacao.controle.cumpridas} de ${painel.comparacao.controle.obrigacoes} obrigações cumpridas|">0 de 0</span>
                 </div>
 
                 <div class="grupo-cartao cartao-lift">
                     <span class="grupo-nome">Diferença</span>
-                    <span class="grupo-taxa lift" th:if="${painel.lift != null}"
-                          th:text="(${painel.lift.signum() > 0} ? '+' : '') + ${#numbers.formatDecimal(painel.lift, 1, 'POINT', 1, 'COMMA')} + ' p.p.'">+0 p.p.</span>
-                    <span class="grupo-taxa vazio" th:if="${painel.lift == null}">sem comparação</span>
-                    <span class="grupo-detalhe">pontos percentuais de comparecimento</span>
+                    <span class="grupo-taxa lift" th:if="${painel.comparacao.deltaPontosPercentuais != null}"
+                          th:text="(${painel.comparacao.deltaPontosPercentuais.signum() > 0} ? '+' : '') + ${#numbers.formatDecimal(painel.comparacao.deltaPontosPercentuais, 1, 'POINT', 1, 'COMMA')} + ' p.p.'">+0 p.p.</span>
+                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.deltaPontosPercentuais == null}">sem comparação</span>
+                    <span class="grupo-detalhe"
+                          th:text="|sobre ${painel.comparacao.tratado.obrigacoes + painel.comparacao.controle.obrigacoes} obrigações|">base</span>
                 </div>
             </div>
 
@@ -103,6 +106,11 @@
                 <canvas id="graficoComparacao" height="200"></canvas>
             </div>
         </div>
+
+        <p class="nota-metodo">
+            Grupo de controle: 10% dos pets, sorteio determinístico por pet.
+            Dados de demonstração.
+        </p>
     </section>
 
 </main>
@@ -146,7 +154,9 @@
     new Chart(document.getElementById('graficoComparacao'), {
         type: 'bar',
         data: {
-            labels: comparacao.map(g => g.rotulo),
+            // o n vai no proprio rotulo do eixo: quem olha so o grafico
+            // tambem precisa enxergar o tamanho do grupo
+            labels: comparacao.map(g => g.rotulo + ' (n=' + g.obrigacoes + ')'),
             datasets: [{
                 data: comparacao.map(g => g.taxa),
                 backgroundColor: [cor('--cor-primaria'), cor('--cor-neutra')],
