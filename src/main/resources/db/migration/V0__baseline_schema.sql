@@ -75,8 +75,8 @@ CREATE TABLE TB_CLV_TIPO_SENSOR (
     id_tipo_sensor NUMBER(19)   GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nm_tipo        VARCHAR2(60) NOT NULL,
     ds_unidade     VARCHAR2(20) NOT NULL,
-    nr_valor_min   NUMBER,
-    nr_valor_max   NUMBER,
+    nr_valor_min   BINARY_DOUBLE,
+    nr_valor_max   BINARY_DOUBLE,
     CONSTRAINT uk_tipo_sensor_nome UNIQUE (nm_tipo)
 );
 
@@ -134,7 +134,7 @@ CREATE TABLE TB_CLV_PET (
     id_pet              NUMBER(19)    GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nm_pet              VARCHAR2(100) NOT NULL,
     dt_nascimento       DATE,
-    ds_sexo             VARCHAR2(1),
+    ds_sexo             CHAR(1),
     nr_microchip        VARCHAR2(30),
     nr_rga              VARCHAR2(30),
     ds_pelagem          VARCHAR2(80),
@@ -213,7 +213,7 @@ CREATE TABLE TB_CLV_EXAME (
     dt_realizacao      DATE           NOT NULL,
     ds_resultado       VARCHAR2(2000),
     id_consulta        NUMBER(19)     NOT NULL,
-    id_vet_solicitante NUMBER(19),                    -- nullable
+    id_vet_solicitante NUMBER(19)                     -- nullable
 );
 
 -- Depende: TB_CLV_PET, TB_CLV_TIPO_VACINA, TB_CLV_VETERINARIO, TB_CLV_CONSULTA (nullable)
