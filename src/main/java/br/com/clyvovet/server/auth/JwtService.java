@@ -14,18 +14,22 @@ import java.util.Date;
 @Service
 public class JwtService {
 
+    /** Claim do tenant. Unica origem do id_clinica em requisicao autenticada. */
+    public static final String CLAIM_ID_CLINICA = "idClinica";
+
     @Value("${app.jwt.secret}")
     private String secret;
 
     @Value("${app.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
 
-    public String generateAccessToken(Long id, String email, String nome, TipoUsuario tipo) {
+    public String generateAccessToken(Long id, String email, String nome, TipoUsuario tipo, Long idClinica) {
         return Jwts.builder()
                 .subject(email)
                 .claim("id", id)
                 .claim("nome", nome)
                 .claim("tipo", tipo.name())
+                .claim(CLAIM_ID_CLINICA, idClinica)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpirationMs))
                 .signWith(getSigningKey())

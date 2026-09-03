@@ -2,11 +2,13 @@ package br.com.clyvovet.server.vacinacao;
 
 import br.com.clyvovet.server.consulta.Consulta;
 import br.com.clyvovet.server.pet.Pet;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import br.com.clyvovet.server.tipovacina.TipoVacina;
 import br.com.clyvovet.server.veterinario.Veterinario;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDate;
 
@@ -14,6 +16,7 @@ import java.time.LocalDate;
 @Table(name = "TB_CLV_APLICACAO_VACINA")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO_VIA_PET)
 public class AplicacaoVacina {
 
     @Id

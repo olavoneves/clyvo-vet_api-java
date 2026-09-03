@@ -1,14 +1,17 @@
 package br.com.clyvovet.server.veterinario;
 
 import br.com.clyvovet.server.clinica.Clinica;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "TB_CLV_VETERINARIO")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO)
 public class Veterinario {
 
     @Id

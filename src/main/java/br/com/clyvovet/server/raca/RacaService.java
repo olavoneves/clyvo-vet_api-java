@@ -41,6 +41,10 @@ public class RacaService {
     public RacaResponse create(RacaRequest request) {
         Raca r = new Raca();
         r.setNome(request.nome());
+        r.setDsGrupoRaca(request.dsGrupoRaca());
+        r.setDsPortePadrao(request.dsPortePadrao());
+        r.setFlBraquicefalico(request.flBraquicefalico());
+        r.setDsPredisposicoes(request.dsPredisposicoes());
         r.setEspecie(especieService.findEntityById(request.especieId()));
         return RacaResponse.from(repository.save(r));
     }
@@ -50,6 +54,10 @@ public class RacaService {
         Raca r = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Raça", id));
         r.setNome(request.nome());
+        r.setDsGrupoRaca(request.dsGrupoRaca());
+        r.setDsPortePadrao(request.dsPortePadrao());
+        r.setFlBraquicefalico(request.flBraquicefalico());
+        r.setDsPredisposicoes(request.dsPredisposicoes());
         r.setEspecie(especieService.findEntityById(request.especieId()));
         return RacaResponse.from(repository.save(r));
     }

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<!--
+  Nao usa o layout: a tela de login nao tem nav nem sessao para mostrar.
+  O POST vai para o filtro do Spring Security, nao para um controller.
+-->
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Entrar · Clyvo Vet</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="tela-login">
+
+<main class="cartao-login">
+    <div class="marca marca-login">
+        <span class="marca-ponto"></span>
+        Clyvo<strong>Vet</strong>
+    </div>
+    <p class="login-sub">Acesso da equipe da clínica</p>
+
+    <div class="aviso aviso-erro" th:if="${param.erro != null}" role="alert">
+        E-mail ou senha inválidos.
+    </div>
+    <div class="aviso aviso-ok" th:if="${param.saiu != null}" role="status">
+        Sessão encerrada.
+    </div>
+
+    <form th:action="@{/login}" method="post">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" name="email" required autofocus autocomplete="username">
+
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" name="senha" required autocomplete="current-password">
+
+        <button type="submit" class="botao-principal">Entrar</button>
+    </form>
+
+    <p class="login-nota">
+        Tutores usam o aplicativo. Esta tela é para veterinários e colaboradores.
+    </p>
+</main>
+
+</body>
+</html>

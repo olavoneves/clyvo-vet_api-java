@@ -33,7 +33,7 @@ public class RefreshToken {
     private LocalDateTime dtExpiracao;
 
     @Convert(converter = SimNaoConverter.class)
-    @Column(name = "fl_revogado", nullable = false, length = 1)
+    @Column(name = "fl_revogado", nullable = false, columnDefinition = "CHAR(1)")
     private Boolean revogado;
 
     @Column(name = "dt_criacao", nullable = false)

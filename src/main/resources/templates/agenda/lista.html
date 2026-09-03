@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: pagina('Agenda', ~{::main}, ~{})}">
+<head><title>Agenda</title></head>
+<body>
+
+<main class="conteudo">
+
+    <div class="cabecalho-tela">
+        <div>
+            <h1>Agenda de obrigações</h1>
+            <p class="subtitulo"
+               th:text="|Hoje é ${#temporals.format(hoje, 'dd/MM/yyyy')}|">Hoje</p>
+        </div>
+    </div>
+
+    <!--
+      Dois blocos com a mesma tabela. O fragmento evita que a coluna de hoje e a
+      da semana divirjam quando uma das duas for ajustada.
+    -->
+    <section class="bloco">
+        <h2 class="titulo-bloco">Hoje</h2>
+        <div th:replace="~{agenda/lista :: tabelaObrigacoes(${doDia}, 'Nada previsto para hoje.')}"></div>
+    </section>
+
+    <section class="bloco">
+        <h2 class="titulo-bloco"
+            th:text="|Próximos dias — até ${#temporals.format(fimDaSemana, 'dd/MM')}|">Próximos dias</h2>
+        <div th:replace="~{agenda/lista :: tabelaObrigacoes(${daSemana}, 'Nada previsto para os próximos sete dias.')}"></div>
+    </section>
+
+</main>
+
+<div th:fragment="tabelaObrigacoes(obrigacoes, vazio)" class="tabela-rolagem">
+    <table class="tabela">
+        <thead>
+        <tr>
+            <th>Prevista</th>
+            <th>Pet</th>
+            <th>Etapa</th>
+            <th>Protocolo</th>
+            <th>Grupo</th>
+            <th>Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="o : ${obrigacoes}">
+            <td th:text="${#temporals.format(o.dtPrevista, 'dd/MM/yyyy')}">—</td>
+            <td><a th:href="@{/pets/{id}(id=${o.petId})}" th:text="${o.petNome}">Pet</a></td>
+            <td th:text="${o.etapaNome}">Etapa</td>
+            <td th:text="${o.protocoloNome}">Protocolo</td>
+            <td th:text="${o.grupoControle} ? 'Controle' : 'Tratado'">—</td>
+            <td>
+                <span class="etiqueta"
+                      th:classappend="'etiqueta-' + ${#strings.toLowerCase(o.status)}"
+                      th:text="${o.status}">STATUS</span>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(obrigacoes)}">
+            <td colspan="6" class="tabela-vazia" th:text="${vazio}">Nada previsto.</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

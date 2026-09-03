@@ -1,8 +1,10 @@
 package br.com.clyvovet.server.pet;
 
+import br.com.clyvovet.server.clinica.ClinicaService;
 import br.com.clyvovet.server.enums.PetStatus;
 import br.com.clyvovet.server.exception.EntityNotFoundException;
 import br.com.clyvovet.server.raca.RacaService;
+import br.com.clyvovet.server.tenant.TenantContext;
 import br.com.clyvovet.server.tutor.TutorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,7 @@ public class PetService {
     private final PetRepository repository;
     private final TutorService tutorService;
     private final RacaService racaService;
+    private final ClinicaService clinicaService;
 
     @Transactional(readOnly = true)
     public Page<PetResponse> findAll(Pageable pageable) {
@@ -55,6 +58,8 @@ public class PetService {
     @Transactional
     public PetResponse create(PetRequest request) {
         Pet p = new Pet();
+        // a clinica vem do token, nunca do corpo da requisicao
+        p.setClinica(clinicaService.findEntityById(TenantContext.getOrThrow()));
         mapRequest(p, request);
         return PetResponse.from(repository.save(p));
     }

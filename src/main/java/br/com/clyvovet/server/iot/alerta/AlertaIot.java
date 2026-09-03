@@ -4,9 +4,11 @@ import br.com.clyvovet.server.consulta.Consulta;
 import br.com.clyvovet.server.converter.SimNaoConverter;
 import br.com.clyvovet.server.enums.SeveridadeAlerta;
 import br.com.clyvovet.server.iot.leitura.LeituraIot;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDateTime;
 
@@ -14,6 +16,7 @@ import java.time.LocalDateTime;
 @Table(name = "TB_CLV_ALERTA_IOT")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO_VIA_LEITURA)
 public class AlertaIot {
 
     @Id
@@ -36,7 +39,7 @@ public class AlertaIot {
     private LocalDateTime dtAlerta;
 
     @Convert(converter = SimNaoConverter.class)
-    @Column(name = "fl_resolvido", length = 1)
+    @Column(name = "fl_resolvido", columnDefinition = "CHAR(1)")
     private Boolean resolvido;
 
     @ManyToOne(fetch = FetchType.LAZY)

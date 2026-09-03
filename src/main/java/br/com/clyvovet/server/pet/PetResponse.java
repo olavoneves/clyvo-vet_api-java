@@ -21,7 +21,8 @@ public record PetResponse(
         Long tutorId,
         String tutorNome,
         Long racaId,
-        String racaNome
+        String racaNome,
+        Long clinicaId
 ) {
     public static PetResponse from(Pet p) {
         return new PetResponse(
@@ -29,6 +30,7 @@ public record PetResponse(
                 p.getMicrochip(), p.getRga(), p.getPelagem(), p.getPorte(),
                 p.getCastrado(), p.getStatus(), p.getObservacaoGeral(),
                 p.getTutor().getId(), p.getTutor().getNome(),
-                p.getRaca().getId(), p.getRaca().getNome());
+                p.getRaca().getId(), p.getRaca().getNome(),
+                p.getClinica().getId());
     }
 }

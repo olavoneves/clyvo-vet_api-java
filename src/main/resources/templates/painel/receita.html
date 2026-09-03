@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: pagina('Painel de receita', ~{::main}, ~{::script})}">
+<head><title>Painel de receita</title></head>
+<body>
+
+<main class="conteudo">
+
+    <div class="cabecalho-tela">
+        <div>
+            <h1>Receita recuperada</h1>
+            <p class="subtitulo"
+               th:text="|Referência: ${#temporals.format(mesAtual, 'MMMM ''de'' yyyy')}|">Referência</p>
+        </div>
+        <div class="navegacao-mes">
+            <a class="botao-secundario" th:href="@{/painel/receita(mes=${mesAnterior})}">&larr; Mês anterior</a>
+            <a class="botao-secundario" th:if="${mesSeguinte != null}"
+               th:href="@{/painel/receita(mes=${mesSeguinte})}">Mês seguinte &rarr;</a>
+            <span class="botao-secundario desabilitado" th:if="${mesSeguinte == null}"
+                  title="Este já é o mês corrente">Mês seguinte &rarr;</span>
+        </div>
+    </div>
+
+    <!-- 1. Funil do mes: do compromisso previsto ao pet na mesa -->
+    <section class="bloco">
+        <h2 class="titulo-bloco">Funil do mês</h2>
+        <p class="ajuda">
+            Cada etapa é um filtro. A largura da barra mostra quanto sobra do compromisso
+            previsto até o pet efetivamente atendido.
+        </p>
+
+        <div class="funil">
+            <div class="funil-etapa" th:each="etapa : ${etapasFunil}">
+                <span class="funil-rotulo" th:text="${etapa.rotulo}">Etapa</span>
+                <span class="funil-valor" th:text="${etapa.valor}">0</span>
+                <span class="funil-taxa" th:if="${etapa.taxa != null}"
+                      th:text="|${etapa.taxa}% do topo|">0%</span>
+            </div>
+        </div>
+
+        <div class="grafico-caixa">
+            <canvas id="graficoFunil" height="120"></canvas>
+        </div>
+
+        <p class="nota-perda">
+            <span class="ponto-perda"></span>
+            <strong th:text="${painel.funil.perdidas}">0</strong>
+            obrigações vencidas sem atendimento neste mês.
+        </p>
+    </section>
+
+    <!-- 2. O numero que sustenta o preco do produto -->
+    <section class="bloco bloco-destaque">
+        <p class="destaque-rotulo">Receita recuperada este mês</p>
+        <p class="destaque-numero"
+           th:text="'R$ ' + ${#numbers.formatDecimal(painel.vlRecuperadoTotal, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</p>
+        <p class="destaque-contraponto">
+            Deixados na mesa:
+            <strong th:text="'R$ ' + ${#numbers.formatDecimal(painel.vlPerdidoTotal, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</strong>
+            em obrigações que venceram sem retorno.
+        </p>
+    </section>
+
+    <!-- 3. Tratado vs. controle: a unica leitura honesta do quanto o produto causou -->
+    <section class="bloco">
+        <h2 class="titulo-bloco">Tratado vs. grupo de controle</h2>
+        <p class="ajuda">
+            O grupo de controle é sorteado para não receber lembrete. A diferença entre as
+            duas taxas é a parte do resultado que o produto causou — o resto teria acontecido
+            de qualquer forma.
+            <strong th:if="${painel.comparacao.janelaInicio != null}"
+                    th:text="|Recorte: toda a janela disponível, de ${#temporals.format(painel.comparacao.janelaInicio, 'MM/yyyy')} a ${#temporals.format(painel.comparacao.janelaFim, 'MM/yyyy')} — não apenas o mês acima.|">Recorte</strong>
+        </p>
+
+        <div class="comparacao">
+            <div class="comparacao-numeros">
+                <div class="grupo-cartao">
+                    <span class="grupo-nome">Tratado</span>
+                    <span class="grupo-taxa" th:if="${painel.comparacao.tratado.pcComparecimento != null}"
+                          th:text="${#numbers.formatDecimal(painel.comparacao.tratado.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
+                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.tratado.pcComparecimento == null}">sem dados</span>
+                    <span class="grupo-detalhe"
+                          th:text="|${painel.comparacao.tratado.cumpridas} de ${painel.comparacao.tratado.obrigacoes} obrigações cumpridas|">0 de 0</span>
+                </div>
+
+                <div class="grupo-cartao">
+                    <span class="grupo-nome">Controle</span>
+                    <span class="grupo-taxa" th:if="${painel.comparacao.controle.pcComparecimento != null}"
+                          th:text="${#numbers.formatDecimal(painel.comparacao.controle.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
+                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.controle.pcComparecimento == null}">sem dados</span>
+                    <span class="grupo-detalhe"
+                          th:text="|${painel.comparacao.controle.cumpridas} de ${painel.comparacao.controle.obrigacoes} obrigações cumpridas|">0 de 0</span>
+                </div>
+
+                <div class="grupo-cartao cartao-lift">
+                    <span class="grupo-nome">Diferença</span>
+                    <span class="grupo-taxa lift" th:if="${painel.comparacao.deltaPontosPercentuais != null}"
+                          th:text="(${painel.comparacao.deltaPontosPercentuais.signum() > 0} ? '+' : '') + ${#numbers.formatDecimal(painel.comparacao.deltaPontosPercentuais, 1, 'POINT', 1, 'COMMA')} + ' p.p.'">+0 p.p.</span>
+                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.deltaPontosPercentuais == null}">sem comparação</span>
+                    <span class="grupo-detalhe"
+                          th:text="|sobre ${painel.comparacao.tratado.obrigacoes + painel.comparacao.controle.obrigacoes} obrigações|">base</span>
+                </div>
+            </div>
+
+            <div class="grafico-caixa grafico-comparacao">
+                <canvas id="graficoComparacao" height="200"></canvas>
+            </div>
+        </div>
+
+        <p class="nota-metodo">
+            Grupo de controle: 10% dos pets, sorteio determinístico por pet.
+            Dados de demonstração.
+        </p>
+    </section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const funil = /*[[${etapasFunil}]]*/ [];
+    const comparacao = /*[[${gruposComparacao}]]*/ [];
+    /*]]>*/
+
+    const tinta = getComputedStyle(document.documentElement);
+    const cor = (nome) => tinta.getPropertyValue(nome).trim();
+
+    const semGrade = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } }
+    };
+
+    new Chart(document.getElementById('graficoFunil'), {
+        type: 'bar',
+        data: {
+            labels: funil.map(e => e.rotulo),
+            datasets: [{
+                data: funil.map(e => e.valor),
+                backgroundColor: cor('--cor-primaria'),
+                borderRadius: 4,
+                barPercentage: 0.7
+            }]
+        },
+        options: Object.assign({}, semGrade, {
+            indexAxis: 'y',
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: cor('--cor-grade') } },
+                y: { grid: { display: false } }
+            }
+        })
+    });
+
+    new Chart(document.getElementById('graficoComparacao'), {
+        type: 'bar',
+        data: {
+            // o n vai no proprio rotulo do eixo: quem olha so o grafico
+            // tambem precisa enxergar o tamanho do grupo
+            labels: comparacao.map(g => g.rotulo + ' (n=' + g.obrigacoes + ')'),
+            datasets: [{
+                data: comparacao.map(g => g.taxa),
+                backgroundColor: [cor('--cor-primaria'), cor('--cor-neutra')],
+                borderRadius: 4,
+                barPercentage: 0.5
+            }]
+        },
+        options: Object.assign({}, semGrade, {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { callback: (v) => v + '%' },
+                    grid: { color: cor('--cor-grade') }
+                },
+                x: { grid: { display: false } }
+            }
+        })
+    });
+</script>
+
+</body>
+</html>

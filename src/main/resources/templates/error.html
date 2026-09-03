@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!--
+  Pagina de erro das telas. Existe para que o browser nunca caia na whitelabel
+  do Spring Boot, que expoe caminho e classe da excecao.
+
+  So mostra status e um texto curto: o diagnostico fica no log do servidor.
+-->
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Erro · Clyvo Vet</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="tela-login">
+
+<main class="cartao-login">
+    <div class="marca marca-login">
+        <span class="marca-ponto"></span>
+        Clyvo<strong>Vet</strong>
+    </div>
+
+    <p class="destaque-rotulo" style="color: var(--cor-texto-suave)"
+       th:text="${status} ?: 'Erro'">Erro</p>
+
+    <h1 style="font-size: 20px; margin: 4px 0 10px"
+        th:switch="${status}">
+        <span th:case="403">Você não tem acesso a esta página</span>
+        <span th:case="404">Página não encontrada</span>
+        <span th:case="*">Algo deu errado</span>
+    </h1>
+
+    <p class="login-sub">
+        Se o problema continuar, avise a equipe técnica com o horário em que aconteceu.
+    </p>
+
+    <a class="botao-principal" style="display: block; text-align: center; text-decoration: none"
+       th:href="@{/painel/receita}">Voltar ao painel</a>
+</main>
+
+</body>
+</html>

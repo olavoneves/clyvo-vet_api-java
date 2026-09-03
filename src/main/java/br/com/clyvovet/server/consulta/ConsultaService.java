@@ -71,6 +71,7 @@ public class ConsultaService {
         c.setMotivo(r.motivo());
         c.setDiagnostico(r.diagnostico());
         c.setStatus(r.status());
+        c.setNrValor(r.nrValor());
         c.setPet(petService.findEntityById(r.petId()));
         c.setVeterinario(veterinarioService.findEntityById(r.veterinarioId()));
     }

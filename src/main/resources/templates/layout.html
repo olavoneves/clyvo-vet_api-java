@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!--
+  Fragmento base de todas as telas autenticadas.
+
+  Uso: th:replace="~{layout :: pagina('Titulo', ~{::main}, ~{::script})}"
+  Pagina sem script proprio passa ~{} no terceiro parametro.
+-->
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="pagina(titulo, conteudo, scripts)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|${titulo} · Clyvo Vet|">Clyvo Vet</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<header class="topo">
+    <a class="marca" th:href="@{/painel/receita}">
+        <span class="marca-ponto"></span>
+        Clyvo<strong>Vet</strong>
+    </a>
+
+    <nav class="menu">
+        <a th:href="@{/painel/receita}" th:classappend="${secao == 'painel'} ? 'ativo'">Painel</a>
+        <a th:href="@{/agenda}" th:classappend="${secao == 'agenda'} ? 'ativo'">Agenda</a>
+        <a th:href="@{/pets}" th:classappend="${secao == 'pets'} ? 'ativo'">Pets</a>
+        <a th:href="@{/swagger-ui.html}" target="_blank" rel="noopener">API</a>
+    </nav>
+
+    <div class="sessao">
+        <span class="sessao-nome" sec:authentication="principal.nomeExibicao">—</span>
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="botao-texto">Sair</button>
+        </form>
+    </div>
+</header>
+
+<main th:replace="${conteudo}">
+    <p>Conteudo da pagina.</p>
+</main>
+
+<footer class="rodape">
+    <span>Clyvo Vet · motor de protocolo e receita recuperada</span>
+    <span th:text="${#temporals.format(#temporals.createToday(), 'dd/MM/yyyy')}">01/01/2026</span>
+</footer>
+
+<th:block th:replace="${scripts}"></th:block>
+</body>
+</html>

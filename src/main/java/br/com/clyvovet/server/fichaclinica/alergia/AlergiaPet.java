@@ -3,10 +3,12 @@ package br.com.clyvovet.server.fichaclinica.alergia;
 import br.com.clyvovet.server.consulta.Consulta;
 import br.com.clyvovet.server.enums.SeveridadeAlergia;
 import br.com.clyvovet.server.pet.Pet;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import br.com.clyvovet.server.tipoalergia.TipoAlergia;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDate;
 
@@ -14,6 +16,7 @@ import java.time.LocalDate;
 @Table(name = "TB_CLV_ALERGIA_PET")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO_VIA_PET)
 public class AlergiaPet {
 
     @Id

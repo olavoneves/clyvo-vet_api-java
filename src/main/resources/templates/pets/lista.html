@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: pagina('Pets', ~{::main}, ~{})}">
+<head><title>Pets</title></head>
+<body>
+
+<main class="conteudo">
+
+    <div class="cabecalho-tela">
+        <div>
+            <h1>Pets</h1>
+            <p class="subtitulo" th:text="|${pagina.totalElements} pets nesta clínica|">0 pets</p>
+        </div>
+    </div>
+
+    <section class="bloco">
+        <div class="tabela-rolagem">
+            <table class="tabela">
+                <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Raça</th>
+                    <th>Porte</th>
+                    <th>Tutor</th>
+                    <th>Status</th>
+                    <th class="col-acao">Ficha</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="pet : ${pagina.content}">
+                    <td><strong th:text="${pet.nome}">Nome</strong></td>
+                    <td th:text="${pet.racaNome}">Raça</td>
+                    <td th:text="${pet.porte}">Porte</td>
+                    <td th:text="${pet.tutorNome}">Tutor</td>
+                    <td>
+                        <span class="etiqueta"
+                              th:classappend="'etiqueta-' + ${#strings.toLowerCase(pet.status)}"
+                              th:text="${pet.status}">STATUS</span>
+                    </td>
+                    <td class="col-acao">
+                        <a class="botao-secundario" th:href="@{/pets/{id}(id=${pet.id})}">Abrir</a>
+                    </td>
+                </tr>
+                <tr th:if="${pagina.empty}">
+                    <td colspan="6" class="tabela-vazia">Nenhum pet cadastrado nesta clínica.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="paginacao" th:if="${pagina.totalPages > 1}">
+            <a class="botao-secundario" th:if="${!pagina.first}"
+               th:href="@{/pets(page=${pagina.number - 1}, size=${pagina.size})}">&larr; Anterior</a>
+            <span class="botao-secundario desabilitado" th:if="${pagina.first}">&larr; Anterior</span>
+
+            <span class="paginacao-posicao"
+                  th:text="|Página ${pagina.number + 1} de ${pagina.totalPages}|">Página 1 de 1</span>
+
+            <a class="botao-secundario" th:if="${!pagina.last}"
+               th:href="@{/pets(page=${pagina.number + 1}, size=${pagina.size})}">Próxima &rarr;</a>
+            <span class="botao-secundario desabilitado" th:if="${pagina.last}">Próxima &rarr;</span>
+        </nav>
+    </section>
+
+</main>
+
+</body>
+</html>

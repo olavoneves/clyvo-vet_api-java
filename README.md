@@ -96,18 +96,31 @@ br.com.clyvovet.server
 
 ## 🗄️ Banco de Dados
 
-25 tabelas Oracle com prefixo `TB_CLV_`. Schema gerenciado via `ddl-auto=update` no Docker ou manualmente no banco FIAP.
+Tabelas Oracle com prefixo `TB_CLV_`. O schema é governado pelo **Flyway**, nunca pelo
+Hibernate: `spring.jpa.hibernate.ddl-auto=validate` faz a aplicação recusar subir se o
+mapeamento divergir do banco.
 
-### Scripts de migração (`docs/migration/`)
+### Migrations (`src/main/resources/db/migration/`)
 
-| Arquivo | Finalidade | Quando usar |
-|---|---|---|
-| `V_COMPLETO__create_all_tables.sql` | DDL completo (25 tabelas + FKs + constraints) | Docker local — fresh install |
-| `V0__foreign_keys.sql` | Apenas FKs via `ALTER TABLE` | Banco FIAP — já tem tabelas, só falta FKs |
-| `V1__veterinario_auth_e_refresh_token.sql` | Adiciona campos de auth no VETERINÁRIO + cria `TB_CLV_REFRESH_TOKEN` | Banco FIAP — após V0 |
-| `V2__colaborador.sql` | Cria `TB_CLV_COLABORADOR` (usuários internos/admin) | Banco FIAP — após V1 |
+| Arquivo | Finalidade |
+|---|---|
+| `V0__baseline_schema.sql` | 23 tabelas do modelo inicial, **sem** foreign keys |
+| `V0_1__foreign_keys.sql` | As FKs, num passo separado — assim a ordem de criação das tabelas não importa |
+| `V1__veterinario_auth_e_refresh_token.sql` | Auth do veterinário + `TB_CLV_REFRESH_TOKEN` |
+| `V2__colaborador.sql` | `TB_CLV_COLABORADOR` |
+| `V3__multi_tenancy_id_clinica.sql` | `id_clinica` em PET, TUTOR e COLABORADOR |
+| `V4__clinica_ticket_medio.sql` | Ticket médio da clínica |
+| `V5__consulta_valor.sql` | Valor da consulta |
+| `V6__raca_perfil.sql` | Perfil da raça |
+| `V7__correcoes_motor.sql` | **Motor de protocolo**: catálogo, obrigações, outbox, auditoria, funções, procedures e a view do painel |
+| `V8__melhorias_banco.sql` | Gerador de dados de demonstração (`PR_CLV_SEED_*`) — nada aqui é chamado pela aplicação |
 
-**Ordem no banco FIAP:** `V0` → `V1` → `V2` (antes de subir a aplicação pela primeira vez)
+**Banco vazio** (container do docker-compose): a cadeia `V0 → V0.1 → V1 … → V8` roda
+inteira e cria tudo, sem intervenção manual.
+
+**Banco da FIAP**: o schema já existia, aplicado à mão pelo DBA. O Flyway está com
+`baseline-version=8`, então nenhuma migration executa — ele apenas registra o baseline e
+segue. Migrations novas começam em **V9**.
 
 ### Diagrama de dependências (simplificado)
 
@@ -157,18 +170,24 @@ O `accessToken` expira em **15 minutos**. O `refreshToken` em **7 dias**.
 
 ### Rotas públicas (sem token)
 
+Esta lista é exaustiva. Qualquer rota fora dela exige autenticação.
+
 | Rota | Descrição |
 |---|---|
-| `POST /auth/login` | Login |
-| `POST /auth/refresh` | Renovar token |
-| `POST /auth/logout` | Revogar sessão |
-| `POST /tutores` | Cadastro de tutor |
-| `POST /clinicas` | Cadastro de clínica |
-| `POST /veterinarios` | Cadastro de veterinário |
-| `GET /swagger-ui.html` | Documentação Swagger |
-| `GET /v3/api-docs/**` | OpenAPI spec |
+| `POST /api/auth/**` | Login, refresh e logout |
+| `POST /api/clinicas` | Autocadastro de clínica na plataforma |
+| `POST /api/tutores` | Autocadastro de tutor, com `clinicaId` no corpo |
+| `GET /swagger-ui/**`, `GET /v3/api-docs/**` | Documentação da API |
+| `GET /actuator/health` | Health check do container |
+| `GET /login` + estáticos | Tela de login e CSS/JS das páginas |
 
-Todas as demais rotas exigem `Authorization: Bearer <accessToken>`.
+> **`POST /api/veterinarios` não é público.** Exige `ROLE_COLABORADOR` e a clínica sai do
+> token, não do corpo. Aberto, seria bypass completo do multi-tenant: qualquer pessoa
+> criaria um veterinário numa clínica alheia, autenticaria com ele e leria todos os dados
+> daquela clínica.
+
+Todas as demais rotas exigem `Authorization: Bearer <accessToken>` (API) ou sessão
+autenticada (telas).
 
 ---
 
@@ -178,49 +197,54 @@ Todas as demais rotas exigem `Authorization: Bearer <accessToken>`.
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/especies` | Listar espécies (paginado) |
-| `GET` | `/especies/{id}` | Buscar espécie por ID |
-| `POST` | `/especies` | Criar espécie |
-| `PUT` | `/especies/{id}` | Atualizar espécie |
-| `DELETE` | `/especies/{id}` | Remover espécie |
-| `GET` | `/racas` | Listar raças |
-| `GET` | `/pets` | Listar pets |
-| `GET` | `/pets/{id}/ficha-tecnica` | Ficha técnica completa do pet |
-| `GET` | `/consultas` | Listar consultas |
-| `GET` | `/agendamentos` | Listar agendamentos |
-| `GET` | `/veterinarios` | Listar veterinários |
-| `GET` | `/tutores` | Listar tutores |
-| `GET` | `/clinicas` | Listar clínicas |
-| `GET` | `/vacinas/tipos` | Listar tipos de vacina |
-| `GET` | `/vacinas/aplicacoes` | Listar aplicações de vacina |
-| `GET` | `/exames` | Listar exames |
-| `GET` | `/prescricoes` | Listar prescrições |
-| `GET` | `/sensores-iot` | Listar sensores IoT |
-| `GET` | `/leituras-iot` | Listar leituras IoT |
-| `GET` | `/alertas-iot` | Listar alertas IoT |
+| `GET` | `/api/especies` | Listar espécies (paginado) |
+| `GET` | `/api/especies/{id}` | Buscar espécie por ID |
+| `POST` | `/api/especies` | Criar espécie |
+| `PUT` | `/api/especies/{id}` | Atualizar espécie |
+| `DELETE` | `/api/especies/{id}` | Remover espécie |
+| `GET` | `/api/racas` | Listar raças |
+| `GET` | `/api/pets` | Listar pets |
+| `GET` | `/api/pets/{id}/ficha-tecnica` | Ficha técnica completa do pet |
+| `GET` | `/api/consultas` | Listar consultas |
+| `GET` | `/api/agendamentos` | Listar agendamentos |
+| `GET` | `/api/veterinarios` | Listar veterinários |
+| `GET` | `/api/tutores` | Listar tutores |
+| `GET` | `/api/clinicas` | Listar clínicas |
+| `GET` | `/api/vacinas/tipos` | Listar tipos de vacina |
+| `GET` | `/api/vacinas/aplicacoes` | Listar aplicações de vacina |
+| `GET` | `/api/exames` | Listar exames |
+| `GET` | `/api/prescricoes` | Listar prescrições |
+| `GET` | `/api/sensores-iot` | Listar sensores IoT |
+| `GET` | `/api/leituras-iot` | Listar leituras IoT |
+| `GET` | `/api/alertas-iot` | Listar alertas IoT |
 
 A documentação completa está disponível via Swagger em `/swagger-ui.html`.
+
+> As rotas REST vivem sob `/api`. O prefixo não está escrito nos controllers: é
+> aplicado no handler mapping (`WebMvcConfig`), para que as telas Thymeleaf possam
+> ocupar `/pets`, `/agenda` e `/painel/receita` sem colidir com a API.
 
 ### Exemplo de uso via curl
 
 ```bash
 # 1. Criar clínica (público)
-curl -X POST http://<IP>:8080/clinicas \
+curl -X POST http://<IP>:8080/api/clinicas \
   -H "Content-Type: application/json" \
   -d '{"nome":"CLYVO Vet SP","cnpj":"12345678000199","logradouro":"Av. Paulista 1000","cidade":"Sao Paulo","estado":"SP"}'
 
-# 2. Criar veterinário (público)
-curl -X POST http://<IP>:8080/veterinarios \
+# 2. Login como colaborador (obter token)
+curl -X POST http://<IP>:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"nome":"Dr. Paulo Costa","crmv":"SP-67890","email":"paulo@clyvovet.com","senha":"<SUA_SENHA>","clinicaId":1}'
+  -d '{"email":"master@clyvovet.com","senha":"master","tipo":"COLABORADOR"}'
 
-# 3. Login (obter token)
-curl -X POST http://<IP>:8080/auth/login \
+# 3. Criar veterinario -- exige token de COLABORADOR; a clinica vem do token
+curl -X POST http://<IP>:8080/api/veterinarios \
   -H "Content-Type: application/json" \
-  -d '{"email":"paulo@clyvovet.com","senha":"<SUA_SENHA>","tipo":"VETERINARIO"}'
+  -H "Authorization: Bearer <SEU_TOKEN>" \
+  -d '{"nome":"Dr. Paulo Costa","crmv":"SP-67890","email":"paulo@clyvovet.com","senha":"<SUA_SENHA>"}'
 
 # 4. Usar token nas rotas protegidas
-curl http://<IP>:8080/especies \
+curl http://<IP>:8080/api/especies \
   -H "Authorization: Bearer <SEU_TOKEN>"
 ```
 
@@ -234,15 +258,25 @@ curl http://<IP>:8080/especies \
 docker compose up --build
 ```
 
-Aguarde o Oracle ficar healthy (~2 min). A API cria as tabelas automaticamente via `ddl-auto=update`.
+Aguarde o Oracle ficar healthy (~2 min). O banco sobe **vazio**: o Flyway executa a cadeia
+`V0 → V0.1 → V1 … → V8` e cria o schema inteiro — tabelas, foreign keys, índices, o motor
+de protocolo em PL/SQL e a view do painel. Nenhum passo manual.
+
+Para popular com dados de demonstração depois que a API subir:
+
+```sql
+BEGIN PR_CLV_SEED_EXECUTAR(p_qtd_pets => 400); END;
+/
+```
 
 API: `http://localhost:8080`  
 Swagger: `http://localhost:8080/swagger-ui.html`
 
 ### Sem Docker (banco FIAP)
 
-1. Configure as variáveis de ambiente
-2. Execute as migrations na ordem: `V0` → `V1` → `V2`
+1. Copie `.env.example` para `.env` e preencha
+2. Nada de migration manual: o Flyway está com `baseline-version=8` e reconhece o schema
+   existente sem executar nada
 3. Rode:
 
 ```bash
@@ -259,11 +293,17 @@ Swagger: `http://localhost:8080/swagger-ui.html`
 | `SPRING_DATASOURCE_URL` | URL JDBC do Oracle | — (obrigatória) |
 | `SPRING_DATASOURCE_USERNAME` | Usuário Oracle | — (obrigatória) |
 | `SPRING_DATASOURCE_PASSWORD` | Senha Oracle | — (obrigatória) |
-| `APP_JWT_SECRET` | Secret HS256 (mín. 32 chars) | — (obrigatória) |
+| `JWT_SECRET` | Secret HS256 (mín. 32 chars) | — (obrigatória) |
+| `CORS_ALLOWED_ORIGINS` | Origens autorizadas a chamar `/api` de um navegador, separadas por vírgula | vazio (nenhuma) |
 | `PORT` | Porta HTTP | `8080` |
 | `SPRING_JPA_HIBERNATE_DDL_AUTO` | DDL auto | `none` |
 
 > ⚠️ **Nunca commite credenciais reais.** Use variáveis de ambiente ou arquivo `.env` (que está no `.gitignore`).
+> Há um `.env.example` versionado com o formato esperado — copie para `.env` e preencha.
+
+> 📌 A variável do JWT chamava-se `APP_JWT_SECRET` até a fase de hardening. Se você tem um
+> `.env` ou um ambiente de deploy antigo, **renomeie para `JWT_SECRET`** — a aplicação não
+> sobe sem ela.
 
 ---
 

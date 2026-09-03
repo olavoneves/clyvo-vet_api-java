@@ -1,14 +1,17 @@
 package br.com.clyvovet.server.pet;
 
+import br.com.clyvovet.server.clinica.Clinica;
 import br.com.clyvovet.server.converter.SimNaoConverter;
 import br.com.clyvovet.server.enums.PetPorte;
 import br.com.clyvovet.server.enums.PetSexo;
 import br.com.clyvovet.server.enums.PetStatus;
 import br.com.clyvovet.server.raca.Raca;
+import br.com.clyvovet.server.tenant.TenantFilters;
 import br.com.clyvovet.server.tutor.Tutor;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDate;
 
@@ -16,6 +19,7 @@ import java.time.LocalDate;
 @Table(name = "TB_CLV_PET")
 @Getter
 @Setter
+@Filter(name = TenantFilters.TENANT, condition = TenantFilters.CONDICAO)
 public class Pet {
 
     @Id
@@ -47,7 +51,7 @@ public class Pet {
     private PetPorte porte;
 
     @Convert(converter = SimNaoConverter.class)
-    @Column(name = "fl_castrado", length = 1)
+    @Column(name = "fl_castrado", columnDefinition = "CHAR(1)")
     private Boolean castrado;
 
     @Enumerated(EnumType.STRING)
@@ -64,4 +68,8 @@ public class Pet {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_raca", nullable = false)
     private Raca raca;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_clinica", nullable = false)
+    private Clinica clinica;
 }
