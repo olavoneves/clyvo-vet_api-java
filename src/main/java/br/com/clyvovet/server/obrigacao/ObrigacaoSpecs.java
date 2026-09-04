@@ -4,6 +4,7 @@ import br.com.clyvovet.server.enums.ObrigacaoStatus;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.Collection;
 
 /**
  * Filtros opcionais da listagem. Specification em vez de "(:x is null or ...)"
@@ -24,6 +25,16 @@ public final class ObrigacaoSpecs {
         return (root, query, cb) -> status == null
                 ? cb.conjunction()
                 : cb.equal(root.get("dsStatus"), status);
+    }
+
+    /**
+     * Varios status de uma vez. Usado pelas pendencias do tutor, que sao tres
+     * estados da mesma coisa: prevista, avisada e respondida sem agendar.
+     */
+    public static Specification<Obrigacao> comStatusEm(Collection<ObrigacaoStatus> status) {
+        return (root, query, cb) -> status == null || status.isEmpty()
+                ? cb.conjunction()
+                : root.get("dsStatus").in(status);
     }
 
     public static Specification<Obrigacao> previstaDe(LocalDate de) {

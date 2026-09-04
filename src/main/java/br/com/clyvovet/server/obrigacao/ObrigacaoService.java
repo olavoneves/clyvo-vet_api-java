@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -30,6 +32,22 @@ public class ObrigacaoService {
                                           Long petId, Pageable pageable) {
         return repository.findAll(ObrigacaoSpecs.filtro(status, de, ate, petId), pageable)
                 .map(ObrigacaoResponse::from);
+    }
+
+    /**
+     * Obrigacoes de um pet em qualquer um dos status pedidos.
+     *
+     * <p>Serve a superficie do tutor e a ferramenta do agente, que fazem a mesma
+     * pergunta por caminhos diferentes: o que este pet ainda deve, e o que ja
+     * cumpriu. O recorte por clinica continua sendo do filtro de tenant.
+     */
+    @Transactional(readOnly = true)
+    public List<ObrigacaoResponse> doPetComStatus(Long petId, Collection<ObrigacaoStatus> status,
+                                                  Pageable pageable) {
+        return repository.findAll(
+                        ObrigacaoSpecs.doPet(petId).and(ObrigacaoSpecs.comStatusEm(status)), pageable)
+                .map(ObrigacaoResponse::from)
+                .getContent();
     }
 
     @Transactional(readOnly = true)

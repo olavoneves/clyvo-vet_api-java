@@ -14,3 +14,7 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      # Sem esta chave a aplicacao sobe igual; so o agente de agendamento
+      # responde 503.
+      - key: ANTHROPIC_API_KEY
+        sync: false
