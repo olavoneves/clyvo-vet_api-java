@@ -1,5 +1,6 @@
 package br.com.clyvovet.server.agente;
 
+import br.com.clyvovet.server.agente.llm.DialogoLlm;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -16,12 +17,17 @@ import java.util.Map;
  * <p>A ordem de declaracao e estavel — mapa que preserva insercao, sobre uma
  * lista ordenada por nome. Nao e detalhe: a lista de ferramentas e o inicio do
  * prompt, e prompt que muda de ordem a cada reinicio joga fora o cache da API.
+ *
+ * <p>As declaracoes saem no vocabulario neutro de {@link DialogoLlm}. Nada aqui
+ * sabe de {@code input_schema} nem de {@code functionDeclarations}: quem traduz
+ * — e quem liga recurso proprio de um fornecedor, como o {@code strict} da
+ * Anthropic — e o adaptador.
  */
 @Component
 public class CatalogoDeFerramentas {
 
     private final Map<String, Ferramenta> porNome = new LinkedHashMap<>();
-    private final List<ProtocoloAnthropic.Ferramenta> declaracoes;
+    private final List<DialogoLlm.Ferramenta> declaracoes;
 
     public CatalogoDeFerramentas(List<Ferramenta> ferramentas) {
         ferramentas.stream()
@@ -29,13 +35,12 @@ public class CatalogoDeFerramentas {
                 .forEach(f -> porNome.put(f.nome(), f));
 
         this.declaracoes = porNome.values().stream()
-                .map(f -> new ProtocoloAnthropic.Ferramenta(
-                        f.nome(), f.descricao(), f.esquema(), Boolean.TRUE))
+                .map(f -> new DialogoLlm.Ferramenta(f.nome(), f.descricao(), f.esquema()))
                 .toList();
     }
 
-    /** As ferramentas como a API precisa recebe-las. */
-    public List<ProtocoloAnthropic.Ferramenta> declaracoes() {
+    /** As ferramentas como a porta as descreve, sem formato de fio. */
+    public List<DialogoLlm.Ferramenta> declaracoes() {
         return declaracoes;
     }
 

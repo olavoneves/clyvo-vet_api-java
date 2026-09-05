@@ -7,6 +7,7 @@ import br.com.clyvovet.server.agente.ferramentas.CriarAgendamento;
 import br.com.clyvovet.server.agente.ferramentas.EscalarParaVeterinario;
 import br.com.clyvovet.server.agente.ferramentas.ListarObrigacoesPendentes;
 import br.com.clyvovet.server.agente.ferramentas.Reagendar;
+import br.com.clyvovet.server.agente.llm.GeminiAdapter;
 import br.com.clyvovet.server.auth.AuthenticatedUser;
 import br.com.clyvovet.server.enums.ObrigacaoStatus;
 import br.com.clyvovet.server.enums.ProtocoloCategoria;
@@ -28,7 +29,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -55,12 +55,12 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
- * O laco do agente, contra um stub da API de mensagens.
+ * O laco do agente, contra um stub do Gemini — o provedor ativo.
  *
- * <p>Nenhuma chamada real, nenhum credito gasto: o {@code MockRestServiceServer}
- * responde no lugar da Anthropic, com o mesmo JSON que ela devolveria. O que
- * esta sob teste e o que e nosso — o laco, o despacho de ferramenta, o
- * tratamento de conflito, o guardrail de saida e o isolamento por tutor.
+ * <p>Nenhuma chamada real, nenhuma cota consumida: o {@code MockRestServiceServer}
+ * responde no lugar da API, com o mesmo JSON que ela devolveria. O que esta sob
+ * teste e o que e nosso — o laco, o despacho de ferramenta, o tratamento de
+ * conflito, o guardrail de saida e o isolamento por tutor.
  *
  * <p>O que <b>nao</b> esta sob teste, e nao pode estar com um stub, e a escolha
  * do modelo. Quando o teste de intencao afirma que "quero marcar" leva a
@@ -68,11 +68,18 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  * essa ferramenta, o agente a executa com os argumentos certos, devolve o
  * resultado no formato certo e continua a conversa. A qualidade da escolha em si
  * e assunto do prompt e de avaliacao com a API de verdade, nao de suite.
+ *
+ * <p>Que o mesmo laco funcione com o outro provedor e assunto de
+ * {@link PortabilidadeDoProvedorTest}, que roda um cenario nos dois formatos de
+ * fio. Aqui o formato e so o do Gemini, de proposito: e este que roda em
+ * producao, e um teste que abstrai o formato deixaria de detectar uma quebra
+ * nele.
  */
 class AgenteServiceTest {
 
-    private static final String STUB = "https://stub.anthropic.local";
-    private static final String ROTA = STUB + "/v1/messages";
+    private static final String STUB = "https://stub.gemini.local";
+    private static final String MODELO = "gemini-2.5-flash";
+    private static final String ROTA = STUB + "/v1beta/models/" + MODELO + ":generateContent";
 
     private static final Long CLINICA = 47L;
     private static final Long TUTOR = 3L;
@@ -119,8 +126,8 @@ class AgenteServiceTest {
         RestClient.Builder builder = RestClient.builder();
         api = MockRestServiceServer.bindTo(builder).build();
 
-        AnthropicClient cliente = new AnthropicClient(
-                AnthropicClient.identificar(builder, propriedades).build(), propriedades);
+        GeminiAdapter provedor = new GeminiAdapter(
+                GeminiAdapter.identificar(builder, propriedades).build(), propriedades);
 
         CatalogoDeFerramentas catalogo = new CatalogoDeFerramentas(List.of(
                 new ListarObrigacoesPendentes(obrigacaoService),
@@ -129,9 +136,41 @@ class AgenteServiceTest {
                 new Reagendar(agendaService, agendamentoService),
                 new EscalarParaVeterinario()));
 
-        agente = new AgenteService(propriedades, cliente, catalogo,
+        agente = new AgenteService(propriedades, provedor, catalogo,
                 new MemoriaDeConversa(propriedades), new GuardrailClinico(), registro,
-                petRepository, JsonMapper.builder().build());
+                petRepository);
+    }
+
+    // ---------- formato de fio do Gemini ----------
+
+    /**
+     * A requisicao tem que sair no formato que a API do Gemini entende.
+     *
+     * <p>O laco nao consegue provar isto sozinho: um adaptador que montasse o
+     * JSON errado ainda passaria em todos os testes de comportamento, porque o
+     * stub responde o que mandarmos independentemente do que recebeu. Este teste
+     * olha o corpo que saiu.
+     */
+    @Test
+    @DisplayName("a requisicao sai no formato do Gemini: contents, systemInstruction e functionDeclarations")
+    void requisicaoSaiNoFormatoDoGemini() {
+        api.expect(ExpectedCount.once(), requestTo(ROTA))
+                .andExpect(header("x-goog-api-key", "chave-de-teste"))
+                .andExpect(content().string(containsString("\"systemInstruction\"")))
+                .andExpect(content().string(containsString("\"contents\"")))
+                .andExpect(content().string(containsString("\"functionDeclarations\"")))
+                .andExpect(content().string(containsString("\"maxOutputTokens\":8192")))
+                // o papel do tutor no Gemini e "user", e a ferramenta e declarada pelo nome
+                .andExpect(content().string(containsString("\"role\":\"user\"")))
+                .andExpect(content().string(containsString("consultar_disponibilidade")))
+                // additionalProperties nao existe no subconjunto de OpenAPI que o
+                // Gemini aceita: se vazar, a API devolve 400 na demonstracao
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.not(containsString("additionalProperties"))))
+                .andRespond(withSuccess(texto("Oi."), MediaType.APPLICATION_JSON));
+
+        agente.responder(PET, "oi");
+        api.verify();
     }
 
     // ---------- classificacao de intencao ----------
@@ -142,7 +181,7 @@ class AgenteServiceTest {
         given(agendaService.horariosLivres(any(), any())).willReturn(List.of(
                 new AgendaService.HorarioLivre(LocalDate.of(2026, 9, 17), "14:00", 5L, "Dra. Ana")));
 
-        esperarChamada(usoDeFerramenta("consultar_disponibilidade",
+        esperarChamada(chamadaDeFuncao("consultar_disponibilidade",
                 "{\"dataInicio\":\"2026-09-14\",\"dataFim\":\"2026-09-21\"}"));
         esperarChamada(texto("Tenho quinta às 14:00 com a Dra. Ana. Serve?"));
 
@@ -156,17 +195,19 @@ class AgenteServiceTest {
     }
 
     @Test
-    @DisplayName("o resultado da ferramenta volta para a API na mesma conversa")
+    @DisplayName("o resultado da ferramenta volta para a API como functionResponse")
     void resultadoDaFerramentaVoltaParaOModelo() {
         given(obrigacaoService.doPetComStatus(eq(PET), any(), any()))
                 .willReturn(List.of(obrigacaoPendente()));
 
-        esperarChamada(usoDeFerramenta("listar_obrigacoes_pendentes", "{\"idPet\":9}"));
+        esperarChamada(chamadaDeFuncao("listar_obrigacoes_pendentes", "{\"idPet\":9}"));
 
         // a segunda requisicao tem que carregar o que a ferramenta devolveu: sem
         // isso o modelo responderia no vazio e o laco seria decorativo
         api.expect(ExpectedCount.once(), requestTo(ROTA))
-                .andExpect(content().string(containsString("tool_result")))
+                .andExpect(content().string(containsString("\"functionResponse\"")))
+                // o Gemini casa chamada e resposta pelo nome da funcao, nao por id
+                .andExpect(content().string(containsString("listar_obrigacoes_pendentes")))
                 .andExpect(content().string(containsString("Reforço anual")))
                 .andRespond(withSuccess(texto("O reforço anual está pendente."),
                         MediaType.APPLICATION_JSON));
@@ -187,7 +228,7 @@ class AgenteServiceTest {
                 .willReturn(new AgendaService.AgendamentoConfirmado(
                         777L, OBRIGACAO, LocalDate.of(2026, 9, 17), "14:00", 5L, "Dra. Ana", "Rex"));
 
-        esperarChamada(usoDeFerramenta("criar_agendamento",
+        esperarChamada(chamadaDeFuncao("criar_agendamento",
                 "{\"idObrigacao\":101,\"dataHora\":\"2026-09-17T14:00\",\"idVeterinario\":5}"));
         esperarChamada(texto("Marcado para 17/09 às 14:00 com a Dra. Ana."));
 
@@ -217,7 +258,7 @@ class AgenteServiceTest {
         willThrow(new ConflitoDeEstadoException("O horário de 14:00 acabou de ser ocupado."))
                 .given(agendaService).agendar(anyLong(), any(LocalDateTime.class), anyLong());
 
-        esperarChamada(usoDeFerramenta("criar_agendamento",
+        esperarChamada(chamadaDeFuncao("criar_agendamento",
                 "{\"idObrigacao\":101,\"dataHora\":\"2026-09-17T14:00\",\"idVeterinario\":5}"));
 
         api.expect(ExpectedCount.once(), requestTo(ROTA))
@@ -238,7 +279,9 @@ class AgenteServiceTest {
     @Test
     @DisplayName("o modelo responde a pergunta clinica mesmo assim, e a saida e barrada")
     void perguntaClinicaRespondidaMesmoAssimEBarrada() {
-        // o caso que justifica a segunda camada: a instrucao do prompt falhou
+        // o caso que justifica a segunda camada: a instrucao do prompt falhou.
+        // Trocar de provedor nao muda nada aqui — e exatamente o ponto: o
+        // guardrail le a resposta final, e nao o formato de quem a produziu
         esperarChamada(texto("Pode dar 250 mg de dipirona a cada 8 horas, não é grave."));
 
         RespostaDoAgenteResponse resposta = agente.responder(PET, "ele está mancando, o que dou?");
@@ -275,7 +318,7 @@ class AgenteServiceTest {
     @Test
     @DisplayName("escalar_para_veterinario marca o turno como escalado")
     void escalarMarcaOTurno() {
-        esperarChamada(usoDeFerramenta("escalar_para_veterinario",
+        esperarChamada(chamadaDeFuncao("escalar_para_veterinario",
                 "{\"idPet\":9,\"resumo\":\"Tutor relata que o pet está mancando.\"}"));
         esperarChamada(texto("Encaminhei para a equipe clínica. Um veterinário vai te responder."));
 
@@ -317,7 +360,7 @@ class AgenteServiceTest {
     // ---------- resiliencia ----------
 
     @Test
-    @DisplayName("sem ANTHROPIC_API_KEY o servico recusa antes de qualquer trabalho")
+    @DisplayName("sem GEMINI_API_KEY o servico recusa antes de qualquer trabalho")
     void semChaveRecusa() {
         montarCom(propriedades(""));
 
@@ -332,7 +375,7 @@ class AgenteServiceTest {
         given(obrigacaoService.doPetComStatus(eq(PET), any(), any())).willReturn(List.of());
 
         api.expect(ExpectedCount.times(6), requestTo(ROTA))
-                .andRespond(withSuccess(usoDeFerramenta("listar_obrigacoes_pendentes", "{\"idPet\":9}"),
+                .andRespond(withSuccess(chamadaDeFuncao("listar_obrigacoes_pendentes", "{\"idPet\":9}"),
                         MediaType.APPLICATION_JSON));
 
         RespostaDoAgenteResponse resposta = agente.responder(PET, "e aí?");
@@ -356,6 +399,23 @@ class AgenteServiceTest {
         assertThat(resposta.escalado()).isTrue();
     }
 
+    /**
+     * O 429 deixa de ser excecao num tier gratuito: e a metade mais exercitada
+     * da politica de retentativa, e a que sustenta a escolha do provedor.
+     */
+    @Test
+    @DisplayName("429 do tier gratuito e retentado; a segunda tentativa vale")
+    void limiteDeCotaERetentado() {
+        api.expect(ExpectedCount.once(), requestTo(ROTA))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
+                        .withTooManyRequests());
+        api.expect(ExpectedCount.once(), requestTo(ROTA))
+                .andRespond(withSuccess(texto("Tudo certo."), MediaType.APPLICATION_JSON));
+
+        assertThat(agente.responder(PET, "quero marcar").texto()).isEqualTo("Tudo certo.");
+        api.verify();
+    }
+
     @Test
     @DisplayName("5xx e retentado; a segunda tentativa vale")
     void erroDeServidorERetentado() {
@@ -375,7 +435,7 @@ class AgenteServiceTest {
     void historicoMostraApenasOQueFoiDito() {
         given(obrigacaoService.doPetComStatus(eq(PET), any(), any())).willReturn(List.of());
 
-        esperarChamada(usoDeFerramenta("listar_obrigacoes_pendentes", "{\"idPet\":9}"));
+        esperarChamada(chamadaDeFuncao("listar_obrigacoes_pendentes", "{\"idPet\":9}"));
         esperarChamada(texto("Nada pendente."));
 
         agente.responder(PET, "o que falta?");
@@ -391,27 +451,37 @@ class AgenteServiceTest {
 
     private void esperarChamada(String corpoDaResposta) {
         api.expect(ExpectedCount.once(), requestTo(ROTA))
-                .andExpect(header("x-api-key", "chave-de-teste"))
-                .andExpect(header("anthropic-version", "2023-06-01"))
+                .andExpect(header("x-goog-api-key", "chave-de-teste"))
                 .andRespond(withSuccess(corpoDaResposta, MediaType.APPLICATION_JSON));
     }
 
     private static AgenteProperties propriedades(String chave) {
-        return new AgenteProperties(chave, "claude-sonnet-4-6", STUB, 6, 8192,
-                Duration.ofSeconds(30), 2, Duration.ofHours(24));
+        return new AgenteProperties(6, 8192, Duration.ofSeconds(30), 2, Duration.ofHours(24),
+                null, new AgenteProperties.Provedor(chave, MODELO, STUB));
     }
 
+    /** Resposta de texto do Gemini: uma parte {@code text} no primeiro candidato. */
     private static String texto(String conteudo) {
         return """
-                {"id":"msg_1","model":"claude-sonnet-4-6","stop_reason":"end_turn",
-                 "content":[{"type":"text","text":"%s"}]}
+                {"candidates":[{"content":{"role":"model",
+                 "parts":[{"text":"%s"}]},"finishReason":"STOP"}],
+                 "modelVersion":"gemini-2.5-flash"}
                 """.formatted(conteudo.replace("\"", "\\\""));
     }
 
-    private static String usoDeFerramenta(String nome, String argumentos) {
+    /**
+     * Pedido de ferramenta do Gemini.
+     *
+     * <p>Note que {@code finishReason} continua {@code STOP}: nao ha equivalente
+     * ao {@code stop_reason: tool_use} da Anthropic. O que diz que o modelo quer
+     * uma ferramenta e a presenca da parte {@code functionCall}, e e isso que o
+     * adaptador tem que olhar.
+     */
+    private static String chamadaDeFuncao(String nome, String argumentos) {
         return """
-                {"id":"msg_1","model":"claude-sonnet-4-6","stop_reason":"tool_use",
-                 "content":[{"type":"tool_use","id":"toolu_1","name":"%s","input":%s}]}
+                {"candidates":[{"content":{"role":"model",
+                 "parts":[{"functionCall":{"name":"%s","args":%s}}]},"finishReason":"STOP"}],
+                 "modelVersion":"gemini-2.5-flash"}
                 """.formatted(nome, argumentos);
     }
 

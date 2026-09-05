@@ -1,4 +1,4 @@
-package br.com.clyvovet.server.agente;
+package br.com.clyvovet.server.agente.llm;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
