@@ -39,6 +39,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -71,6 +74,9 @@ class PortabilidadeDoProvedorTest {
     private static final Long CLINICA = 47L;
     private static final Long TUTOR = 3L;
     private static final Long PET = 9L;
+
+    /** Um token opaco qualquer: o que importa e sair identico ao que entrou. */
+    private static final String ASSINATURA = "EtsMCtgMARFNMg+jcu3ug3m2dnuOs66mDg";
 
     private ObrigacaoService obrigacaoService;
     private AgendaService agendaService;
@@ -123,6 +129,71 @@ class PortabilidadeDoProvedorTest {
     @DisplayName("Anthropic: o guardrail clinico barra a resposta final")
     void guardrailNaAnthropic() {
         guardrailBarraIndependenteDoProvedor(anthropic());
+    }
+
+    /**
+     * A assinatura que acompanha a chamada de ferramenta volta intacta na
+     * requisicao seguinte.
+     *
+     * <p>Nao e zelo: a familia Gemini 3.x recusa a requisicao inteira com 400 e
+     * {@code Function call is missing a thought_signature} quando a chamada
+     * reaparece no historico sem o token que a acompanhava. Como o
+     * {@code gemini-2.5-flash} saiu do ar para chaves novas, todo modelo
+     * disponivel exige isso — e sem este teste o laco volta a quebrar na segunda
+     * volta, que e justamente onde nenhum teste de uma volta so olha.
+     */
+    @Test
+    @DisplayName("Gemini: a assinatura da chamada reaparece na volta seguinte")
+    void assinaturaDaChamadaVoltaNoHistorico() {
+        Fixture fixture = gemini();
+        Montagem montagem = montar(fixture);
+
+        given(agendaService.horariosLivres(any(), any())).willReturn(List.of(
+                new AgendaService.HorarioLivre(LocalDate.of(2026, 9, 17), "14:00", 5L, "Dra. Ana")));
+
+        montagem.api.expect(ExpectedCount.once(), requestTo(fixture.rota))
+                .andRespond(withSuccess("""
+                        {"candidates":[{"content":{"role":"model","parts":[
+                         {"functionCall":{"name":"consultar_disponibilidade",
+                           "args":{"dataInicio":"2026-09-14","dataFim":"2026-09-21"}},
+                          "thoughtSignature":"%s"}]},"finishReason":"STOP"}]}
+                        """.formatted(ASSINATURA), MediaType.APPLICATION_JSON));
+
+        montagem.api.expect(ExpectedCount.once(), requestTo(fixture.rota))
+                .andExpect(content().string(containsString(ASSINATURA)))
+                .andRespond(withSuccess(fixture.texto.apply("Tenho quinta às 14:00 com a Dra. Ana."),
+                        MediaType.APPLICATION_JSON));
+
+        montagem.agente.responder(PET, "quero marcar");
+
+        montagem.api.verify();
+    }
+
+    /**
+     * O contraponto: a Anthropic nao tem token de continuacao, e nada do
+     * vocabulario neutro pode vazar para o fio dela.
+     */
+    @Test
+    @DisplayName("Anthropic: nenhuma assinatura vaza para o fio")
+    void anthropicNaoEmiteAssinatura() {
+        Fixture fixture = anthropic();
+        Montagem montagem = montar(fixture);
+
+        given(agendaService.horariosLivres(any(), any())).willReturn(List.of(
+                new AgendaService.HorarioLivre(LocalDate.of(2026, 9, 17), "14:00", 5L, "Dra. Ana")));
+
+        montagem.responder(fixture.chamada.apply("consultar_disponibilidade",
+                "{\"dataInicio\":\"2026-09-14\",\"dataFim\":\"2026-09-21\"}"));
+
+        montagem.api.expect(ExpectedCount.once(), requestTo(fixture.rota))
+                .andExpect(content().string(not(containsString("thoughtSignature"))))
+                .andExpect(content().string(not(containsString("assinatura"))))
+                .andRespond(withSuccess(fixture.texto.apply("Tenho quinta às 14:00 com a Dra. Ana."),
+                        MediaType.APPLICATION_JSON));
+
+        montagem.agente.responder(PET, "quero marcar");
+
+        montagem.api.verify();
     }
 
     // ---------- os dois cenarios, escritos uma vez so ----------

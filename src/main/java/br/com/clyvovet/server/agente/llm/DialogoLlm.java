@@ -43,11 +43,30 @@ public final class DialogoLlm {
         record Texto(String texto) implements Bloco {
         }
 
-        /** O modelo quer que uma ferramenta seja executada. */
-        record Chamada(String id, String nome, Map<String, Object> argumentos) implements Bloco {
+        /**
+         * O modelo quer que uma ferramenta seja executada.
+         *
+         * <p>A {@code assinatura} e um token opaco de continuacao: o provedor
+         * emite junto da chamada e exige de volta na volta seguinte, e quem nao
+         * usa isso deixa nula. Nao e um detalhe de conforto — o Gemini 3.x
+         * recusa a requisicao inteira com 400 se a chamada reaparece no
+         * historico sem ela. Fica aqui, e nao dentro do adaptador, porque o laco
+         * remonta o historico a cada volta: se o token nao viajasse pelo
+         * vocabulario comum, nao haveria onde guarda-lo entre uma volta e outra.
+         *
+         * <p>Opaca de proposito. Ninguem fora do adaptador que a emitiu deve ler
+         * o conteudo, e nenhum outro adaptador deve tentar interpreta-la.
+         */
+        record Chamada(String id, String nome, Map<String, Object> argumentos, String assinatura)
+                implements Bloco {
 
             public Chamada {
                 argumentos = argumentos == null ? Map.of() : Map.copyOf(argumentos);
+            }
+
+            /** Para o provedor que nao emite token de continuacao. */
+            public Chamada(String id, String nome, Map<String, Object> argumentos) {
+                this(id, nome, argumentos, null);
             }
         }
 

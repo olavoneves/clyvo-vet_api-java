@@ -47,7 +47,7 @@ class AgentePropriedadesTest {
 
             AgenteProperties propriedades = ctx.getBean(AgenteProperties.class);
 
-            assertThat(propriedades.gemini().modelo()).isEqualTo("gemini-2.5-flash");
+            assertThat(propriedades.gemini().modelo()).isEqualTo("gemini-3.1-flash-lite");
             assertThat(propriedades.gemini().urlBase())
                     .isEqualTo("https://generativelanguage.googleapis.com");
 

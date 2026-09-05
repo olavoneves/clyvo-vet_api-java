@@ -45,6 +45,9 @@ services:
       - SPRING_DATASOURCE_PASSWORD=PetFlow2026
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.OracleDialect
       - JWT_SECRET=clyvovet-2026-local-dev-secret-key-docker!!
+      # Vem do .env da raiz, que o compose carrega sozinho. Sem ela a
+      # aplicacao sobe igual e so /api/agente/** responde 503.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     ports:
       - "8080:8080"
     networks:
