@@ -51,7 +51,30 @@ public final class ProtocoloGemini {
     public record Declaracao(String name, String description, Map<String, Object> parameters) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record ConfiguracaoDeGeracao(Integer maxOutputTokens) {}
+    public record ConfiguracaoDeGeracao(Integer maxOutputTokens, Pensamento thinkingConfig) {
+
+        /**
+         * Sem raciocinio estendido, que e o padrao da familia 3.x.
+         *
+         * <p>O agente escolhe entre cinco ferramentas com o esquema na mao e o
+         * proximo passo escrito no prompt — nao ha o que deliberar. Ligado, o
+         * pensamento respondia por quase todo o tempo de resposta e por boa parte
+         * dos tokens de saida; desligado, a mesma volta cai de dezenas de
+         * segundos para poucos.
+         */
+        public static ConfiguracaoDeGeracao semPensar(Integer maxOutputTokens) {
+            return new ConfiguracaoDeGeracao(maxOutputTokens, new Pensamento(0));
+        }
+    }
+
+    /**
+     * O orcamento de raciocinio do modelo, em tokens.
+     *
+     * <p>Zero desliga. Nem toda familia aceita desligar — os modelos "pro"
+     * exigem pensar —, e por isso este e um campo do pedido e nao uma constante:
+     * trocar de modelo pode exigir trocar o valor, sem recompilar nada.
+     */
+    public record Pensamento(Integer thinkingBudget) {}
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonIgnoreProperties(ignoreUnknown = true)

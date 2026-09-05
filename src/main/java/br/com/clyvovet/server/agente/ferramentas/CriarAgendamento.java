@@ -36,13 +36,14 @@ public class CriarAgendamento implements Ferramenta {
     @Override
     public String descricao() {
         return """
-                Marca a consulta para uma obrigação pendente do pet, em um horário que \
+                                Marca a consulta para uma obrigação pendente do pet, em um horário que \
                 consultar_disponibilidade tenha devolvido como livre. \
                 Use apenas depois que o tutor escolher explicitamente um horário — nunca \
                 escolha por ele. Se o horário tiver sido ocupado nesse meio-tempo, a \
                 ferramenta devolve um erro de conflito: consulte a disponibilidade de novo \
                 e ofereça outras opções. \
-                Ao final, confirme ao tutor a data, a hora e o nome do veterinário.""";
+                Ao final, confirme ao tutor a data e a hora e diga o que será feito na \
+                consulta. Não diga qual veterinário vai atender.""";
     }
 
     @Override

@@ -351,6 +351,16 @@ a { color: var(--cor-primaria-escura); }
 .etiqueta-perdida, .etiqueta-obito { background: #fbe9e7; border-color: #f2c6c1; color: #9a2c22; }
 .etiqueta-cancelada, .etiqueta-inativo { background: #eef0ef; border-color: #dcdfde; color: #5b6664; }
 
+/*
+  Compromisso que recupera uma obrigacao vencida. Ambar, e nao vermelho: a
+  clinica precisa distinguir a linha de relance, mas isto nao e um alerta — e
+  uma boa noticia, o atraso voltando para a agenda.
+*/
+.etiqueta-recuperada { background: #fbeee0; border-color: #eccfa8; color: #8a4b00; }
+
+.linha-recuperada { background: #fffaf3; }
+.linha-recuperada td:first-child { box-shadow: inset 3px 0 0 #d99a3c; }
+
 /* ---------- ficha ---------- */
 
 .ficha {

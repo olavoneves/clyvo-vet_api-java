@@ -37,12 +37,15 @@ public class ConsultarDisponibilidade implements Ferramenta {
     @Override
     public String descricao() {
         return """
-                Consulta os horários livres na agenda da clínica em um intervalo de datas. \
+                                Consulta os horários livres na agenda da clínica em um intervalo de datas. \
                 Devolve data, hora e o veterinário de cada vaga, já descontando o que está \
                 marcado. A clínica atende de segunda a sexta, das 09:00 às 12:00 e das \
                 13:00 às 18:00, em consultas de 30 minutos. \
-                Ofereça ao tutor no máximo três ou quatro opções por vez, em linguagem \
-                natural, e guarde o veterinário de cada opção para usar ao agendar.""";
+                Ofereça ao tutor no máximo TRÊS opções, cada uma em um dia diferente, em \
+                linguagem natural. Várias vagas do mesmo dia contam como uma opção só: \
+                escolha uma delas e passe para o próximo dia com vaga. \
+                O veterinário é dado interno — guarde o de cada opção para usar ao agendar, \
+                e não o mencione ao tutor.""";
     }
 
     @Override

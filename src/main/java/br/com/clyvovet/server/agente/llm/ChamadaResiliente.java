@@ -4,6 +4,7 @@ import br.com.clyvovet.server.agente.FalhaNaApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
@@ -31,6 +32,15 @@ import java.util.function.Supplier;
  *
  * <p>4xx que nao seja 429 tambem nao e retentado: requisicao malformada ou chave
  * invalida nao melhoram por insistencia.
+ *
+ * <p><b>Nada sai daqui como excecao crua.</b> Toda falha da chamada vira
+ * {@link FalhaNaApiException}, que o {@code AgenteService} traduz na mensagem de
+ * indisponibilidade com escalonamento. O motivo e concreto: um timeout durante a
+ * <i>leitura</i> da resposta nao chega como {@link ResourceAccessException} — ele
+ * nasce dentro do conversor, ao resolver o content-type de uma resposta truncada,
+ * e sai como {@link RestClientException}. Enquanto so a primeira era capturada, o
+ * tutor recebia HTTP 500 em vez da mensagem — exatamente o oposto do que esta
+ * camada existe para fazer.
  */
 @Slf4j
 final class ChamadaResiliente {
@@ -74,6 +84,12 @@ final class ChamadaResiliente {
             } catch (ResourceAccessException ex) {
                 log.warn("{} nao respondeu em {}s", provedor, timeout.toSeconds());
                 throw new FalhaNaApiException("Tempo esgotado em " + provedor, ex);
+
+            } catch (RestClientException ex) {
+                // resposta truncada, corpo ilegivel, content-type ausente: o
+                // formato varia, a consequencia para o tutor nao pode variar
+                log.warn("{} falhou na leitura da resposta: {}", provedor, ex.getMessage());
+                throw new FalhaNaApiException("Resposta ilegivel de " + provedor, ex);
             }
         }
 

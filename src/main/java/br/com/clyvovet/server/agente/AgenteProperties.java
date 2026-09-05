@@ -41,14 +41,14 @@ public record AgenteProperties(
     public AgenteProperties {
         maxIteracoes = maxIteracoes > 0 ? maxIteracoes : 6;
         maxTokens = maxTokens > 0 ? maxTokens : 8192;
-        timeout = timeout != null ? timeout : Duration.ofSeconds(30);
+        timeout = timeout != null ? timeout : Duration.ofSeconds(60);
         maxRetentativas = maxRetentativas >= 0 ? maxRetentativas : 2;
         validadeDaConversa = validadeDaConversa != null ? validadeDaConversa : Duration.ofHours(24);
 
         anthropic = Provedor.comPadroes(anthropic,
                 "claude-sonnet-4-6", "https://api.anthropic.com");
         gemini = Provedor.comPadroes(gemini,
-                "gemini-2.5-flash", "https://generativelanguage.googleapis.com");
+                "gemini-3.1-flash-lite", "https://generativelanguage.googleapis.com");
     }
 
     /**

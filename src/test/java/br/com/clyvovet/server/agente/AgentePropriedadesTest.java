@@ -56,7 +56,7 @@ class AgentePropriedadesTest {
 
             assertThat(propriedades.maxIteracoes()).isEqualTo(6);
             assertThat(propriedades.maxTokens()).isEqualTo(8192);
-            assertThat(propriedades.timeout()).isEqualTo(Duration.ofSeconds(30));
+            assertThat(propriedades.timeout()).isEqualTo(Duration.ofSeconds(60));
             assertThat(propriedades.maxRetentativas()).isEqualTo(2);
             assertThat(propriedades.validadeDaConversa()).isEqualTo(Duration.ofHours(24));
         });

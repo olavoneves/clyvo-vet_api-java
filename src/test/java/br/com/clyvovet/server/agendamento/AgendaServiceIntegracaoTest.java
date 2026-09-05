@@ -149,6 +149,75 @@ class AgendaServiceIntegracaoTest {
                 .hasMessageContaining("Escolha outro horário");
     }
 
+    /**
+     * A consulta que a agenda operacional usa, contra o banco de verdade.
+     *
+     * <p>O que se prova aqui e que ela <b>executa</b>: e um join de entidade com
+     * clausula ON, por um lado da relacao que a {@code Agendamento} nao mapeia —
+     * quem tem a chave e {@code Obrigacao.agendamento}. Os testes da pagina
+     * rodam sobre mock e passariam com um JPQL que nem compila no Oracle.
+     *
+     * <p>E prova o left join: marcar pelo agente cria a linha com obrigacao
+     * atras, e ela tem que voltar com etapa e protocolo preenchidos, e nao nulos.
+     */
+    @Test
+    @DisplayName("a agenda devolve o compromisso recem-marcado, com a obrigacao atras")
+    void agendaTrazOCompromissoComAObrigacao() {
+        Long obrigacao = umaObrigacaoPendente();
+        AgendaService.HorarioLivre vaga = primeiraVaga();
+
+        AgendaService.AgendamentoConfirmado feito =
+                agendaService.agendar(obrigacao, quando(vaga), vaga.idVeterinario());
+        entityManager.flush();
+        entityManager.clear();
+
+        List<CompromissoDaAgenda> agenda =
+                agendaService.compromissosEntre(vaga.data(), vaga.data());
+
+        assertThat(agenda)
+                .as("o compromisso marcado tem que aparecer no dia em que acontece")
+                .anySatisfy(c -> {
+                    assertThat(c.idAgendamento()).isEqualTo(feito.idAgendamento());
+                    assertThat(c.data()).isEqualTo(vaga.data());
+                    assertThat(c.hora()).isEqualTo(vaga.hora());
+                    assertThat(c.veioDeObrigacao())
+                            .as("veio do motor: a etapa e o protocolo nao podem vir nulos")
+                            .isTrue();
+                    assertThat(c.etapaNome()).isNotBlank();
+                    assertThat(c.protocoloNome()).isNotBlank();
+                });
+    }
+
+    /**
+     * Obrigacao vencida remarcada para frente aparece marcada como atraso.
+     *
+     * <p>E o caso que motivou trocar o criterio da tela: pela data prevista ela
+     * some, porque o vencimento ja passou. Pela data do compromisso ela aparece,
+     * que e a receita recuperada ficando visivel.
+     */
+    @Test
+    @DisplayName("compromisso de obrigacao vencida vem marcado como atraso")
+    void compromissoDeObrigacaoVencidaVemMarcado() {
+        List<Long> vencidas = entityManager.createNativeQuery("""
+                select id_obrigacao from TB_CLV_OBRIGACAO
+                 where dt_prevista < trunc(sysdate)
+                   and ds_status in ('PREVISTA','NOTIFICADA','RESPONDIDA')
+                 order by id_obrigacao
+                """, Long.class).setMaxResults(1).getResultList();
+        Assumptions.assumeFalse(vencidas.isEmpty(), "nenhuma obrigacao vencida na base");
+
+        AgendaService.HorarioLivre vaga = primeiraVaga();
+        agendaService.agendar(vencidas.get(0), quando(vaga), vaga.idVeterinario());
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(agendaService.compromissosEntre(vaga.data(), vaga.data()))
+                .filteredOn(c -> c.recuperaAtraso())
+                .as("a obrigacao vencida remarcada para frente tem que vir marcada")
+                .isNotEmpty()
+                .allSatisfy(c -> assertThat(c.diasDeAtraso()).isPositive());
+    }
+
     @Test
     @DisplayName("fim de semana e horario fora do expediente sao recusados")
     void horarioForaDoExpedienteERecusado() {
