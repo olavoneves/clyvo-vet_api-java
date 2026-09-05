@@ -42,6 +42,16 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+		<!--
+			RestClient.Builder do agente. A classe RestClient vem em spring-web, mas
+			a auto-configuracao que publica o bean do builder mora neste modulo, e o
+			starter-web do Boot 4 nao o traz. Sem ele a aplicacao nao sobe: o
+			AgenteConfig fica sem a dependencia e derruba o contexto inteiro.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-restclient</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>

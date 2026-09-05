@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+import java.util.Optional;
+
 public interface ObrigacaoRepository
         extends JpaRepository<Obrigacao, Long>, JpaSpecificationExecutor<Obrigacao> {
 
@@ -15,4 +17,7 @@ public interface ObrigacaoRepository
     @Override
     @EntityGraph(attributePaths = {"pet", "etapa", "etapa.versaoProtocolo", "etapa.versaoProtocolo.protocolo"})
     Page<Obrigacao> findAll(Specification<Obrigacao> spec, Pageable pageable);
+
+    /** A obrigacao que este agendamento atende, quando ha uma. */
+    Optional<Obrigacao> findByAgendamentoId(Long agendamentoId);
 }

@@ -1,5 +1,6 @@
 package br.com.clyvovet.server.exception;
 
+import br.com.clyvovet.server.agente.AgenteDesligadoException;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.extern.slf4j.Slf4j;
@@ -78,6 +79,22 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         pd.setType(URI.create("https://clinicavet.com/errors/conflito-de-estado"));
         pd.setTitle("State Conflict");
+        return pd;
+    }
+
+    /**
+     * Agente sem chave de API.
+     *
+     * <p>Precisa de handler proprio mesmo tendo @ResponseStatus na excecao: o
+     * handler de Exception abaixo pega qualquer coisa que nao tenha um mais
+     * especifico, e transformaria em 500 uma indisponibilidade declarada.
+     */
+    @ExceptionHandler(AgenteDesligadoException.class)
+    public ProblemDetail handleAgenteDesligado(AgenteDesligadoException ex) {
+        log.warn("Agente de agendamento acionado sem ANTHROPIC_API_KEY configurada");
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        pd.setType(URI.create("https://clinicavet.com/errors/service-unavailable"));
+        pd.setTitle("Service Unavailable");
         return pd;
     }
 

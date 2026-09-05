@@ -16,6 +16,7 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 - [Banco de Dados](#-banco-de-dados)
 - [Autenticação](#-autenticação)
 - [Rotas da API](#-rotas-da-api)
+- [Agente de Agendamento](#-agente-de-agendamento)
 - [Rodando Localmente](#-rodando-localmente)
 - [Variáveis de Ambiente](#-variáveis-de-ambiente)
 - [Deploy — Render](#-deploy--render)
@@ -40,6 +41,7 @@ A plataforma conecta tutores de pets, clínicas veterinárias e o ecossistema de
 - Controle de vacinação e prescrições médicas
 - Monitoramento via sensores IoT com alertas inteligentes
 - Autenticação JWT (access token 15min + refresh token 7 dias)
+- Agente de agendamento conversacional, que fecha o ciclo do lembrete até a receita
 - Documentação interativa via Swagger
 
 ---
@@ -64,6 +66,7 @@ A plataforma conecta tutores de pets, clínicas veterinárias e o ecossistema de
 
 ```
 br.com.clyvovet.server
+├── agente/         # Agente de agendamento: laço, ferramentas, guardrail clínico
 ├── auth/           # Login, RefreshToken, JwtService, AuthService
 ├── config/         # AppConfig, AuthInterceptor, WebConfig, DataInitializer
 ├── exception/      # GlobalExceptionHandler, exceções customizadas
@@ -114,6 +117,7 @@ mapeamento divergir do banco.
 | `V6__raca_perfil.sql` | Perfil da raça |
 | `V7__correcoes_motor.sql` | **Motor de protocolo**: catálogo, obrigações, outbox, auditoria, funções, procedures e a view do painel |
 | `V8__melhorias_banco.sql` | Gerador de dados de demonstração (`PR_CLV_SEED_*`) — nada aqui é chamado pela aplicação |
+| `V9__catalogo_clinico_e_correcoes.sql` | Catálogo clínico (espécies, raças, 26 protocolos) e correções de regra do motor |
 
 **Banco vazio** (container do docker-compose): a cadeia `V0 → V0.1 → V1 … → V8` roda
 inteira e cria tudo, sem intervenção manual.
@@ -218,6 +222,13 @@ autenticada (telas).
 | `GET` | `/api/leituras-iot` | Listar leituras IoT |
 | `GET` | `/api/alertas-iot` | Listar alertas IoT |
 
+### Rotas do tutor
+
+| Método | Rota | Perfil | Descrição |
+|---|---|---|---|
+| `POST` | `/api/agente/mensagens` | `TUTOR` | Conversa com o agente de agendamento |
+| `GET` | `/api/agente/conversas/{idPet}` | `TUTOR` | Histórico da conversa sobre um pet |
+
 A documentação completa está disponível via Swagger em `/swagger-ui.html`.
 
 > As rotas REST vivem sob `/api`. O prefixo não está escrito nos controllers: é
@@ -250,6 +261,111 @@ curl http://<IP>:8080/api/especies \
 
 ---
 
+## 🤖 Agente de Agendamento
+
+O terceiro elo da cadeia de valor era o último com saída: atendimento →
+obrigação futura → lembrete → **parava aqui**. O tutor recebia o aviso e não
+tinha como agir. O agente fecha os elos que faltavam — entende o pedido,
+consulta a agenda real, propõe horários e grava o agendamento, que volta para a
+obrigação e entra no painel de receita recuperada.
+
+### Como funciona
+
+Sem framework de agente. Um `RestClient` chamando a API de mensagens da
+Anthropic, com ferramentas declaradas e laço de execução próprio:
+
+1. Recebe a mensagem do tutor
+2. Monta a requisição com o histórico e a lista de ferramentas
+3. Se a resposta vem com `stop_reason: "tool_use"`, executa a ferramenta em Java
+   e devolve o resultado como `tool_result`
+4. Quando a resposta é texto, entrega ao tutor
+5. Teto de 6 voltas por turno; ao estourar, escala para o veterinário
+
+Modelo: `claude-sonnet-4-6`. A chave vem de `ANTHROPIC_API_KEY`, nunca do código.
+
+### Ferramentas
+
+Todas recebem a clínica do `TenantContext` — nenhuma expõe `idClinica` ao
+modelo — e são métodos Java sobre serviços que já existiam.
+
+| Ferramenta | O que faz |
+|---|---|
+| `listar_obrigacoes_pendentes` | Obrigações em `PREVISTA`, `NOTIFICADA` ou `RESPONDIDA` |
+| `consultar_disponibilidade` | Horários livres, derivados de `TB_CLV_AGENDAMENTO` |
+| `criar_agendamento` | Cria com `ds_canal_origem = 'APP'` e chama `PR_CLV_TRANSITAR_OBRIGACAO` |
+| `reagendar` | Move um compromisso já marcado |
+| `escalar_para_veterinario` | Passa a conversa para uma pessoa |
+
+### Guardrail clínico
+
+O agente **nunca** opina sobre saúde do animal. Sem diagnóstico, sem dosagem,
+sem interpretação de sintoma, sem recomendação de tratamento — mesmo que o tutor
+insista, mesmo que a informação esteja no prontuário.
+
+Duas camadas, e a segunda é a que importa na defesa:
+
+1. **Prompt do sistema** — instrução explícita de escalar qualquer questão clínica.
+2. **Verificação em Java sobre a resposta final** (`GuardrailClinico`) — padrões de
+   conteúdo clínico. Se disparar, a resposta é substituída pela mensagem de
+   escalonamento, o evento é registrado, e o texto barrado sai também do
+   histórico, para não voltar à API no turno seguinte.
+
+A segunda camada existe porque instrução em prompt não é controle. A resposta a
+"por que confiar no agente?" é que não confiamos — verificamos na saída.
+
+### Estado da conversa
+
+Caffeine com validade de 24h, chaveado por clínica, tutor e pet. Cada turno é
+gravado em `TB_CLV_OUTBOX_EVENT` como evento `ConversaAgente`, para auditoria e
+para o clyvo-insights consumir depois — a memória é de trabalho, o registro é o
+outbox.
+
+> O spec previa Redis quando configurado. Não foi adotado: subir Redis contraria
+> a decisão que o projeto já tinha tomado em `CacheConfig` — a demonstração não
+> pode depender de um serviço externo de pé. O custo é conhecido e aceito: com
+> mais de uma instância, o tutor que cair em outra perde o fio da conversa (o
+> histórico, esse, não se perde).
+
+### Resiliência
+
+- Timeout de 30s; ao estourar, mensagem de indisponibilidade e escalonamento
+- Retry com backoff apenas em `429` e `5xx`, no máximo 2 tentativas extras
+- **Sem `ANTHROPIC_API_KEY` a aplicação sobe normalmente** e apenas
+  `/api/agente/**` responde `503`. Nada mais no sistema depende disso.
+- Concorrência: `criar_agendamento` trava a linha do veterinário
+  (`SELECT ... FOR UPDATE`) e revalida a disponibilidade dentro da transação; o
+  conflito volta ao modelo como resultado de ferramenta, e ele propõe outro horário
+
+### Superfície do tutor
+
+`/tutor/pets/{id}` — servida pela cadeia de `formLogin`, com login de tutor
+habilitado. Mostra dados do pet, obrigações pendentes, carteirinha de vacinas e o
+campo de conversa. Quando o agente confirma um agendamento, a lista de pendências
+é recarregada.
+
+Não é o app do tutor: é a tela que fecha o laço da demonstração.
+
+### Roteiro da demonstração
+
+Veterinário registra consulta no painel → a obrigação futura aparece, gerada pelo
+motor → tutor abre `/tutor/pets/{id}`, vê a pendência → escreve pedindo horário →
+o agente propõe, o tutor escolhe, confirma → o agendamento aparece na agenda do
+veterinário → o painel de receita recuperada sobe.
+
+### Testes
+
+A suíte usa um stub HTTP da API (`MockRestServiceServer`) — nenhuma chamada real,
+nenhum crédito gasto. O que fica sob teste é o que é nosso: o laço, o despacho de
+ferramenta, o tratamento de conflito, o guardrail de saída e o isolamento por
+tutor. A qualidade da escolha do modelo não é testável com stub, e o Javadoc de
+`AgenteServiceTest` diz isso explicitamente.
+
+```bash
+./mvnw test -Dtest='Agente*,GuardrailClinicoTest'
+```
+
+---
+
 ## 💻 Rodando Localmente
 
 ### Com Docker Compose (recomendado)
@@ -259,7 +375,7 @@ docker compose up --build
 ```
 
 Aguarde o Oracle ficar healthy (~2 min). O banco sobe **vazio**: o Flyway executa a cadeia
-`V0 → V0.1 → V1 … → V8` e cria o schema inteiro — tabelas, foreign keys, índices, o motor
+`V0 → V0.1 → V1 … → V10` e cria o schema inteiro — tabelas, foreign keys, índices, o motor
 de protocolo em PL/SQL e a view do painel. Nenhum passo manual.
 
 Para popular com dados de demonstração depois que a API subir:
@@ -268,6 +384,28 @@ Para popular com dados de demonstração depois que a API subir:
 BEGIN PR_CLV_SEED_EXECUTAR(p_qtd_pets => 400); END;
 /
 ```
+
+### Logins de demonstração
+
+Ninguém "cria" esses usuários: eles nascem do seed, todos com a senha
+**`Clyvo@2026`**. Não são credenciais de produção.
+
+| Perfil | E-mail | Clínica |
+|---|---|---|
+| Colaborador | `patricia@vidaanimal.com.br` | Vida Animal |
+| Colaborador | `diego@petcare.com.br` | PetCare |
+| Veterinário | `helena@vidaanimal.com.br` | Vida Animal |
+| Tutor (Thor) | `camila.ferreira@exemplo.com` | Vida Animal |
+| Tutor (Nala) | `roberto.almeida@exemplo.com` | Vida Animal |
+
+O fluxo completo atravessa duas telas e dois logins — use uma janela anônima
+para a segunda sessão, senão uma derruba a outra. Entre como Patricia ou
+Helena, registre uma consulta para o Thor e veja a obrigação nascer; entre como
+Camila em `/tutor/pets/{id}`, converse com o agente e agende; volte para a
+Helena e o agendamento está na agenda.
+
+Base semeada antes de 2026-09-04 carrega o hash quebrado da V8 antiga — a
+**V10** corrige, basta subir a aplicação.
 
 API: `http://localhost:8080`  
 Swagger: `http://localhost:8080/swagger-ui.html`
@@ -295,6 +433,7 @@ Swagger: `http://localhost:8080/swagger-ui.html`
 | `SPRING_DATASOURCE_PASSWORD` | Senha Oracle | — (obrigatória) |
 | `JWT_SECRET` | Secret HS256 (mín. 32 chars) | — (obrigatória) |
 | `CORS_ALLOWED_ORIGINS` | Origens autorizadas a chamar `/api` de um navegador, separadas por vírgula | vazio (nenhuma) |
+| `ANTHROPIC_API_KEY` | Chave da API da Anthropic, usada pelo agente de agendamento | vazio (agente desligado) |
 | `PORT` | Porta HTTP | `8080` |
 | `SPRING_JPA_HIBERNATE_DDL_AUTO` | DDL auto | `none` |
 

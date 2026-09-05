@@ -4,6 +4,7 @@ import br.com.clyvovet.server.auth.JwtAuthenticationFilter;
 import br.com.clyvovet.server.auth.JwtService;
 import br.com.clyvovet.server.enums.TipoUsuario;
 import br.com.clyvovet.server.tenant.TenantFilter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -89,6 +92,17 @@ public class SecurityConfig {
             "/painel/**"
     };
 
+    /**
+     * Rotas do aplicativo do tutor.
+     *
+     * <p>O agente de agendamento e a unica superficie que so o tutor alcanca:
+     * veterinario e colaborador tem a agenda inteira nas telas de gestao, e nao
+     * precisam conversar com um assistente para marcar o que ja podem marcar.
+     */
+    private static final String[] API_ROTAS_DO_TUTOR = {
+            "/agente/**"
+    };
+
     /** Documentacao da API. Fora de /api: quem a serve e o springdoc. */
     private static final String[] DOCUMENTACAO = {
             "/swagger-ui/**",
@@ -104,7 +118,17 @@ public class SecurityConfig {
             "/favicon.ico"
     };
 
-    /** Telas de gestao da clinica. O tutor usa o app, nao estas paginas. */
+    /**
+     * Telas do tutor. Servidas pela mesma cadeia de formLogin das telas da
+     * clinica, e nao pela API: e uma pagina com sessao em cookie, nao um cliente
+     * de token.
+     */
+    private static final String[] PAGINAS_DO_TUTOR = {
+            "/tutor",
+            "/tutor/**"
+    };
+
+    /** Telas de gestao da clinica. O tutor nao entra aqui. */
     private static final String[] PAGINAS_DA_CLINICA = {
             "/",
             "/painel/**",
@@ -158,6 +182,7 @@ public class SecurityConfig {
                                 .hasRole(TipoUsuario.COLABORADOR.name())
                         .requestMatchers(api(API_ROTAS_CLINICAS)).hasAnyRole(
                                 TipoUsuario.VETERINARIO.name(), TipoUsuario.COLABORADOR.name())
+                        .requestMatchers(api(API_ROTAS_DO_TUTOR)).hasRole(TipoUsuario.TUTOR.name())
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, ex) -> escreverProblema(
@@ -191,6 +216,7 @@ public class SecurityConfig {
                         .requestMatchers(DOCUMENTACAO).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**").authenticated()
+                        .requestMatchers(PAGINAS_DO_TUTOR).hasRole(TipoUsuario.TUTOR.name())
                         .requestMatchers(PAGINAS_DA_CLINICA).hasAnyRole(
                                 TipoUsuario.VETERINARIO.name(), TipoUsuario.COLABORADOR.name())
                         .anyRequest().authenticated())
@@ -199,9 +225,9 @@ public class SecurityConfig {
                         .loginProcessingUrl("/login")
                         .usernameParameter("email")
                         .passwordParameter("senha")
-                        // true: quem digitou /login direto tambem cai no painel, em
-                        // vez de numa pagina salva que nunca existiu
-                        .defaultSuccessUrl("/painel/receita", true)
+                        // destino por perfil, sempre: o tutor nao tem painel de
+                        // receita e cairia num 403 logo depois de acertar a senha
+                        .successHandler(SecurityConfig::destinoDepoisDoLogin)
                         .failureUrl("/login?erro")
                         .permitAll())
                 .logout(logout -> logout
@@ -251,6 +277,24 @@ public class SecurityConfig {
                 .httpStrictTransportSecurity(hsts -> hsts
                         .includeSubDomains(true)
                         .maxAgeInSeconds(HSTS_SEGUNDOS));
+    }
+
+    /**
+     * Para onde cada perfil vai depois de entrar.
+     *
+     * <p>Ignora a pagina que o usuario tentava abrir antes do login, de proposito:
+     * quem digitou /login direto nao tem pagina salva, e restaurar uma pagina de
+     * outro perfil seria mandar o tutor para uma tela que ele nao pode ver.
+     */
+    private static void destinoDepoisDoLogin(HttpServletRequest request,
+                                             HttpServletResponse response,
+                                             Authentication autenticacao) throws IOException {
+        String papelDeTutor = "ROLE_" + TipoUsuario.TUTOR.name();
+        boolean tutor = autenticacao.getAuthorities().stream()
+                .anyMatch(a -> papelDeTutor.equals(a.getAuthority()));
+
+        new DefaultRedirectStrategy().sendRedirect(
+                request, response, tutor ? "/tutor" : "/painel/receita");
     }
 
     /** Rota como o controller a declara -> rota como o servidor a expoe. */

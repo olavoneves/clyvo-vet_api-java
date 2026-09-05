@@ -9,6 +9,7 @@ import br.com.clyvovet.server.enums.ObrigacaoStatus;
 import br.com.clyvovet.server.enums.PetPorte;
 import br.com.clyvovet.server.enums.PetSexo;
 import br.com.clyvovet.server.enums.PetStatus;
+import br.com.clyvovet.server.enums.ProtocoloCategoria;
 import br.com.clyvovet.server.enums.TipoUsuario;
 import br.com.clyvovet.server.exception.EntityNotFoundException;
 import br.com.clyvovet.server.obrigacao.ObrigacaoResponse;
@@ -22,6 +23,7 @@ import br.com.clyvovet.server.pet.PetResponse;
 import br.com.clyvovet.server.pet.PetService;
 import br.com.clyvovet.server.pet.web.PetWebController;
 import br.com.clyvovet.server.auth.web.LoginWebController;
+import br.com.clyvovet.server.tutor.web.TutorWebController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -63,7 +65,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         LoginWebController.class,
         PainelWebController.class,
         PetWebController.class,
-        AgendaWebController.class
+        AgendaWebController.class,
+        TutorWebController.class
 })
 @Import({SecurityConfig.class, WebMvcConfig.class, JwtService.class})
 @TestPropertySource(properties = {
@@ -75,6 +78,11 @@ class PaginasRenderizamTest {
     private static final ClinicaUserDetails COLABORADOR = new ClinicaUserDetails(
             new AuthenticatedUser(1L, "master@clyvovet.com", "Master da Clinica",
                     TipoUsuario.COLABORADOR, 47L),
+            "irrelevante-nao-ha-autenticacao-por-senha-aqui");
+
+    private static final ClinicaUserDetails TUTOR = new ClinicaUserDetails(
+            new AuthenticatedUser(3L, "joana@exemplo.com", "Joana Ribeiro",
+                    TipoUsuario.TUTOR, 47L),
             "irrelevante-nao-ha-autenticacao-por-senha-aqui");
 
     @Autowired
@@ -93,7 +101,7 @@ class PaginasRenderizamTest {
     void loginRenderizaSemAutenticacao() throws Exception {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("Acesso da equipe")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Entre com seu e-mail")));
     }
 
     @Test
@@ -196,7 +204,77 @@ class PaginasRenderizamTest {
                 .andExpect(status().isNotFound());
     }
 
-    /** Tutor autentica na API, mas nao nas telas de gestao da clinica. */
+    // ---------- superficie do tutor ----------
+
+    /**
+     * A tela que fecha o laco da demonstracao.
+     *
+     * <p>Renderiza pendencia, carteirinha e o campo de conversa numa passada so,
+     * porque e assim que ela aparece para o tutor: se a carteirinha quebrar, a
+     * pagina inteira quebra, e nao adianta o resto ter passado.
+     */
+    @Test
+    void telaDoTutorRenderiza() throws Exception {
+        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(petDeExemplo())));
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.doPetComStatus(eq(9L), any(), any(Pageable.class)))
+                .willReturn(List.of(obrigacaoDeExemplo()));
+
+        mockMvc.perform(get("/tutor/pets/9").with(user(TUTOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Rex"),
+                        org.hamcrest.Matchers.containsString("Cuidados pendentes"),
+                        org.hamcrest.Matchers.containsString("Reforço anual"),
+                        org.hamcrest.Matchers.containsString("Carteirinha de vacinas"),
+                        // o campo de conversa e o token que o faz funcionar
+                        org.hamcrest.Matchers.containsString("Falar com a clínica"),
+                        org.hamcrest.Matchers.containsString("/api/agente/mensagens"))));
+    }
+
+    /** /tutor sem id escolhe o primeiro pet: e para onde o login manda o tutor. */
+    @Test
+    void tutorSemIdCaiNoPrimeiroPet() throws Exception {
+        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(petDeExemplo())));
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.doPetComStatus(eq(9L), any(), any(Pageable.class)))
+                .willReturn(List.of());
+
+        mockMvc.perform(get("/tutor").with(user(TUTOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Tudo em dia")));
+    }
+
+    @Test
+    void tutorSemPetVeExplicacaoEmVezDeErro() throws Exception {
+        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+                .willReturn(Page.empty(PageRequest.of(0, 50)));
+
+        mockMvc.perform(get("/tutor").with(user(TUTOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("Nenhum pet cadastrado")));
+    }
+
+    /** Pet de outro tutor nao aparece na lista dele, entao nao existe para a tela. */
+    @Test
+    void tutorNaoAbrePetDeOutroDono() throws Exception {
+        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(petDeExemplo())));
+
+        mockMvc.perform(get("/tutor/pets/4242").with(user(TUTOR)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void colaboradorNaoAlcancaATelaDoTutor() throws Exception {
+        mockMvc.perform(get("/tutor").with(user(COLABORADOR)))
+                .andExpect(status().isForbidden());
+    }
+
+    /** Tutor autentica nas telas, mas nao nas de gestao da clinica. */
     @Test
     void tutorNaoAlcancaAsTelasDaClinica() throws Exception {
         ClinicaUserDetails tutor = new ClinicaUserDetails(
@@ -249,7 +327,7 @@ class PaginasRenderizamTest {
 
     private static ObrigacaoResponse obrigacaoDeExemplo() {
         return new ObrigacaoResponse(101L, 9L, "Rex", 4L, "Reforço anual",
-                "VAC-V10", "Vacinação V10", ObrigacaoStatus.PREVISTA,
+                "VAC-V10", "Vacinação V10", ProtocoloCategoria.VACINA, ObrigacaoStatus.PREVISTA,
                 LocalDate.of(2026, 9, 15), LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 25),
                 false, new BigDecimal("180.00"), null);
     }

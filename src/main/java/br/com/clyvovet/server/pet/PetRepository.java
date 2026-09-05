@@ -27,4 +27,24 @@ public interface PetRepository extends JpaRepository<Pet, Long> {
 
     @Query("SELECT p FROM Pet p JOIN FETCH p.tutor JOIN FETCH p.raca r JOIN FETCH r.especie WHERE p.id = :id")
     Optional<Pet> findByIdWithDetails(@Param("id") Long id);
+
+    /**
+     * De quem e este pet, em uma consulta e sem carregar a entidade.
+     *
+     * <p>Usada onde so importa a resposta "e do tutor que perguntou?" — a
+     * superficie do tutor e o agente. Carregar o Pet para navegar ate o tutor
+     * exigiria transacao aberta, porque a associacao e LAZY e nao ha
+     * open-in-view; devolver o id direto evita as duas coisas.
+     *
+     * <p>Vazio significa tanto "nao existe" quanto "e de outra clinica": o filtro
+     * de tenant nao distingue, e quem pergunta tambem nao deve distinguir.
+     */
+    @Query("SELECT p.tutor.id FROM Pet p WHERE p.id = :id")
+    Optional<Long> idDoTutor(@Param("id") Long id);
+
+    @Query("SELECT p.nome FROM Pet p WHERE p.id = :id")
+    Optional<String> nomeDoPet(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"tutor", "raca", "clinica"})
+    java.util.List<Pet> findByTutorIdOrderByNomeAsc(Long tutorId);
 }

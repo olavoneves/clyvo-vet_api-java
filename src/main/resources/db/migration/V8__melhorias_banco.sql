@@ -11,6 +11,13 @@
 --     /
 --
 -- PR_CLV_SEED_LIMPAR apaga os dados gerados. Nunca rode em base real.
+--
+-- Todo login gerado aqui nasce com a senha 'Clyvo@2026' em BCrypt custo 10,
+-- que e o formato verificado pelo BCryptPasswordEncoder do AppConfig. Ate
+-- 2026-09-04 estas procedures gravavam o literal
+-- '$2a$10$seedhashplaceholder00000', que parece um BCrypt mas nao e um, e
+-- por isso nenhum usuario do seed conseguia entrar. Bases que ja foram
+-- semeadas com o placeholder sao corrigidas pela V10.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION FN_CLV_SEED_CONSULTA (
@@ -99,27 +106,35 @@ BEGIN
     INSERT INTO TB_CLV_VETERINARIO (nm_veterinario, nr_crmv, ds_especialidade,
                                     ds_email, ds_senha_hash, id_clinica)
     VALUES ('Dra. Helena Prado', 'SP-11001', 'Clinica geral',
-            'helena@vidaanimal.com.br', '$2a$10$seedhashplaceholder00000', v_a);
+            'helena@vidaanimal.com.br',
+            '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
+            v_a);
 
     INSERT INTO TB_CLV_VETERINARIO (nm_veterinario, nr_crmv, ds_especialidade,
                                     ds_email, ds_senha_hash, id_clinica)
     VALUES ('Dr. Rafael Nunes', 'SP-11002', 'Nefrologia',
-            'rafael@vidaanimal.com.br', '$2a$10$seedhashplaceholder00000', v_a);
+            'rafael@vidaanimal.com.br',
+            '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
+            v_a);
 
     INSERT INTO TB_CLV_VETERINARIO (nm_veterinario, nr_crmv, ds_especialidade,
                                     ds_email, ds_senha_hash, id_clinica)
     VALUES ('Dra. Marina Costa', 'SP-22001', 'Clinica geral',
-            'marina@petcare.com.br', '$2a$10$seedhashplaceholder00000', v_b);
+            'marina@petcare.com.br',
+            '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
+            v_b);
 
     INSERT INTO TB_CLV_COLABORADOR (nm_colaborador, ds_email, ds_senha_hash,
                                     ds_cargo, id_clinica)
     VALUES ('Patricia Moraes', 'patricia@vidaanimal.com.br',
-            '$2a$10$seedhashplaceholder00000', 'ADMINISTRADOR', v_a);
+            '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
+            'ADMINISTRADOR', v_a);
 
     INSERT INTO TB_CLV_COLABORADOR (nm_colaborador, ds_email, ds_senha_hash,
                                     ds_cargo, id_clinica)
     VALUES ('Diego Tavares', 'diego@petcare.com.br',
-            '$2a$10$seedhashplaceholder00000', 'RECEPCAO', v_b);
+            '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
+            'RECEPCAO', v_b);
 
     COMMIT;
 END PR_CLV_SEED_BASE;
@@ -183,7 +198,7 @@ BEGIN
         VALUES (v_sobre(MOD(i,10)+1) || ' ' || v_sobre(MOD(i*3,10)+1),
                 'tutor' || i || '@exemplo.com',
                 '119' || LPAD(i, 8, '0'),
-                '$2a$10$seedhashplaceholder00000',
+                '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
                 CASE WHEN MOD(i,4) = 0 THEN 'WEB' ELSE 'APP' END,
                 TRUNC(SYSDATE) - ROUND(DBMS_RANDOM.VALUE(30, 900)),
                 v_clinica)
@@ -351,7 +366,8 @@ BEGIN
     INSERT INTO TB_CLV_TUTOR (nm_tutor, ds_email, nr_telefone, ds_senha_hash,
                               ds_canal_preferencial, dt_cadastro, id_clinica)
     VALUES ('Camila Ferreira', 'camila.ferreira@exemplo.com', '11987650001',
-            '$2a$10$seedhashplaceholder00000', 'APP', SYSDATE-70, v_clinica)
+            '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
+            'APP', SYSDATE-70, v_clinica)
     RETURNING id_tutor INTO v_tutor;
 
     SELECT id_raca INTO v_raca FROM TB_CLV_RACA WHERE nm_raca = 'Golden Retriever';
@@ -372,7 +388,8 @@ BEGIN
     INSERT INTO TB_CLV_TUTOR (nm_tutor, ds_email, nr_telefone, ds_senha_hash,
                               ds_canal_preferencial, dt_cadastro, id_clinica)
     VALUES ('Roberto Almeida', 'roberto.almeida@exemplo.com', '11987650002',
-            '$2a$10$seedhashplaceholder00000', 'APP', SYSDATE-700, v_clinica)
+            '$2b$10$37zKe76f547bIVAQx0IcceqDze29cYAr.vhPhPXOVXRfEUY/3ZJwW',
+            'APP', SYSDATE-700, v_clinica)
     RETURNING id_tutor INTO v_tutor;
 
     SELECT id_raca INTO v_raca FROM TB_CLV_RACA WHERE nm_raca = 'Persa';

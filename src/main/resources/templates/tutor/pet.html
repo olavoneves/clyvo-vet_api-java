@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<!--
+  A tela do tutor. Nao usa layout.html de proposito: aquele cabecalho leva ao
+  painel de receita, a agenda e ao prontuario, telas que o tutor nao pode abrir.
+  Um menu cheio de links que devolvem 403 e pior que nenhum menu.
+-->
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${pet != null} ? |${pet.nome} · Clyvo Vet| : 'Meus pets · Clyvo Vet'">Clyvo Vet</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<header class="topo">
+    <a class="marca" th:href="@{/tutor}">
+        <span class="marca-ponto"></span>
+        Clyvo<strong>Vet</strong>
+    </a>
+
+    <nav class="menu">
+        <a th:each="p : ${pets}"
+           th:href="@{/tutor/pets/{id}(id=${p.id})}"
+           th:text="${p.nome}"
+           th:classappend="${pet != null and pet.id == p.id} ? 'ativo'">Pet</a>
+    </nav>
+
+    <div class="sessao">
+        <span class="sessao-nome" th:text="${tutor.nome}">Tutor</span>
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="botao-texto">Sair</button>
+        </form>
+    </div>
+</header>
+
+<main class="conteudo">
+
+    <section class="bloco" th:if="${pet == null}">
+        <h2 class="titulo-bloco">Nenhum pet cadastrado</h2>
+        <p class="ajuda">
+            Você ainda não tem nenhum pet vinculado a esta clínica.
+            Fale com a recepção para fazer o cadastro.
+        </p>
+    </section>
+
+    <th:block th:if="${pet != null}">
+
+        <div class="cabecalho-tela">
+            <div>
+                <h1 th:text="${pet.nome}">Nome do pet</h1>
+                <p class="subtitulo"
+                   th:text="|${pet.especieNome} · ${pet.racaNome} · ${pet.porte}|">Espécie · raça</p>
+            </div>
+            <span class="etiqueta etiqueta-grande"
+                  th:classappend="'etiqueta-' + ${#strings.toLowerCase(pet.status)}"
+                  th:text="${pet.status}">STATUS</span>
+        </div>
+
+        <div class="tutor-colunas">
+
+            <div class="tutor-coluna">
+
+                <section class="bloco">
+                    <h2 class="titulo-bloco">Cuidados pendentes</h2>
+                    <p class="ajuda">
+                        O que o protocolo do <span th:text="${pet.nome}">pet</span> prevê e ainda
+                        não tem horário marcado.
+                    </p>
+
+                    <ul class="pendencias" id="pendencias">
+                        <li class="pendencia" th:each="o : ${pendentes}">
+                            <div>
+                                <strong th:text="${o.etapaNome}">Etapa</strong>
+                                <span class="pendencia-protocolo" th:text="${o.protocoloNome}">Protocolo</span>
+                            </div>
+                            <div class="pendencia-quando">
+                                <span th:text="|prevista para ${#temporals.format(o.dtPrevista, 'dd/MM/yyyy')}|">data</span>
+                                <span class="etiqueta"
+                                      th:classappend="'etiqueta-' + ${#strings.toLowerCase(o.status)}"
+                                      th:text="${o.status}">STATUS</span>
+                            </div>
+                        </li>
+                        <li class="pendencia pendencia-vazia" th:if="${#lists.isEmpty(pendentes)}">
+                            Nada pendente por aqui. Tudo em dia.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="bloco">
+                    <h2 class="titulo-bloco">Carteirinha de vacinas</h2>
+                    <p class="ajuda">Vacinas do protocolo já aplicadas.</p>
+
+                    <div class="tabela-rolagem">
+                        <table class="tabela">
+                            <thead>
+                            <tr>
+                                <th>Vacina</th>
+                                <th>Protocolo</th>
+                                <th>Aplicada</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="v : ${carteirinha}">
+                                <td><strong th:text="${v.etapaNome}">Dose</strong></td>
+                                <td th:text="${v.protocoloNome}">Protocolo</td>
+                                <td th:text="${#temporals.format(v.dtPrevista, 'dd/MM/yyyy')}">data</td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(carteirinha)}">
+                                <td colspan="3" class="tabela-vazia">
+                                    Nenhuma vacina registrada ainda.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
+
+            <div class="tutor-coluna">
+                <section class="bloco conversa-bloco">
+                    <h2 class="titulo-bloco">Falar com a clínica</h2>
+                    <p class="ajuda">
+                        O assistente marca e remarca horários. Sobre saúde do
+                        <span th:text="${pet.nome}">pet</span>, quem responde é o veterinário.
+                    </p>
+
+                    <div class="conversa" id="conversa" aria-live="polite">
+                        <div class="fala fala-agente">
+                            Olá! Posso ajudar a marcar ou remarcar uma consulta para o
+                            <span th:text="${pet.nome}">pet</span>. O que você precisa?
+                        </div>
+                    </div>
+
+                    <form class="conversa-envio" id="envio" autocomplete="off">
+                        <input type="text" id="texto" name="texto" maxlength="2000"
+                               placeholder="Ex.: quero marcar a vacina" required>
+                        <button type="submit" class="botao-principal" id="enviar">Enviar</button>
+                    </form>
+                </section>
+            </div>
+
+        </div>
+    </th:block>
+
+</main>
+
+<footer class="rodape">
+    <span>Clyvo Vet · assistente de agendamento</span>
+    <span th:text="${#temporals.format(#temporals.createToday(), 'dd/MM/yyyy')}">01/01/2026</span>
+</footer>
+
+<script th:if="${pet != null}" th:inline="javascript">
+    /*
+      Cliente minimo do agente. Chama exatamente o mesmo POST /api/agente/mensagens
+      que o aplicativo do tutor vai chamar — nao um atalho de tela — para que o
+      contrato seja exercitado de verdade na demonstracao.
+    */
+    (function () {
+        const idPet = /*[[${pet.id}]]*/ 0;
+        const token = /*[[${tokenApi}]]*/ '';
+        const rota = /*[[@{/api/agente/mensagens}]]*/ '/api/agente/mensagens';
+        const recarregar = /*[[@{/tutor/pets/{id}(id=${pet.id})}]]*/ '/tutor';
+
+        const conversa = document.getElementById('conversa');
+        const envio = document.getElementById('envio');
+        const campo = document.getElementById('texto');
+        const botao = document.getElementById('enviar');
+
+        function falar(classe, texto) {
+            const linha = document.createElement('div');
+            linha.className = 'fala ' + classe;
+            linha.textContent = texto;
+            conversa.appendChild(linha);
+            conversa.scrollTop = conversa.scrollHeight;
+            return linha;
+        }
+
+        envio.addEventListener('submit', async function (evento) {
+            evento.preventDefault();
+            const texto = campo.value.trim();
+            if (!texto) return;
+
+            falar('fala-tutor', texto);
+            campo.value = '';
+            campo.disabled = true;
+            botao.disabled = true;
+            const pensando = falar('fala-agente fala-pensando', 'Consultando a agenda...');
+
+            try {
+                const resposta = await fetch(rota, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({idPet: idPet, texto: texto})
+                });
+
+                if (resposta.status === 503) {
+                    pensando.remove();
+                    falar('fala-agente', 'O assistente não está disponível nesta instalação. '
+                        + 'Ligue para a clínica para marcar.');
+                    return;
+                }
+                if (resposta.status === 401) {
+                    // o token da página tem validade curta: recarregar emite outro
+                    pensando.remove();
+                    falar('fala-agente', 'Sua sessão expirou. Atualize a página para continuar.');
+                    return;
+                }
+                if (!resposta.ok) {
+                    pensando.remove();
+                    falar('fala-agente', 'Não consegui responder agora. Tente de novo em instantes.');
+                    return;
+                }
+
+                const corpo = await resposta.json();
+                pensando.remove();
+                falar('fala-agente', corpo.texto);
+
+                // a lista de pendências mudou no servidor; recarregar é honesto e
+                // barato, e evita manter dois estados da mesma informação na tela
+                const mudou = (corpo.acoes || []).some(function (a) {
+                    return a.tipo === 'AGENDAMENTO_CRIADO' || a.tipo === 'AGENDAMENTO_REMARCADO';
+                });
+                if (mudou) {
+                    falar('fala-sistema', 'Atualizando seus cuidados pendentes...');
+                    setTimeout(function () { window.location.href = recarregar; }, 1600);
+                }
+
+            } catch (erro) {
+                pensando.remove();
+                falar('fala-agente', 'Não consegui falar com a clínica agora. Tente de novo.');
+            } finally {
+                campo.disabled = false;
+                botao.disabled = false;
+                campo.focus();
+            }
+        });
+    })();
+</script>
+
+</body>
+</html>
