@@ -375,7 +375,7 @@ docker compose up --build
 ```
 
 Aguarde o Oracle ficar healthy (~2 min). O banco sobe **vazio**: o Flyway executa a cadeia
-`V0 → V0.1 → V1 … → V8` e cria o schema inteiro — tabelas, foreign keys, índices, o motor
+`V0 → V0.1 → V1 … → V10` e cria o schema inteiro — tabelas, foreign keys, índices, o motor
 de protocolo em PL/SQL e a view do painel. Nenhum passo manual.
 
 Para popular com dados de demonstração depois que a API subir:
@@ -384,6 +384,28 @@ Para popular com dados de demonstração depois que a API subir:
 BEGIN PR_CLV_SEED_EXECUTAR(p_qtd_pets => 400); END;
 /
 ```
+
+### Logins de demonstração
+
+Ninguém "cria" esses usuários: eles nascem do seed, todos com a senha
+**`Clyvo@2026`**. Não são credenciais de produção.
+
+| Perfil | E-mail | Clínica |
+|---|---|---|
+| Colaborador | `patricia@vidaanimal.com.br` | Vida Animal |
+| Colaborador | `diego@petcare.com.br` | PetCare |
+| Veterinário | `helena@vidaanimal.com.br` | Vida Animal |
+| Tutor (Thor) | `camila.ferreira@exemplo.com` | Vida Animal |
+| Tutor (Nala) | `roberto.almeida@exemplo.com` | Vida Animal |
+
+O fluxo completo atravessa duas telas e dois logins — use uma janela anônima
+para a segunda sessão, senão uma derruba a outra. Entre como Patricia ou
+Helena, registre uma consulta para o Thor e veja a obrigação nascer; entre como
+Camila em `/tutor/pets/{id}`, converse com o agente e agende; volte para a
+Helena e o agendamento está na agenda.
+
+Base semeada antes de 2026-09-04 carrega o hash quebrado da V8 antiga — a
+**V10** corrige, basta subir a aplicação.
 
 API: `http://localhost:8080`  
 Swagger: `http://localhost:8080/swagger-ui.html`
