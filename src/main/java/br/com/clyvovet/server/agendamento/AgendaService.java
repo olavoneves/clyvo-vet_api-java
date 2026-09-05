@@ -75,6 +75,22 @@ public class AgendaService {
     }
 
     /**
+     * O que a clinica atende numa faixa de datas, na ordem em que acontece.
+     *
+     * <p>A contrapartida de {@link #horariosLivres}: aquela responde "quando
+     * cabe", esta responde "quem vem". E o que a agenda operacional mostra —
+     * compromisso pela data em que ele ocorre, e nao obrigacao pela data em que
+     * venceu. Cada linha diz se recupera uma obrigacao atrasada, que e o caso
+     * que a tela existe para tornar visivel.
+     *
+     * <p>O recorte por clinica vem do filtro de tenant do Hibernate.
+     */
+    @Transactional(readOnly = true)
+    public List<CompromissoDaAgenda> compromissosEntre(LocalDate de, LocalDate ate) {
+        return repository.agendaEntre(de, ate);
+    }
+
+    /**
      * Horarios vagos na faixa pedida, do mais proximo ao mais distante.
      *
      * <p>O recorte por clinica vem do filtro de tenant do Hibernate: a lista de

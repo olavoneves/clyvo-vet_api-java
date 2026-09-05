@@ -94,7 +94,7 @@ public class GeminiAdapter implements ProvedorLlm {
                 ProtocoloGemini.Conteudo.instrucao(promptDoSistema),
                 historico.stream().map(GeminiAdapter::traduzir).toList(),
                 declarar(ferramentas),
-                new ProtocoloGemini.ConfiguracaoDeGeracao(propriedades.maxTokens()));
+                ProtocoloGemini.ConfiguracaoDeGeracao.semPensar(propriedades.maxTokens()));
 
         ProtocoloGemini.Resposta resposta = ChamadaResiliente.executar(
                 NOME, propriedades.maxRetentativas(), propriedades.timeout(),

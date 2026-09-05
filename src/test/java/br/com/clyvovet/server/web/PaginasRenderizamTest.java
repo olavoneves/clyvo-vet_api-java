@@ -13,6 +13,11 @@ import br.com.clyvovet.server.enums.ProtocoloCategoria;
 import br.com.clyvovet.server.enums.TipoUsuario;
 import br.com.clyvovet.server.exception.EntityNotFoundException;
 import br.com.clyvovet.server.obrigacao.ObrigacaoResponse;
+import br.com.clyvovet.server.agendamento.AgendaService;
+import br.com.clyvovet.server.agendamento.CompromissoDaAgenda;
+import br.com.clyvovet.server.enums.AgendamentoStatus;
+import br.com.clyvovet.server.enums.CanalPreferencial;
+import br.com.clyvovet.server.enums.ObrigacaoStatus;
 import br.com.clyvovet.server.obrigacao.ObrigacaoService;
 import br.com.clyvovet.server.obrigacao.web.AgendaWebController;
 import br.com.clyvovet.server.painel.PainelReceitaResponse;
@@ -97,6 +102,9 @@ class PaginasRenderizamTest {
     @MockitoBean
     private ObrigacaoService obrigacaoService;
 
+    @MockitoBean
+    private AgendaService agendaService;
+
     @Test
     void loginRenderizaSemAutenticacao() throws Exception {
         mockMvc.perform(get("/login"))
@@ -175,15 +183,70 @@ class PaginasRenderizamTest {
 
     @Test
     void agendaRenderizaOsDoisBlocos() throws Exception {
-        given(obrigacaoService.buscar(isNull(), any(LocalDate.class), any(LocalDate.class),
-                isNull(), any(Pageable.class)))
-                .willReturn(new PageImpl<>(List.of(obrigacaoDeExemplo())));
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class)))
+                .willReturn(List.of(compromissoEmDia()));
 
         mockMvc.perform(get("/agenda").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.containsString("Hoje"),
-                        org.hamcrest.Matchers.containsString("Próximos dias"))));
+                        org.hamcrest.Matchers.containsString("Próximos dias"),
+                        org.hamcrest.Matchers.containsString("Rex"))));
+    }
+
+    /**
+     * O caso que motivou trocar o criterio da tela.
+     *
+     * <p>Uma obrigacao vencida em 01/09 remarcada para 10/09 nao aparecia em
+     * lugar nenhum: nem no dia previsto, ja passado, nem no dia da consulta. Agora
+     * ela aparece no dia da consulta, marcada, com quantos dias de atraso — que e
+     * a receita recuperada ficando visivel para a clinica.
+     */
+    @Test
+    void agendaMarcaOCompromissoQueRecuperaObrigacaoVencida() throws Exception {
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class)))
+                .willReturn(List.of(compromissoAtrasado()));
+
+        mockMvc.perform(get("/agenda").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("linha-recuperada"),
+                        org.hamcrest.Matchers.containsString("em atraso"),
+                        org.hamcrest.Matchers.containsString("9d"))));
+    }
+
+    /** Compromisso do balcao: sem obrigacao atras, nao pode ser marcado como atraso. */
+    @Test
+    void agendaNaoMarcaAtrasoNoQueVeioDoBalcao() throws Exception {
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class)))
+                .willReturn(List.of(compromissoDeBalcao()));
+
+        mockMvc.perform(get("/agenda").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Marcado pela clínica"),
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("linha-recuperada")))));
+    }
+
+    private static CompromissoDaAgenda compromissoEmDia() {
+        return new CompromissoDaAgenda(1L, LocalDate.of(2026, 9, 10), "09:00",
+                AgendamentoStatus.CONFIRMADO, CanalPreferencial.APP, 9L, "Rex", "Dra. Ana",
+                "Reforço anual", "Série V10", LocalDate.of(2026, 9, 10),
+                ObrigacaoStatus.AGENDADA);
+    }
+
+    private static CompromissoDaAgenda compromissoAtrasado() {
+        return new CompromissoDaAgenda(2L, LocalDate.of(2026, 9, 10), "14:00",
+                AgendamentoStatus.CONFIRMADO, CanalPreferencial.APP, 9L, "Rex", "Dra. Ana",
+                "Reforço anual", "Série V10", LocalDate.of(2026, 9, 1),
+                ObrigacaoStatus.AGENDADA);
+    }
+
+    private static CompromissoDaAgenda compromissoDeBalcao() {
+        return new CompromissoDaAgenda(3L, LocalDate.of(2026, 9, 10), "16:00",
+                AgendamentoStatus.CONFIRMADO, CanalPreferencial.WEB, 9L, "Rex", "Dra. Ana",
+                null, null, null, null);
     }
 
     /**

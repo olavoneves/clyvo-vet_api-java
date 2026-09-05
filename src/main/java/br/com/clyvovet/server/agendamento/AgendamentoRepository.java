@@ -47,4 +47,34 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
 
     @Query("select a from Agendamento a join fetch a.pet join fetch a.veterinario where a.id = :id")
     Optional<Agendamento> buscarComPetEVeterinario(@Param("id") Long id);
+
+    /**
+     * A agenda da clinica numa faixa de datas, com a obrigacao que originou cada
+     * compromisso quando houver uma.
+     *
+     * <p>O join e <b>left</b>, e pela obrigacao: quem carrega a chave estrangeira
+     * e {@code Obrigacao.agendamento}, e nem todo compromisso vem do motor — o que
+     * o balcao marca direto nao tem obrigacao atras e ainda assim ocupa a sala.
+     * Um inner join sumiria com esses.
+     *
+     * <p>Cancelado fica de fora pelo mesmo motivo de {@code ocupadosEntre}: nao
+     * ocupa nada, e listar cancelamento na agenda do dia so gera telefonema.
+     */
+    @Query("""
+            select new br.com.clyvovet.server.agendamento.CompromissoDaAgenda(
+                     a.id, a.dtAgendamento, a.hrAgendamento, a.status, a.canalOrigem,
+                     p.id, p.nome, v.nome,
+                     e.nmEtapa, pr.nmProtocolo, o.dtPrevista, o.dsStatus)
+              from Agendamento a
+              join a.pet p
+              join a.veterinario v
+              left join Obrigacao o on o.agendamento = a
+              left join o.etapa e
+              left join o.versaoProtocolo vp
+              left join vp.protocolo pr
+             where a.dtAgendamento between :de and :ate
+               and (a.status is null or a.status <> br.com.clyvovet.server.enums.AgendamentoStatus.CANCELADO)
+             order by a.dtAgendamento asc, a.hrAgendamento asc
+            """)
+    List<CompromissoDaAgenda> agendaEntre(@Param("de") LocalDate de, @Param("ate") LocalDate ate);
 }

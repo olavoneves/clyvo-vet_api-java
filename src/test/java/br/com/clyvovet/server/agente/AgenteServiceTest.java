@@ -400,6 +400,50 @@ class AgenteServiceTest {
     }
 
     /**
+     * O caso que chegou a produzir HTTP 500 no tutor.
+     *
+     * <p>Um timeout durante a <i>leitura</i> da resposta nao chega como
+     * {@code ResourceAccessException}: ele nasce dentro do conversor, ao resolver
+     * o content-type de uma resposta truncada, e sai como
+     * {@code RestClientException}. Enquanto o {@code ChamadaResiliente} so
+     * capturava a primeira, esta falha subia inteira ate o
+     * {@code GlobalExceptionHandler} — e quem estava do outro lado, preocupado
+     * com um animal, via "Erro interno" em vez da mensagem que encaminha para a
+     * clinica.
+     */
+    @Test
+    @DisplayName("resposta ilegivel do provedor vira indisponibilidade, nunca 500")
+    void respostaIlegivelViraMensagemDeIndisponibilidade() {
+        api.expect(ExpectedCount.once(), requestTo(ROTA))
+                .andRespond(withSuccess("{\"candidates\":[{\"content\":{\"role\":\"mod",
+                        MediaType.APPLICATION_JSON));
+
+        RespostaDoAgenteResponse resposta = agente.responder(PET, "quero marcar");
+
+        api.verify();
+        assertThat(resposta.texto()).isEqualTo(MensagensDoAgente.INDISPONIVEL);
+        assertThat(resposta.escalado()).isTrue();
+    }
+
+    /**
+     * Uma conversa de agendamento nao delibera: ela escolhe entre cinco
+     * ferramentas com o esquema na mao. O raciocinio estendido so custava tempo,
+     * e o tempo aqui e o tutor esperando na tela.
+     */
+    @Test
+    @DisplayName("o pedido ao Gemini desliga o raciocinio estendido")
+    void pedidoDesligaOPensamento() {
+        api.expect(ExpectedCount.once(), requestTo(ROTA))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers
+                        .jsonPath("$.generationConfig.thinkingConfig.thinkingBudget").value(0))
+                .andRespond(withSuccess(texto("Oi."), MediaType.APPLICATION_JSON));
+
+        agente.responder(PET, "oi");
+
+        api.verify();
+    }
+
+    /**
      * O 429 deixa de ser excecao num tier gratuito: e a metade mais exercitada
      * da politica de retentativa, e a que sustenta a escolha do provedor.
      */
