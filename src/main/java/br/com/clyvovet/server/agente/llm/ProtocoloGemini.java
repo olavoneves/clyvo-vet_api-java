@@ -74,18 +74,28 @@ public final class ProtocoloGemini {
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Parte(String text, ChamadaDeFuncao functionCall, RespostaDeFuncao functionResponse) {
+    public record Parte(String text, ChamadaDeFuncao functionCall, RespostaDeFuncao functionResponse,
+                        String thoughtSignature) {
 
         public static Parte texto(String texto) {
-            return new Parte(texto, null, null);
+            return new Parte(texto, null, null, null);
         }
 
-        public static Parte chamada(ChamadaDeFuncao chamada) {
-            return new Parte(null, chamada, null);
+        /**
+         * A chamada de ferramenta, com a assinatura que a acompanhava.
+         *
+         * <p>O {@code thoughtSignature} e irmao do {@code functionCall} dentro da
+         * mesma parte, e nao um campo dele. Devolver a chamada sem ele faz a
+         * familia 3.x recusar a requisicao inteira com 400
+         * ({@code Function call is missing a thought_signature}), entao o que o
+         * modelo emitiu numa volta tem que reaparecer identico na seguinte.
+         */
+        public static Parte chamada(ChamadaDeFuncao chamada, String assinatura) {
+            return new Parte(null, chamada, null, assinatura);
         }
 
         public static Parte resposta(String nome, Object conteudo) {
-            return new Parte(null, null, new RespostaDeFuncao(nome, Map.of("resultado", conteudo)));
+            return new Parte(null, null, new RespostaDeFuncao(nome, Map.of("resultado", conteudo)), null);
         }
     }
 

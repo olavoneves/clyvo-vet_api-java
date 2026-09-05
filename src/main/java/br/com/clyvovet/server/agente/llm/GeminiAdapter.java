@@ -133,7 +133,8 @@ public class GeminiAdapter implements ProvedorLlm {
                 chamadas.add(new DialogoLlm.Bloco.Chamada(
                         NOME + "-" + i,
                         parte.functionCall().name(),
-                        parte.functionCall().args()));
+                        parte.functionCall().args(),
+                        parte.thoughtSignature()));
             }
         }
 
@@ -158,8 +159,9 @@ public class GeminiAdapter implements ProvedorLlm {
             case DialogoLlm.Bloco.Texto texto ->
                     ProtocoloGemini.Parte.texto(texto.texto());
             case DialogoLlm.Bloco.Chamada chamada ->
-                    ProtocoloGemini.Parte.chamada(new ProtocoloGemini.ChamadaDeFuncao(
-                            chamada.nome(), chamada.argumentos()));
+                    ProtocoloGemini.Parte.chamada(
+                            new ProtocoloGemini.ChamadaDeFuncao(chamada.nome(), chamada.argumentos()),
+                            chamada.assinatura());
             case DialogoLlm.Bloco.Resultado resultado ->
                     ProtocoloGemini.Parte.resposta(resultado.nome(), resultado.conteudo());
         };
