@@ -1,14 +1,20 @@
 package br.com.clyvovet.server.agente;
 
+import br.com.clyvovet.server.agente.llm.DialogoLlm;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * O historico de um tutor sobre um pet, no formato que a API entende.
+ * O historico de um tutor sobre um pet, no vocabulario neutro do dialogo.
  *
- * <p>Guardar as mensagens ja no formato de fio evita manter duas representacoes
- * da mesma conversa. A visao legivel — o que o endpoint de historico devolve — e
- * derivada daqui filtrando os blocos que so interessam ao modelo.
+ * <p>Guardado no formato da porta, e nao no de um provedor: e o que permite que
+ * a mesma conversa seja entregue a qualquer adaptador. Guardar no formato de fio
+ * de um fornecedor amarraria o historico a ele — e trocar de provedor passaria a
+ * exigir traduzir conversas ja gravadas.
+ *
+ * <p>A visao legivel — o que o endpoint de historico devolve — e derivada daqui
+ * filtrando os blocos que so interessam ao modelo.
  */
 public class Conversa {
 
@@ -21,10 +27,10 @@ public class Conversa {
      */
     private static final int MAX_TURNOS = 12;
 
-    private final List<ProtocoloAnthropic.Mensagem> mensagens = new ArrayList<>();
+    private final List<DialogoLlm.Mensagem> mensagens = new ArrayList<>();
     private boolean escalada;
 
-    public List<ProtocoloAnthropic.Mensagem> mensagens() {
+    public List<DialogoLlm.Mensagem> mensagens() {
         return List.copyOf(mensagens);
     }
 
@@ -36,7 +42,7 @@ public class Conversa {
         this.escalada = true;
     }
 
-    public void adicionar(ProtocoloAnthropic.Mensagem mensagem) {
+    public void adicionar(DialogoLlm.Mensagem mensagem) {
         mensagens.add(mensagem);
     }
 
@@ -44,15 +50,14 @@ public class Conversa {
      * Troca a ultima fala do agente pelo texto que o tutor de fato recebeu.
      *
      * <p>Chamado quando o guardrail barra a resposta. Sem isto, o texto proibido
-     * continuaria no historico e voltaria para a API na mensagem seguinte — o
-     * modelo leria a propria opiniao clinica como precedente aceito e seguiria
+     * continuaria no historico e voltaria para o provedor na mensagem seguinte —
+     * o modelo leria a propria opiniao clinica como precedente aceito e seguiria
      * dali. A barragem tem que valer para a conversa, nao so para a tela.
      */
     public void substituirUltimaRespostaDoAgente(String texto) {
         for (int i = mensagens.size() - 1; i >= 0; i--) {
-            if (ProtocoloAnthropic.PAPEL_AGENTE.equals(mensagens.get(i).role())) {
-                mensagens.set(i, ProtocoloAnthropic.Mensagem.doAgente(
-                        List.of(ProtocoloAnthropic.Bloco.texto(texto))));
+            if (mensagens.get(i).papel() == DialogoLlm.Papel.AGENTE) {
+                mensagens.set(i, DialogoLlm.Mensagem.doAgente(texto));
                 return;
             }
         }
@@ -62,9 +67,9 @@ public class Conversa {
      * Descarta os turnos mais antigos.
      *
      * <p>Corta so no inicio de um turno — a mensagem do tutor que o abriu. Cortar
-     * em qualquer outro ponto deixaria um {@code tool_use} sem o
-     * {@code tool_result} correspondente, e a API recusa a requisicao inteira
-     * quando isso acontece.
+     * em qualquer outro ponto deixaria uma chamada de ferramenta sem o resultado
+     * correspondente, e os dois provedores recusam a requisicao inteira quando
+     * isso acontece.
      */
     public void podar() {
         List<Integer> inicios = new ArrayList<>();
@@ -81,9 +86,8 @@ public class Conversa {
     }
 
     /** Mensagem do tutor com texto de verdade, e nao um lote de resultados de ferramenta. */
-    private static boolean ehInicioDeTurno(ProtocoloAnthropic.Mensagem mensagem) {
-        return ProtocoloAnthropic.PAPEL_TUTOR.equals(mensagem.role())
-                && mensagem.content() != null
-                && mensagem.content().stream().anyMatch(ProtocoloAnthropic.Bloco::ehTexto);
+    private static boolean ehInicioDeTurno(DialogoLlm.Mensagem mensagem) {
+        return mensagem.papel() == DialogoLlm.Papel.TUTOR
+                && mensagem.blocos().stream().anyMatch(DialogoLlm.Bloco.Texto.class::isInstance);
     }
 }

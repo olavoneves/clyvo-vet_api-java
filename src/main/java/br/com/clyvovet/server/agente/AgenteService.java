@@ -1,5 +1,7 @@
 package br.com.clyvovet.server.agente;
 
+import br.com.clyvovet.server.agente.llm.DialogoLlm;
+import br.com.clyvovet.server.agente.llm.ProvedorLlm;
 import br.com.clyvovet.server.auth.AuthenticatedUser;
 import br.com.clyvovet.server.enums.TipoUsuario;
 import br.com.clyvovet.server.exception.ConflitoDeEstadoException;
@@ -10,7 +12,6 @@ import br.com.clyvovet.server.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.time.format.TextStyle;
@@ -23,15 +24,17 @@ import java.util.Optional;
 /**
  * O laco do agente: recebe a mensagem do tutor e devolve a resposta.
  *
- * <p>Nao ha framework de agente aqui. O ciclo e o da propria API de mensagens —
- * pergunta, {@code stop_reason} igual a {@code tool_use}, executa em Java,
- * devolve o resultado, repete — e cabe em um {@code for} com teto. O teto e o
- * que impede que um modelo confuso fique chamando ferramenta para sempre as
- * nossas custas; ao estourar, a conversa vai para uma pessoa.
+ * <p>Nao ha framework de agente aqui, e nao ha provedor de LLM tambem. O ciclo —
+ * pergunta, o modelo pede uma ferramenta, executa em Java, devolve o resultado,
+ * repete — cabe em um {@code for} com teto, e conversa com o modelo pela porta
+ * {@link ProvedorLlm}. Nada neste arquivo sabe se atras dela esta o Gemini ou a
+ * Anthropic. O teto e o que impede que um modelo confuso fique chamando
+ * ferramenta para sempre as nossas custas; ao estourar, a conversa vai para uma
+ * pessoa.
  *
  * <p><b>Este metodo nao e transacional, de proposito.</b> Uma volta do laco pode
- * levar dezenas de segundos esperando a API. Segurar uma conexao do pool Oracle
- * durante essa espera esgotaria o pool de dez conexoes com dez tutores
+ * levar dezenas de segundos esperando o provedor. Segurar uma conexao do pool
+ * Oracle durante essa espera esgotaria o pool de dez conexoes com dez tutores
  * conversando ao mesmo tempo, e derrubaria o sistema inteiro por causa do
  * modulo que menos importa. Cada ferramenta abre e fecha a propria transacao; o
  * agendamento, que precisa ser atomico com a transicao da obrigacao, e uma
@@ -43,32 +46,36 @@ import java.util.Optional;
 public class AgenteService {
 
     private final AgenteProperties propriedades;
-    private final AnthropicClient cliente;
+    private final ProvedorLlm provedor;
     private final CatalogoDeFerramentas catalogo;
     private final MemoriaDeConversa memoria;
     private final GuardrailClinico guardrail;
     private final RegistroDeConversa registro;
     private final PetRepository petRepository;
-    private final ObjectMapper objectMapper;
 
-    /** O que uma execucao de ferramenta produz para a volta seguinte. */
-    private record Execucao(String conteudo, AcaoDoAgente acao, boolean escalonamento) {
+    /**
+     * O que uma execucao de ferramenta produz para a volta seguinte.
+     *
+     * <p>{@code conteudo} e objeto, e nao JSON pronto: quem serializa e o
+     * adaptador, porque cada provedor quer o resultado numa forma diferente.
+     */
+    private record Execucao(Object conteudo, AcaoDoAgente acao, boolean escalonamento) {
     }
 
     /**
      * Um turno completo de conversa.
      *
-     * @throws AgenteDesligadoException se nao ha chave de API configurada
+     * @throws AgenteDesligadoException se o provedor ativo nao tem chave
      * @throws EntityNotFoundException se o pet nao e deste tutor
      */
     public RespostaDoAgenteResponse responder(Long idPet, String textoDoTutor) {
-        if (!propriedades.disponivel()) {
+        if (!provedor.disponivel()) {
             throw new AgenteDesligadoException();
         }
 
         ContextoDoAgente contexto = contexto(idPet);
         Conversa conversa = memoria.carregar(contexto);
-        conversa.adicionar(ProtocoloAnthropic.Mensagem.doTutor(textoDoTutor));
+        conversa.adicionar(DialogoLlm.Mensagem.doTutor(textoDoTutor));
 
         List<String> ferramentasUsadas = new ArrayList<>();
         List<AcaoDoAgente> acoes = new ArrayList<>();
@@ -77,31 +84,31 @@ public class AgenteService {
 
         try {
             for (int volta = 0; volta < propriedades.maxIteracoes() && resposta == null; volta++) {
-                ProtocoloAnthropic.Resposta doModelo = cliente.enviar(new ProtocoloAnthropic.Requisicao(
-                        propriedades.modelo(), propriedades.maxTokens(),
-                        promptDoSistema(contexto), conversa.mensagens(), catalogo.declaracoes()));
+                DialogoLlm.Turno doModelo = provedor.responder(
+                        promptDoSistema(contexto), conversa.mensagens(), catalogo.declaracoes());
 
-                conversa.adicionar(ProtocoloAnthropic.Mensagem.doAgente(doModelo.content()));
+                conversa.adicionar(DialogoLlm.Mensagem.doAgente(doModelo.comoBlocos()));
 
                 if (!doModelo.pediuFerramenta()) {
-                    resposta = doModelo.textoConcatenado();
+                    resposta = doModelo.texto();
                     continue;
                 }
 
                 // todos os resultados voltam numa unica mensagem: quebra-los em
                 // varias ensina o modelo a parar de pedir ferramentas em paralelo
-                List<ProtocoloAnthropic.Bloco> resultados = new ArrayList<>();
-                for (ProtocoloAnthropic.Bloco uso : doModelo.usosDeFerramenta()) {
-                    ferramentasUsadas.add(uso.name());
-                    Execucao execucao = executar(uso, contexto);
+                List<DialogoLlm.Bloco> resultados = new ArrayList<>();
+                for (DialogoLlm.Bloco.Chamada chamada : doModelo.chamadas()) {
+                    ferramentasUsadas.add(chamada.nome());
+                    Execucao execucao = executar(chamada, contexto);
 
                     if (execucao.acao() != null) {
                         acoes.add(execucao.acao());
                     }
                     escalado |= execucao.escalonamento();
-                    resultados.add(ProtocoloAnthropic.Bloco.resultado(uso.id(), execucao.conteudo()));
+                    resultados.add(new DialogoLlm.Bloco.Resultado(
+                            chamada.id(), chamada.nome(), execucao.conteudo()));
                 }
-                conversa.adicionar(ProtocoloAnthropic.Mensagem.doTutor(resultados));
+                conversa.adicionar(DialogoLlm.Mensagem.doTutor(resultados));
             }
 
             if (resposta == null || resposta.isBlank()) {
@@ -112,7 +119,8 @@ public class AgenteService {
             }
 
         } catch (FalhaNaApiException ex) {
-            log.error("Agente indisponivel para o pet {}: {}", contexto.idPet(), ex.getMessage());
+            log.error("Agente indisponivel para o pet {} pelo provedor {}: {}",
+                    contexto.idPet(), provedor.nome(), ex.getMessage());
             resposta = MensagensDoAgente.INDISPONIVEL;
             escalado = true;
         }
@@ -149,19 +157,12 @@ public class AgenteService {
         Conversa conversa = memoria.buscar(contexto).orElseGet(Conversa::new);
         List<ConversaResponse.Turno> turnos = new ArrayList<>();
 
-        for (ProtocoloAnthropic.Mensagem mensagem : conversa.mensagens()) {
-            String autor = ProtocoloAnthropic.PAPEL_AGENTE.equals(mensagem.role())
+        for (DialogoLlm.Mensagem mensagem : conversa.mensagens()) {
+            String autor = mensagem.papel() == DialogoLlm.Papel.AGENTE
                     ? ConversaResponse.Turno.AGENTE
                     : ConversaResponse.Turno.TUTOR;
 
-            if (mensagem.content() == null) {
-                continue;
-            }
-            mensagem.content().stream()
-                    .filter(ProtocoloAnthropic.Bloco::ehTexto)
-                    .map(ProtocoloAnthropic.Bloco::text)
-                    .filter(texto -> texto != null && !texto.isBlank())
-                    .forEach(texto -> turnos.add(new ConversaResponse.Turno(autor, texto)));
+            mensagem.textos().forEach(texto -> turnos.add(new ConversaResponse.Turno(autor, texto)));
         }
 
         return new ConversaResponse(idPet, conversa.escalada(), turnos);
@@ -171,35 +172,31 @@ public class AgenteService {
      * Executa uma ferramenta e transforma o que ela devolveu em algo que o
      * modelo consiga ler.
      *
-     * <p>Erro de dominio nao interrompe o turno: vira texto de resultado. Um
+     * <p>Erro de dominio nao interrompe o turno: vira conteudo de resultado. Um
      * horario que acabou de ser ocupado e informacao util para o modelo — ele
      * consulta de novo e oferece outro —, nao motivo para o tutor ver uma tela
      * de erro. E o que o requisito de concorrencia pede: conflito tratado, e nao
      * excecao propagada.
+     *
+     * <p>Vale para qualquer provedor, e e por isso que fica aqui e nao no
+     * adaptador: um modelo que erra o argumento precisa receber a recusa e
+     * corrigir na volta seguinte, venha ele de onde vier.
      */
-    private Execucao executar(ProtocoloAnthropic.Bloco uso, ContextoDoAgente contexto) {
+    private Execucao executar(DialogoLlm.Bloco.Chamada chamada, ContextoDoAgente contexto) {
         try {
-            Ferramenta ferramenta = catalogo.porNome(uso.name());
-            Ferramenta.Resultado resultado = ferramenta.executar(entrada(uso), contexto);
-            return new Execucao(json(resultado.conteudo()), resultado.acao(), resultado.escalonamento());
+            Ferramenta ferramenta = catalogo.porNome(chamada.nome());
+            Ferramenta.Resultado resultado = ferramenta.executar(chamada.argumentos(), contexto);
+            return new Execucao(resultado.conteudo(), resultado.acao(), resultado.escalonamento());
 
         } catch (ConflitoDeEstadoException | IllegalArgumentException | EntityNotFoundException ex) {
-            log.info("Ferramenta {} recusou a chamada do agente: {}", uso.name(), ex.getMessage());
-            return new Execucao(json(Map.of("erro", ex.getMessage())), null, false);
+            log.info("Ferramenta {} recusou a chamada do agente: {}", chamada.nome(), ex.getMessage());
+            return new Execucao(Map.of("erro", ex.getMessage()), null, false);
 
         } catch (RuntimeException ex) {
-            log.error("Falha inesperada na ferramenta {} do agente", uso.name(), ex);
-            return new Execucao(json(Map.of("erro",
-                    "Não foi possível executar esta operação agora.")), null, false);
+            log.error("Falha inesperada na ferramenta {} do agente", chamada.nome(), ex);
+            return new Execucao(Map.of("erro",
+                    "Não foi possível executar esta operação agora."), null, false);
         }
-    }
-
-    private static Map<String, Object> entrada(ProtocoloAnthropic.Bloco uso) {
-        return uso.input() == null ? Map.of() : uso.input();
-    }
-
-    private String json(Object valor) {
-        return objectMapper.writeValueAsString(valor);
     }
 
     /**
@@ -235,7 +232,8 @@ public class AgenteService {
      * A primeira camada do guardrail clinico e as regras de trabalho do agente.
      *
      * <p>Instrucao em prompt nao e controle — e por isso que existe a verificacao
-     * de saida em {@link GuardrailClinico}. Mas continua sendo a camada que faz o
+     * de saida em {@link GuardrailClinico}, que roda depois, sobre a resposta
+     * final, seja qual for o provedor. Mas continua sendo a camada que faz o
      * agente acertar na maioria esmagadora das vezes, e vale escreve-la com
      * cuidado: cada frase daqui e uma resposta que a segunda camada nao precisa
      * barrar.

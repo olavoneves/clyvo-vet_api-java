@@ -4,10 +4,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
- * ANTHROPIC_API_KEY ausente: o agente nao existe neste ambiente.
+ * O provedor de LLM ativo nao tem chave: o agente nao existe neste ambiente.
  *
  * <p>503 e nao 500 porque nao ha erro nenhum — a aplicacao sobe inteira sem a
- * chave, de proposito, e todo o resto do sistema continua funcionando. Quem
+ * chave (GEMINI_API_KEY ou ANTHROPIC_API_KEY, conforme
+ * {@code clyvo.agente.provedor}), de proposito, e todo o resto do sistema
+ * continua funcionando. Quem
  * chamou precisa saber que este recurso especifico esta fora, nao que algo
  * quebrou.
  */
