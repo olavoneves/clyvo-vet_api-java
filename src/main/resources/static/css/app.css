@@ -24,6 +24,22 @@
 
 * { box-sizing: border-box; }
 
+/*
+  Foco visivel em tudo que recebe foco, e nao so nos tres lugares que alguem
+  lembrou de estilizar. E :focus-visible e nao :focus para o contorno aparecer
+  na navegacao por teclado sem piscar a cada clique de mouse.
+*/
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--cor-primaria);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
 body {
     margin: 0;
     background: var(--cor-fundo);
@@ -345,11 +361,33 @@ a { color: var(--cor-primaria-escura); }
 
 .etiqueta-grande { font-size: 13px; padding: 6px 14px; }
 
-.etiqueta-cumprida, .etiqueta-ativo { background: #e4f3ee; border-color: #b9dfd2; color: #17594f; }
-.etiqueta-agendada, .etiqueta-respondida { background: #e6eefb; border-color: #c2d5f2; color: #1e4b8f; }
-.etiqueta-notificada, .etiqueta-prevista { background: #fdf3e0; border-color: #f0ddb6; color: #8a5a00; }
+/*
+  Cor por SIGNIFICADO, e nao por enum. Ha dois vocabularios de estado no
+  sistema — ObrigacaoStatus e AgendamentoStatus — e eles se sobrepoem: o que a
+  obrigacao chama CUMPRIDA o agendamento chama REALIZADO, e e a mesma coisa
+  para quem olha a tela. Agrupados aqui, o mesmo significado tem a mesma cor no
+  painel, na agenda e na tela do tutor.
+
+  Sem este agrupamento os estados de agendamento caiam no estilo neutro e a
+  agenda ficava com etiquetas sem cor nenhuma, enquanto a mesma situacao
+  aparecia colorida nas outras telas.
+
+  Verde: acabou bem.       Azul: marcado, vai acontecer.
+  Ambar: esperando acao.   Vermelho: perdeu.   Cinza: saiu do fluxo.
+*/
+.etiqueta-cumprida, .etiqueta-realizado,
+.etiqueta-ativo { background: #e4f3ee; border-color: #b9dfd2; color: #17594f; }
+
+.etiqueta-agendada, .etiqueta-confirmado,
+.etiqueta-respondida { background: #e6eefb; border-color: #c2d5f2; color: #1e4b8f; }
+
+.etiqueta-notificada, .etiqueta-prevista,
+.etiqueta-solicitado { background: #fdf3e0; border-color: #f0ddb6; color: #8a5a00; }
+
 .etiqueta-perdida, .etiqueta-obito { background: #fbe9e7; border-color: #f2c6c1; color: #9a2c22; }
-.etiqueta-cancelada, .etiqueta-inativo { background: #eef0ef; border-color: #dcdfde; color: #5b6664; }
+
+.etiqueta-cancelada, .etiqueta-cancelado,
+.etiqueta-inativo { background: #eef0ef; border-color: #dcdfde; color: #5b6664; }
 
 /*
   Compromisso que recupera uma obrigacao vencida. Ambar, e nao vermelho: a

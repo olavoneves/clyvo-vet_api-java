@@ -39,6 +39,7 @@ import br.com.clyvovet.server.auth.web.LoginWebController;
 import br.com.clyvovet.server.tutor.web.TutorWebController;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -51,6 +52,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -531,6 +533,35 @@ class PaginasRenderizamTest {
                 "982000123456789", "RGA-77", "Curta", PetPorte.MEDIO, true,
                 PetStatus.ATIVO, "Pet dócil.", 3L, "Joana Ribeiro",
                 "joana@exemplo.com", "11999990000", 5L, "Labrador", 1L, "Canina");
+    }
+
+    /**
+     * O mesmo significado tem a mesma cor nas tres telas.
+     *
+     * <p>Ha dois vocabularios de estado no sistema — {@code ObrigacaoStatus} e
+     * {@code AgendamentoStatus} — e eles se sobrepoem: CUMPRIDA e REALIZADO sao a
+     * mesma coisa para quem olha. Enquanto a folha so nomeava os estados de
+     * obrigacao, a agenda renderizava etiqueta sem cor nenhuma enquanto a mesma
+     * situacao aparecia colorida nas outras telas.
+     *
+     * <p>O teste le a propria folha porque e la que a regra vive: verificar no
+     * HTML so provaria que a classe foi escrita, nao que ela pinta alguma coisa.
+     */
+    @Test
+    void aFolhaCobreOsEstadosDasDuasMaquinas() throws Exception {
+        String css = new String(new ClassPathResource("static/css/app.css")
+                .getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        for (ObrigacaoStatus status : ObrigacaoStatus.values()) {
+            org.assertj.core.api.Assertions.assertThat(css)
+                    .as("estado de obrigacao %s sem cor na folha", status)
+                    .contains(".etiqueta-" + status.name().toLowerCase());
+        }
+        for (AgendamentoStatus status : AgendamentoStatus.values()) {
+            org.assertj.core.api.Assertions.assertThat(css)
+                    .as("estado de agendamento %s sem cor na folha", status)
+                    .contains(".etiqueta-" + status.name().toLowerCase());
+        }
     }
 
     /**
