@@ -16,6 +16,7 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 - [Banco de Dados](#-banco-de-dados)
 - [Autenticação](#-autenticação)
 - [Rotas da API](#-rotas-da-api)
+- [Painel — Receita Recuperada e Coorte](#-painel--receita-recuperada-e-coorte)
 - [Lembrete Automático](#-lembrete-automático)
 - [Agente de Agendamento](#-agente-de-agendamento)
 - [Rodando Localmente](#-rodando-localmente)
@@ -298,6 +299,58 @@ curl -X POST http://<IP>:8080/api/veterinarios \
 curl http://<IP>:8080/api/especies \
   -H "Authorization: Bearer <SEU_TOKEN>"
 ```
+
+---
+
+## 📊 Painel — Receita Recuperada e Coorte
+
+O painel responde a pergunta que justifica o produto: **quanto da receita aconteceu
+porque o Clyvo cobrou, e quanto teria acontecido de qualquer jeito.**
+
+Para poder responder isso, `FN_CLV_GRUPO_CONTROLE` sorteia ~10% dos pets para um **grupo
+de controle** que nunca recebe lembrete e nunca entra no agente. A diferença entre a taxa
+de cumprimento dos dois grupos é o efeito do produto; sem o controle, o número do painel
+seria só a taxa de comparecimento da clínica, que existiria com ou sem software.
+
+O sorteio é **persistido** em `TB_CLV_OBRIGACAO.fl_grupo_controle`, com o seed e o hash
+que o produziram. Toda leitura usa a flag gravada — nunca recalcula em Java, nunca chama
+a função de novo. Duas fontes da mesma verdade divergiriam no dia em que os parâmetros do
+sorteio mudassem, e aí ninguém saberia qual delas o número da tela usou.
+
+### O denominador são as obrigações resolvidas
+
+`VW_CLV_PAINEL_COORTE` conta apenas `CUMPRIDA` e `PERDIDA`. Uma obrigação que ainda está
+`PREVISTA` não é um não comparecimento — ela nem teve a chance. Contá-la afundava as duas
+taxas e, pior, fazia o número andar sozinho com o calendário: a mesma coorte "piorava" a
+cada mês que passava sem que nada acontecesse. Era isso que mostrava 37% onde o seed
+sorteia 58%. `CANCELADA` fica fora: cancelamento é decisão da clínica, não desfecho do
+tutor.
+
+### Tamanho da amostra — medição de 06/09/2026
+
+Como o denominador mudou, o `n` do controle mudou junto. Os números abaixo são do banco
+da FIAP, que é o que a demonstração usa:
+
+| Clínica | Grupo | Resolvidas | Cumpridas | Taxa | Pets |
+|---|---|---:|---:|---:|---:|
+| Clínica Vida Animal | Controle | 312 | 105 | **33,65%** | 28 |
+| Clínica Vida Animal | Tratado | 2.449 | 1.449 | **59,17%** | 210 |
+| PetCare Zona Sul | Controle | 178 | 56 | **31,46%** | 11 |
+| PetCare Zona Sul | Tratado | 1.767 | 1.042 | **58,97%** | 146 |
+
+Delta de **+25,5 pontos** na Vida Animal e **+27,5** na PetCare. As taxas do grupo tratado
+(59,2% e 59,0%) batem com os 0,58 que `PR_CLV_SEED_DESFECHOS` sorteia, o que é a
+confirmação de que o denominador agora mede o que diz medir.
+
+> ⚠️ **A amostra da PetCare Zona Sul está no limite.** O card exige no mínimo **10 pets**
+> no controle para exibir um valor em reais (`CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE`),
+> e ela tem **11**. Um pet a menos e o card passa a esconder o número — corretamente, mas
+> de repente. Amostra pequena assim move a taxa em pontos inteiros com um único tutor
+> faltoso; leia o delta dessa clínica como ordem de grandeza, não como medida.
+
+O banco local do docker-compose tem outra amostra (controle com 27 e 18 pets) e chega às
+mesmas taxas — tratado 59,0% e 58,4%, controle 33,9% e 33,7%. As **taxas** são
+reprodutíveis; as **contagens** não, porque o seed sorteia quantidades a cada execução.
 
 ---
 
