@@ -77,16 +77,31 @@
                               th:text="${o.status}">STATUS</span>
                     </td>
                     <!--
-                      O botao so existe onde ele faz alguma coisa: PREVISTA e o
-                      unico estado de onde a transicao para NOTIFICADA e legal, e
-                      um botao que devolve 409 e pior que botao nenhum.
+                      O botao so existe onde ele faz alguma coisa, e sao duas
+                      condicoes.
+
+                      PREVISTA, porque e o unico estado de onde a transicao para
+                      NOTIFICADA e legal, e um botao que devolve 409 e pior que
+                      botao nenhum.
+
+                      E fora do grupo de controle, que e a condicao que importa:
+                      pet de controle nao pode ser lembrado de jeito nenhum — e
+                      dele que sai a medida do que teria acontecido sem o
+                      produto. Um botao ali seria um convite a destruir o
+                      experimento com um clique bem-intencionado.
+
+                      O nome diz que o disparo padrao nao e este. Quem lembra e a
+                      varredura diaria; o botao existe para antecipar o aviso de
+                      uma obrigacao cuja janela ainda nao abriu.
                     -->
                     <td>
-                        <form th:if="${o.status.name() == 'PREVISTA'}"
+                        <form th:if="${o.status.name() == 'PREVISTA' and !o.grupoControle}"
                               th:action="@{/obrigacoes/{id}/lembrete(id=${o.id})}"
                               method="post">
-                            <button type="submit" class="botao-texto">Enviar lembrete</button>
+                            <button type="submit" class="botao-texto">Antecipar lembrete</button>
                         </form>
+                        <span th:if="${o.status.name() == 'PREVISTA' and o.grupoControle}"
+                              class="subtitulo" title="O grupo de controle mede o que acontece sem lembrete">não se aplica</span>
                         <span th:if="${o.status.name() == 'NOTIFICADA'}"
                               class="subtitulo">enviado</span>
                     </td>

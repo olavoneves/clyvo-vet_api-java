@@ -565,13 +565,15 @@ class PaginasRenderizamTest {
     }
 
     /**
-     * O botao que fecha a cadeia de valor na tela.
+     * O botao de excecao, com o nome que diz que ele e excecao.
      *
-     * <p>Sem ele o lembrete so saia por chamada de API na mao — o elo existia no
-     * codigo e nao na tela, e a demonstracao tinha um passo manual no meio.
+     * <p>"Antecipar lembrete", e nao mais "Enviar lembrete": o disparo padrao e a
+     * {@code VarreduraDeLembretes}, que roda todo dia. O nome antigo afirmava que
+     * sem apertar o botao nada saia — era verdade e deixou de ser, e um rotulo
+     * que mente sobre quem faz o trabalho e pior que rotulo nenhum.
      */
     @Test
-    void fichaOfereceEnviarLembreteSoOndeATransicaoELegal() throws Exception {
+    void fichaOfereceAnteciparLembreteSoOndeATransicaoELegal() throws Exception {
         given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
         given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(
@@ -582,11 +584,56 @@ class PaginasRenderizamTest {
         mockMvc.perform(get("/pets/9").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.allOf(
-                        // PREVISTA: o botao existe
-                        org.hamcrest.Matchers.containsString("Enviar lembrete"),
+                        // PREVISTA e fora do controle: o botao existe
+                        org.hamcrest.Matchers.containsString("Antecipar lembrete"),
                         org.hamcrest.Matchers.containsString("/obrigacoes/101/lembrete"),
                         // NOTIFICADA: ja saiu, e a tela diz isso em vez de repetir o botao
-                        org.hamcrest.Matchers.containsString("enviado"))));
+                        org.hamcrest.Matchers.containsString("enviado"),
+                        // o nome antigo prometia que o lembrete so saia daqui
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("Enviar lembrete")))));
+    }
+
+    /**
+     * Pet de controle nao ganha botao.
+     *
+     * <p>E dele que sai a medida do que acontece sem o produto. Um botao de
+     * lembrete na ficha de um pet de controle e um convite a destruir o
+     * experimento com um clique bem-intencionado — e nao ha como desnotificar.
+     */
+    @Test
+    void fichaNaoOfereceLembreteParaPetDoGrupoDeControle() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(doGrupoDeControle())));
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("Antecipar lembrete")),
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("/obrigacoes/101/lembrete")))));
+    }
+
+    /**
+     * Esconder o botao nao fecha a rota.
+     *
+     * <p>Link antigo, tela em cache, alguem testando com curl: o POST continua
+     * alcancavel, e sem esta guarda ele notificaria o controle sem deixar rastro
+     * de intencao. A tela e conveniencia; a regra e do servidor.
+     */
+    @Test
+    void postDeLembreteERecusadoParaPetDoGrupoDeControle() throws Exception {
+        given(obrigacaoService.findById(101L))
+                .willReturn(new ObrigacaoDetalheResponse(doGrupoDeControle(),
+                        "corr-1", null, null, null, null, List.of()));
+
+        mockMvc.perform(post("/obrigacoes/101/lembrete").with(user(COLABORADOR)).with(csrf()))
+                .andExpect(status().isConflict());
+
+        org.mockito.Mockito.verify(obrigacaoService, org.mockito.Mockito.never())
+                .transitar(org.mockito.ArgumentMatchers.anyLong(), any(TransicaoRequest.class));
     }
 
     /**
@@ -594,7 +641,10 @@ class PaginasRenderizamTest {
      * nasce dentro dela. Dois caminhos para a mesma coisa divergiriam.
      */
     @Test
-    void enviarLembreteTransitaParaNotificadaEVoltaParaAFicha() throws Exception {
+    void anteciparLembreteTransitaParaNotificadaEVoltaParaAFicha() throws Exception {
+        given(obrigacaoService.findById(101L))
+                .willReturn(new ObrigacaoDetalheResponse(obrigacaoDeExemplo(),
+                        "corr-1", null, null, null, null, List.of()));
         given(obrigacaoService.transitar(eq(101L), any(TransicaoRequest.class)))
                 .willReturn(new ObrigacaoDetalheResponse(obrigacaoDeExemplo(),
                         "corr-1", null, null, null, null, List.of()));
@@ -608,6 +658,15 @@ class PaginasRenderizamTest {
         org.mockito.Mockito.verify(obrigacaoService).transitar(eq(101L), pedido.capture());
         org.assertj.core.api.Assertions.assertThat(pedido.getValue().novoStatus())
                 .isEqualTo(ObrigacaoStatus.NOTIFICADA);
+    }
+
+    /** A mesma obrigacao de exemplo, sorteada para o grupo de controle. */
+    private static ObrigacaoResponse doGrupoDeControle() {
+        ObrigacaoResponse base = obrigacaoDeExemplo();
+        return new ObrigacaoResponse(base.id(), base.petId(), base.petNome(), base.etapaId(),
+                base.etapaNome(), base.protocoloCodigo(), base.protocoloNome(),
+                base.protocoloCategoria(), base.status(), base.dtPrevista(), base.dtJanelaInicio(),
+                base.dtJanelaFim(), true, base.valorEstimado(), base.valorRealizado());
     }
 
     private static ObrigacaoResponse comStatus(ObrigacaoStatus status) {

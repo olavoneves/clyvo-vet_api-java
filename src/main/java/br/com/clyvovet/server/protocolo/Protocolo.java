@@ -54,6 +54,16 @@ public class Protocolo {
     @Column(name = "ds_descricao", length = 600)
     private String dsDescricao;
 
+    /**
+     * Dias antes de {@code dt_prevista} em que o lembrete sai.
+     *
+     * <p>E regra clinica, e por isso mora aqui e nao numa constante em Java: a
+     * clinica que quiser avisar cirurgia com 20 dias muda uma linha do catalogo,
+     * sem deploy. A varredura de lembretes le esta coluna e nada mais.
+     */
+    @Column(name = "nr_antecedencia_lembrete_dias", nullable = false)
+    private Integer nrAntecedenciaLembreteDias;
+
     @Convert(converter = SimNaoConverter.class)
     @Column(name = "fl_ativo", nullable = false, columnDefinition = "CHAR(1)")
     private Boolean flAtivo;

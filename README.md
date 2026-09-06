@@ -16,6 +16,7 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 - [Banco de Dados](#-banco-de-dados)
 - [Autenticação](#-autenticação)
 - [Rotas da API](#-rotas-da-api)
+- [Lembrete Automático](#-lembrete-automático)
 - [Agente de Agendamento](#-agente-de-agendamento)
 - [Rodando Localmente](#-rodando-localmente)
 - [Variáveis de Ambiente](#-variáveis-de-ambiente)
@@ -118,13 +119,30 @@ mapeamento divergir do banco.
 | `V7__correcoes_motor.sql` | **Motor de protocolo**: catálogo, obrigações, outbox, auditoria, funções, procedures e a view do painel |
 | `V8__melhorias_banco.sql` | Gerador de dados de demonstração (`PR_CLV_SEED_*`) — nada aqui é chamado pela aplicação |
 | `V9__catalogo_clinico_e_correcoes.sql` | Catálogo clínico (espécies, raças, 26 protocolos) e correções de regra do motor |
+| `V10__senha_dos_usuarios_de_demonstracao.sql` | Regrava as senhas do seed em BCrypt válido |
+| `V11__vw_clv_painel_coorte.sql` | `VW_CLV_PAINEL_COORTE` — comparação controle × tratado |
+| `V12__notificacao_do_tutor.sql` | `TB_CLV_NOTIFICACAO` — a caixa de entrada do tutor |
+| `V13__antecedencia_do_lembrete.sql` | `nr_antecedencia_lembrete_dias` no protocolo: quantos dias antes o lembrete sai |
 
-**Banco vazio** (container do docker-compose): a cadeia `V0 → V0.1 → V1 … → V8` roda
+**Banco vazio** (container do docker-compose): a cadeia `V0 → V0.1 → V1 … → V13` roda
 inteira e cria tudo, sem intervenção manual.
 
-**Banco da FIAP**: o schema já existia, aplicado à mão pelo DBA. O Flyway está com
-`baseline-version=8`, então nenhuma migration executa — ele apenas registra o baseline e
-segue. Migrations novas começam em **V9**.
+**Banco da FIAP**: o schema até a V8 já existia, aplicado à mão pelo DBA. O Flyway está
+com `baseline-version=8`, então V0–V8 não executam — ele registra o baseline e segue a
+partir da **V9**, que é a primeira migration que o repositório de fato aplica.
+
+> **Repair de migration que cria objeto PL/SQL exige um segundo passo.**
+> `flyway repair` só reescreve o checksum na `flyway_schema_history`; ele **não**
+> reexecuta nada. Um `CREATE OR REPLACE PROCEDURE` corrigido no arquivo continua com o
+> corpo **antigo** dentro do banco, e a divergência é invisível — a aplicação sobe, os
+> testes passam, e o erro aparece na regra que a correção mudou. Já aconteceu uma vez
+> aqui e derrubou o login. Depois de todo repair que toque num objeto PL/SQL, **regrave
+> o objeto** rodando o trecho `CREATE OR REPLACE` da migration atual direto no schema, e
+> confira com:
+>
+> ```sql
+> SELECT name, text FROM user_source ORDER BY name, line;
+> ```
 
 ### Diagrama de dependências (simplificado)
 
@@ -258,6 +276,59 @@ curl -X POST http://<IP>:8080/api/veterinarios \
 curl http://<IP>:8080/api/especies \
   -H "Authorization: Bearer <SEU_TOKEN>"
 ```
+
+---
+
+## ⏰ Lembrete Automático
+
+O elo que o produto afirmava ter e não tinha. A obrigação nascia `PREVISTA` e ficava
+parada até alguém abrir a ficha do pet e apertar um botão: **quem perseguia a obrigação
+era o colaborador, não o motor**. O que o sistema oferecia era a lista do que a pessoa
+deveria ter feito.
+
+`VarreduraDeLembretes` é um `@Scheduled` que varre as obrigações `PREVISTA` cuja janela
+de antecedência já abriu e chama `PR_CLV_TRANSITAR_OBRIGACAO` para levá-las a
+`NOTIFICADA`. A notificação já pendia da transição, então a caixa de entrada do tutor
+funciona sem alteração nenhuma.
+
+### O que a varredura precisa acertar
+
+| Risco | Como está resolvido |
+|---|---|
+| **Notificar o grupo de controle** | `fl_grupo_controle = 'N'` no `WHERE` da consulta, lendo a **flag persistida** pelo sorteio de `FN_CLV_GRUPO_CONTROLE`. Nada é recalculado em Java: seriam duas fontes da mesma verdade. Notificar o controle destrói o A/B na primeira execução e não tem desfazer |
+| **Tenant vazio fora de requisição** | O job itera as clínicas explicitamente, preenche o `TenantContext` a cada volta e limpa no `finally`. ThreadLocal sujo entre iterações vaza uma clínica na outra |
+| **Antecedência codificada em Java** | É regra clínica e mora no catálogo: `TB_CLV_PROTOCOLO.nr_antecedencia_lembrete_dias`, com padrão por categoria (cirurgia 15 dias, checkup 14, odonto 10, vacina e exame 7, vermífugo 5, retorno e monitoramento 3) |
+| **Notificar duas vezes** | O próprio filtro de estado: a obrigação sai de `PREVISTA` na primeira passada e a segunda não a encontra mais |
+
+> ⚠️ **A idempotência acima vale para instância única.** Duas instâncias varrendo ao
+> mesmo tempo leem a mesma lista antes de qualquer uma escrever, e as duas tentam
+> transitar as mesmas linhas. A rede de segurança do banco segura o pior caso — o
+> `EmissorDeLembretes` recusa lembrete repetido e a V12 tem índice único por obrigação e
+> canal —, mas o resultado seriam transições concorrentes disputando a mesma obrigação.
+> **A versão multi-instância precisa de lock distribuído** (ShedLock sobre a própria
+> tabela do Oracle, ou um `SELECT ... FOR UPDATE SKIP LOCKED` na seleção da fila).
+
+### O botão da ficha do pet
+
+`Antecipar lembrete`, e não mais "Enviar lembrete": o disparo padrão é o job, e o botão
+é a exceção manual, para o caso em que a clínica quer avisar antes de a janela abrir. O
+nome antigo dizia que sem ele nada saía — era verdade e deixou de ser.
+
+Ele **não aparece** para pet do grupo de controle, e a rota `POST
+/obrigacoes/{id}/lembrete` recusa o pedido mesmo assim: esconder o botão não fecha a
+rota, e um POST direto notificaria o controle sem deixar rastro de intenção.
+
+### Configuração
+
+```properties
+app.lembretes.habilitado=true
+app.lembretes.cron=0 0 8 * * *
+app.lembretes.fuso=America/Sao_Paulo
+app.lembretes.max-por-execucao=200
+```
+
+O teto por execução existe para a primeira varredura de uma base com histórico: sem ele,
+o backlog inteiro viraria notificação de uma vez.
 
 ---
 
