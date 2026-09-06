@@ -134,10 +134,16 @@
           por hash do pet, entao a fatia real de uma clinica com algumas centenas
           de pets oscila vários pontos em torno dele. O que esta na tela agora sai
           da mesma consulta que alimenta o card, e anda junto com a base.
+
+          O rotulo diz "com obrigacao ja resolvida", e nao "desta clinica", porque
+          e esse o universo: o denominador e o mesmo do card, que so conta
+          CUMPRIDA e PERDIDA. Um pet cadastrado ontem, sem nenhuma obrigacao
+          fechada, nao esta nesta conta. Os dois universos sao proximos e nao
+          iguais, e prometer o maior tornava o numero errado sem muda-lo.
         -->
         <p class="nota-metodo">
             <span th:if="${coorte.pcPetsNoControle != null}"
-                  th:text="|Grupo de controle: ${#numbers.formatDecimal(coorte.pcPetsNoControle, 1, 'POINT', 1, 'COMMA')}% dos pets desta clínica (${coorte.controle.pets} de ${coorte.petsSorteados}), sorteio determinístico por pet.|">
+                  th:text="|Grupo de controle: ${#numbers.formatDecimal(coorte.pcPetsNoControle, 1, 'POINT', 1, 'COMMA')}% dos pets com obrigação já resolvida (${coorte.controle.pets} de ${coorte.petsNaCoorte}), sorteio determinístico por pet.|">
                 Grupo de controle: sorteio determinístico por pet.
             </span>
             <span th:unless="${coorte.pcPetsNoControle != null}">

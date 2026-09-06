@@ -355,6 +355,35 @@ cada mês que passava sem que nada acontecesse. Era isso que mostrava 37% onde o
 sorteia 58%. `CANCELADA` fica fora: cancelamento é decisão da clínica, não desfecho do
 tutor.
 
+### O universo de cada número do card
+
+Todos os números do card saem de `VW_CLV_PAINEL_COORTE`, e **o universo dela são as
+obrigações já resolvidas** — `CUMPRIDA` ou `PERDIDA`. Nenhum número ali fala sobre a
+clínica inteira, e a distinção importa mais do que parece:
+
+| Número no card | Numerador | Denominador |
+|---|---|---|
+| Taxa de cumprimento (tratado / controle) | Obrigações `CUMPRIDA` do grupo | Obrigações **resolvidas** do grupo |
+| Delta em p.p. | — | Diferença entre as duas taxas acima |
+| Consultas atribuíveis | Obrigações resolvidas do tratado × delta | — |
+| Valor atribuível | Consultas atribuíveis × ticket médio | — |
+| Ticket médio | Soma de `nr_valor` das consultas `REALIZADA` | Quantidade dessas consultas |
+| **Fatia do controle (rodapé)** | Pets do controle **com obrigação resolvida** | Pets dos dois grupos **com obrigação resolvida** |
+
+A última linha é a que já causou confusão. O rodapé dizia *"X% dos pets desta
+clínica"*, mas o denominador nunca foi o total de pets da clínica — é o mesmo
+denominador do card. Os dois são próximos e não iguais: na base local, 245 pets na
+coorte contra 250 pets cadastrados; na FIAP, 238 contra 241. A diferença são os pets
+que ainda não têm nenhuma obrigação fechada. O texto passou a nomear o universo que de
+fato usa (*"dos pets com obrigação já resolvida"*), porque número certo com rótulo
+errado continua sendo número errado.
+
+> **Números lidos em bancos diferentes não se comparam.** O seed usa `SYS_GUID` e datas
+> relativas a `SYSDATE`, então o Docker local e a FIAP têm populações diferentes e
+> sorteios diferentes — em 06/09/2026, 27 pets de controle no local e 28 na FIAP.
+> As **taxas** são reprodutíveis entre bancos; as **contagens** não. Ao conferir um
+> número do card, rode as duas consultas no mesmo banco.
+
 ### Tamanho da amostra — medição de 06/09/2026
 
 Como o denominador mudou, o `n` do controle mudou junto. Os números abaixo são do banco

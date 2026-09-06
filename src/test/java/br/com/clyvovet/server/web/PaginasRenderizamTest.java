@@ -199,6 +199,10 @@ class PaginasRenderizamTest {
      * segunda cópia que não acompanharia uma recalibragem do sorteio. E o alvo
      * nem era o número honesto: o sorteio é por hash do pet, então a fatia real
      * oscila em torno dele. Aqui, 27 de 245 pets dão 11,0%.
+     *
+     * <p>E o rótulo nomeia o universo. A frase dizia "dos pets desta clínica"
+     * enquanto o denominador eram só os pets com obrigação resolvida — próximos,
+     * mas não iguais. Número certo com rótulo errado continua errado.
      */
     @Test
     void rodapeDoMetodoMostraAFatiaMedidaDoControle() throws Exception {
@@ -209,8 +213,13 @@ class PaginasRenderizamTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.allOf(
                         // 27 de (218 + 27) = 11,0%
-                        org.hamcrest.Matchers.containsString("11,0% dos pets desta clínica"),
+                        org.hamcrest.Matchers.containsString(
+                                "11,0% dos pets com obrigação já resolvida"),
                         org.hamcrest.Matchers.containsString("(27 de 245)"),
+                        // o universo maior nao pode voltar ao rotulo: o
+                        // denominador do card sao os pets com obrigacao resolvida
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("dos pets desta clínica")),
                         // o alvo do sorteio nao pode voltar como texto fixo
                         org.hamcrest.Matchers.not(
                                 org.hamcrest.Matchers.containsString("10% dos pets")))));

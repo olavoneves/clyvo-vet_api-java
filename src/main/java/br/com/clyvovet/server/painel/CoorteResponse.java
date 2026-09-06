@@ -67,6 +67,13 @@ public record CoorteResponse(
      * <p>Devolvendo a proporcao <b>medida</b>, o numero da tela passa a sair da
      * mesma consulta que ja alimenta o card e acompanha a base sozinho. Nulo
      * quando nao ha pet nenhum: dizer "0%" sugeriria que o sorteio nao funcionou.
+     *
+     * <p><b>O universo sao os pets com obrigacao ja resolvida</b>, e nao todos os
+     * pets da clinica — o denominador e o mesmo do card, que so conta CUMPRIDA e
+     * PERDIDA. Os dois numeros sao proximos mas nao iguais (na base local, 245
+     * contra 250), e a tela dizia "dos pets desta clinica", o que prometia o
+     * universo maior. O texto agora nomeia o universo que de fato usa: um numero
+     * certo com rotulo errado continua sendo um numero errado.
      */
     public BigDecimal pcPetsNoControle() {
         long total = tratado.pets() + controle.pets();
@@ -78,8 +85,14 @@ public record CoorteResponse(
                 .divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP);
     }
 
-    /** Pets nos dois grupos: o denominador de {@link #pcPetsNoControle()}. */
-    public long petsSorteados() {
+    /**
+     * Pets nos dois grupos: o denominador de {@link #pcPetsNoControle()}.
+     *
+     * <p>Chamava-se {@code petsSorteados} e o nome mentia: sorteados sao todos os
+     * pets da clinica, inclusive os que ainda nao tem obrigacao resolvida e por
+     * isso nao entram na coorte. Estes sao os que a coorte conta.
+     */
+    public long petsNaCoorte() {
         return tratado.pets() + controle.pets();
     }
 
