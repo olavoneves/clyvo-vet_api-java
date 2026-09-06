@@ -131,18 +131,40 @@ inteira e cria tudo, sem intervenção manual.
 com `baseline-version=8`, então V0–V8 não executam — ele registra o baseline e segue a
 partir da **V9**, que é a primeira migration que o repositório de fato aplica.
 
-> **Repair de migration que cria objeto PL/SQL exige um segundo passo.**
-> `flyway repair` só reescreve o checksum na `flyway_schema_history`; ele **não**
-> reexecuta nada. Um `CREATE OR REPLACE PROCEDURE` corrigido no arquivo continua com o
-> corpo **antigo** dentro do banco, e a divergência é invisível — a aplicação sobe, os
-> testes passam, e o erro aparece na regra que a correção mudou. Já aconteceu uma vez
-> aqui e derrubou o login. Depois de todo repair que toque num objeto PL/SQL, **regrave
-> o objeto** rodando o trecho `CREATE OR REPLACE` da migration atual direto no schema, e
-> confira com:
->
-> ```sql
-> SELECT name, text FROM user_source ORDER BY name, line;
-> ```
+### ⚠️ Repair de migration que cria objeto PL/SQL exige um segundo passo
+
+`flyway repair` só reescreve o checksum na `flyway_schema_history`. Ele **não reexecuta
+nada**. Um `CREATE OR REPLACE PROCEDURE` corrigido no arquivo continua com o corpo
+**antigo** dentro do banco, e a divergência é invisível: a aplicação sobe, o Flyway diz
+que está tudo aplicado, os testes passam. O erro aparece depois, na regra que a correção
+mudou.
+
+**Não é hipotético.** A conferência de 06/09/2026 encontrou três procedures divergentes
+no banco da FIAP — `PR_CLV_SEED_BASE`, `PR_CLV_SEED_HEROIS` e `PR_CLV_SEED_POPULACAO` —
+todas ainda com o hash de senha placeholder (`$2a$10$seedhashplaceholder00000`) que a V8
+já tinha corrigido para um BCrypt válido no repositório. A V10 consertou as **linhas** de
+usuário existentes, então o login funcionava; mas as **procedures** continuavam gravando
+o placeholder, e o próximo reseed derrubaria o login de novo. Os cinco objetos do motor
+(`PR_CLV_GERAR_OBRIGACOES`, `PR_CLV_TRANSITAR_OBRIGACAO`, `FN_CLV_CALCULAR_DATA`,
+`FN_CLV_GRUPO_CONTROLE`, `TR_CLV_AUDIT_OBRIGACAO`) estavam idênticos nos dois bancos.
+
+**O procedimento, depois de todo repair que toque num objeto PL/SQL:**
+
+1. Conferir o corpo do que está no banco contra o que está na migration:
+
+   ```sql
+   SELECT name, text FROM user_source ORDER BY name, line;
+   ```
+
+   No SQL\*Plus, use `SET TAB OFF` antes de comparar — com `TAB ON` (o padrão) a saída
+   troca sequências de espaço por tabulação e **todo** objeto parece divergir.
+   O `USER_SOURCE` guarda o texto já sem o `CREATE OR REPLACE [EDITIONABLE]`, então tire
+   esse prefixo do lado da migration antes de comparar.
+
+2. **Regravar** cada objeto divergente rodando o trecho `CREATE OR REPLACE` da migration
+   atual direto no schema.
+
+3. Conferir de novo. Só aí o repair está terminado.
 
 ### Diagrama de dependências (simplificado)
 
