@@ -46,6 +46,9 @@ class AgendaServiceIntegracaoTest {
     /** Janela varrida em busca de vaga: tres semanas cobrem qualquer feriado. */
     private static final int DIAS_DE_BUSCA = 21;
 
+    /** Marca as linhas que este teste fabrica, para reencontra-las sem ambiguidade. */
+    private static final String CORRELACAO_DO_TESTE = "teste-agenda-vencida";
+
     @Autowired
     private AgendaService agendaService;
 
@@ -198,21 +201,15 @@ class AgendaServiceIntegracaoTest {
     @Test
     @DisplayName("compromisso de obrigacao vencida vem marcado como atraso")
     void compromissoDeObrigacaoVencidaVemMarcado() {
-        List<Long> vencidas = entityManager.createNativeQuery("""
-                select id_obrigacao from TB_CLV_OBRIGACAO
-                 where dt_prevista < trunc(sysdate)
-                   and ds_status in ('PREVISTA','NOTIFICADA','RESPONDIDA')
-                 order by id_obrigacao
-                """, Long.class).setMaxResults(1).getResultList();
-        Assumptions.assumeFalse(vencidas.isEmpty(), "nenhuma obrigacao vencida na base");
+        Long vencida = umaObrigacaoVencida();
 
         AgendaService.HorarioLivre vaga = primeiraVaga();
-        agendaService.agendar(vencidas.get(0), quando(vaga), vaga.idVeterinario());
+        agendaService.agendar(vencida, quando(vaga), vaga.idVeterinario());
         entityManager.flush();
         entityManager.clear();
 
         assertThat(agendaService.compromissosEntre(vaga.data(), vaga.data()))
-                .filteredOn(c -> c.recuperaAtraso())
+                .filteredOn(CompromissoDaAgenda::recuperaAtraso)
                 .as("a obrigacao vencida remarcada para frente tem que vir marcada")
                 .isNotEmpty()
                 .allSatisfy(c -> assertThat(c.diasDeAtraso()).isPositive());
@@ -275,6 +272,54 @@ class AgendaServiceIntegracaoTest {
         Assumptions.assumeFalse(pendentes.isEmpty(),
                 "a clinica nao tem obrigacao pendente: rode o motor de protocolo antes");
         return pendentes.getFirst();
+    }
+
+    /**
+     * Uma obrigacao vencida criada aqui, e nao procurada na base.
+     *
+     * <p>Antes o teste varria {@code TB_CLV_OBRIGACAO} atras de alguma linha com
+     * {@code dt_prevista} no passado e desistia por {@code assumeFalse} quando
+     * nao achava. Isso o tornava um teste que so existia em base ja envelhecida:
+     * num banco recem-semeado — todo ambiente novo, e o container local depois de
+     * um reseed — ele passava a vida inteira em verde-cinza, sem nunca ter
+     * exercitado nada. Skip silencioso e a mesma coisa que nao ter o teste, com a
+     * agravante de parecer que se tem.
+     *
+     * <p>O vencimento e o unico dado que este caso precisa, entao ele e o unico
+     * fabricado: 30 dias no passado, sobre pet, versao e etapa que ja existem no
+     * catalogo clinico. Roda dentro da transacao do teste, entao nada sobra.
+     */
+    private Long umaObrigacaoVencida() {
+        Long modelo = idNativo("""
+                select min(id_obrigacao) from TB_CLV_OBRIGACAO where id_clinica = %d
+                """.formatted(clinica));
+        Assumptions.assumeTrue(modelo != null,
+                "a clinica precisa de ao menos uma obrigacao para servir de molde");
+
+        // copia de uma linha existente, com o vencimento no passado e o status de
+        // volta ao inicio do trilho: e o unico jeito de garantir pet, versao e
+        // etapa coerentes entre si sem recriar o catalogo inteiro no teste.
+        entityManager.createNativeQuery("""
+                insert into TB_CLV_OBRIGACAO
+                       (id_clinica, id_pet, id_versao_protocolo, id_etapa,
+                        dt_prevista, dt_janela_inicio, dt_janela_fim,
+                        ds_status, ds_correlation_id, fl_grupo_controle)
+                select id_clinica, id_pet, id_versao_protocolo, id_etapa,
+                       TRUNC(SYSDATE) - 30, TRUNC(SYSDATE) - 37, TRUNC(SYSDATE) - 23,
+                       'PREVISTA', '%s', 'N'
+                  from TB_CLV_OBRIGACAO where id_obrigacao = %d
+                """.formatted(CORRELACAO_DO_TESTE, modelo)).executeUpdate();
+        entityManager.flush();
+
+        return idNativo("""
+                select max(id_obrigacao) from TB_CLV_OBRIGACAO
+                 where ds_correlation_id = '%s'
+                """.formatted(CORRELACAO_DO_TESTE));
+    }
+
+    private Long idNativo(String sql) {
+        Object resultado = entityManager.createNativeQuery(sql).getSingleResult();
+        return resultado == null ? null : ((Number) resultado).longValue();
     }
 
     private static LocalDate proximoSabado() {
