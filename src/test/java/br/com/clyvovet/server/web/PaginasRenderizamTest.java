@@ -191,6 +191,53 @@ class PaginasRenderizamTest {
                         org.hamcrest.Matchers.containsString("sorteio determinístico por pet"))));
     }
 
+    /**
+     * O rodapé de método mostra a fatia MEDIDA, e não os 10% que o sorteio mira.
+     *
+     * <p>A tela dizia "10% dos pets" em texto fixo. Os 10% moram no banco, em
+     * {@code FN_CLV_GRUPO_CONTROLE.p_percentual} — repeti-los no HTML era uma
+     * segunda cópia que não acompanharia uma recalibragem do sorteio. E o alvo
+     * nem era o número honesto: o sorteio é por hash do pet, então a fatia real
+     * oscila em torno dele. Aqui, 27 de 245 pets dão 11,0%.
+     */
+    @Test
+    void rodapeDoMetodoMostraAFatiaMedidaDoControle() throws Exception {
+        given(painelService.doMes(any(LocalDate.class))).willReturn(painelDeExemplo());
+        given(coorteService.daClinicaLogada()).willReturn(coorteDeExemplo());
+
+        mockMvc.perform(get("/painel/receita").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        // 27 de (218 + 27) = 11,0%
+                        org.hamcrest.Matchers.containsString("11,0% dos pets desta clínica"),
+                        org.hamcrest.Matchers.containsString("(27 de 245)"),
+                        // o alvo do sorteio nao pode voltar como texto fixo
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("10% dos pets")))));
+    }
+
+    /**
+     * O piso da ressalva sai da constante que o serviço consulta.
+     *
+     * <p>Com o piso e a frase escritos em lugares diferentes, mudar
+     * {@code MINIMO_DE_PETS_NO_CONTROLE} deixaria a tela dizendo o número antigo
+     * — e a tela continuaria plausível, que é o pior tipo de erro.
+     */
+    @Test
+    void ressalvaDeAmostraCitaOPisoDaConstante() throws Exception {
+        given(painelService.doMes(any(LocalDate.class))).willReturn(painelDeExemplo());
+        given(coorteService.daClinicaLogada()).willReturn(new CoorteResponse(
+                new CoorteResponse.Grupo(300, 177, 40, new BigDecimal("59.00")),
+                new CoorteResponse.Grupo(10, 8, 1, new BigDecimal("80.00")),
+                new BigDecimal("-21.00"), 0, BigDecimal.ZERO,
+                new BigDecimal("200.00"), false));
+
+        mockMvc.perform(get("/painel/receita").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "abaixo de " + CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE)));
+    }
+
     private static CoorteResponse coorteDeExemplo() {
         return new CoorteResponse(
                 new CoorteResponse.Grupo(2764, 1633, 218, new BigDecimal("59.08")),

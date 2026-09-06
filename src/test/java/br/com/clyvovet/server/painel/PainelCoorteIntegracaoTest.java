@@ -44,8 +44,32 @@ class PainelCoorteIntegracaoTest {
     /** Tolerancia das taxas: o sorteio e aleatorio, a media e que e estavel. */
     private static final double FOLGA_PP = 6.0;
 
-    private static final double TAXA_TRATADO_SEED = 58.0;
-    private static final double TAXA_CONTROLE_SEED = 36.0;
+    /**
+     * A taxa que o seed sorteia, lida do proprio seed.
+     *
+     * <p>Antes eram duas constantes aqui, 58,0 e 36,0, copiadas de
+     * {@code PR_CLV_SEED_DESFECHOS}. Copia de numero e copia de verdade: quem
+     * recalibrasse o sorteio no banco veria este teste falhar sem nada estar
+     * quebrado, e a leitura obvia da falha seria mexer no teste ate ele calar.
+     *
+     * <p>O default do parametro nao chega em {@code ALL_ARGUMENTS} — a coluna
+     * {@code DEFAULT_VALUE} vem vazia para este caso —, entao a leitura e do
+     * texto da procedure, que e onde o valor de fato esta. Feio de olhar e
+     * honesto: existe uma fonte so, e e a mesma que o seed executa.
+     *
+     * <p>Devolve o literal como texto, e a conversao acontece em Java. Com
+     * {@code TO_NUMBER} no SQL a consulta quebrava com ORA-01722 na sessao da
+     * aplicacao enquanto passava no SQL*Plus: o driver herda o locale da JVM, e
+     * em pt-BR o separador decimal da sessao vira virgula — entao o ponto do
+     * literal deixa de ser separador. {@link BigDecimal} nao tem locale.
+     */
+    private static final String SQL_TAXA_DO_SEED = """
+            select regexp_substr(text, 'DEFAULT\\s+([0-9]+\\.?[0-9]*)', 1, 1, NULL, 1)
+              from user_source
+             where name = 'PR_CLV_SEED_DESFECHOS'
+               and upper(text) like '%' || :parametro || '%'
+               and upper(text) like '%DEFAULT%'
+            """;
 
     private static final String SQL_LINHAS = """
             select ds_grupo, qt_obrigacoes, qt_cumpridas, pc_cumprimento,
@@ -86,8 +110,8 @@ class PainelCoorteIntegracaoTest {
                 .containsExactlyInAnyOrder("TRATADO", "CONTROLE");
 
         for (PainelCoorteService.Linha linha : linhas) {
-            double esperada = "TRATADO".equals(linha.dsGrupo())
-                    ? TAXA_TRATADO_SEED : TAXA_CONTROLE_SEED;
+            double esperada = taxaDoSeed("TRATADO".equals(linha.dsGrupo())
+                    ? "P_TAXA_TRATADO" : "P_TAXA_CONTROLE");
 
             assertThat(linha.pcCumprimento().doubleValue())
                     .as("taxa do grupo %s: o seed sorteia perto de %s%%",
@@ -233,5 +257,25 @@ class PainelCoorteIntegracaoTest {
     private List<PainelCoorteService.Linha> linhasDa(Long clinica) {
         return jdbcClient.sql(SQL_LINHAS).param("id", clinica)
                 .query(PainelCoorteService.Linha.class).list();
+    }
+
+    /**
+     * A taxa alvo de um dos parametros de {@code PR_CLV_SEED_DESFECHOS}, em
+     * pontos percentuais. Pula o teste se a procedure nao estiver no schema —
+     * um banco sem o seed nao tem o que este teste afirma.
+     */
+    private double taxaDoSeed(String parametro) {
+        java.util.Optional<String> literal = jdbcClient.sql(SQL_TAXA_DO_SEED)
+                .param("parametro", parametro)
+                .query(String.class)
+                .optional();
+
+        Assumptions.assumeTrue(literal.isPresent() && literal.get() != null,
+                "PR_CLV_SEED_DESFECHOS nao esta no schema: sem seed, sem taxa alvo");
+
+        // a procedure guarda a fracao (0,58); a view devolve pontos percentuais
+        return new BigDecimal(literal.get().trim())
+                .multiply(BigDecimal.valueOf(100))
+                .doubleValue();
     }
 }

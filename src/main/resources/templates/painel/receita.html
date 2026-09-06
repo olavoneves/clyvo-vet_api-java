@@ -80,7 +80,8 @@
         <p class="ajuda aviso-amostra" th:unless="${coorte.amostraSuficiente}">
             Amostra insuficiente para comparação: o grupo de controle tem
             <strong th:text="|${coorte.controle.pets} pet(s)|">0</strong>,
-            e abaixo de 10 um único tutor move a taxa em dezenas de pontos.
+            e abaixo de [[${coorte.minimoDePetsNoControle}]] um único tutor move a
+            taxa em dezenas de pontos.
         </p>
 
         <div class="coorte" th:if="${coorte.amostraSuficiente}">
@@ -124,8 +125,24 @@
             </div>
         </div>
 
+        <!--
+          A fatia exibida e a MEDIDA, e nao os 10% que o sorteio mira.
+
+          O alvo mora em FN_CLV_GRUPO_CONTROLE (p_percentual), no banco; repeti-lo
+          aqui criava uma segunda copia que nao acompanharia uma mudanca do
+          sorteio. E o alvo tambem nao era o numero honesto a mostrar: o sorteio e
+          por hash do pet, entao a fatia real de uma clinica com algumas centenas
+          de pets oscila vários pontos em torno dele. O que esta na tela agora sai
+          da mesma consulta que alimenta o card, e anda junto com a base.
+        -->
         <p class="nota-metodo">
-            Grupo de controle: 10% dos pets, sorteio determinístico por pet.
+            <span th:if="${coorte.pcPetsNoControle != null}"
+                  th:text="|Grupo de controle: ${#numbers.formatDecimal(coorte.pcPetsNoControle, 1, 'POINT', 1, 'COMMA')}% dos pets desta clínica (${coorte.controle.pets} de ${coorte.petsSorteados}), sorteio determinístico por pet.|">
+                Grupo de controle: sorteio determinístico por pet.
+            </span>
+            <span th:unless="${coorte.pcPetsNoControle != null}">
+                Grupo de controle: sorteio determinístico por pet.
+            </span>
             Dados de demonstração.
         </p>
     </section>
