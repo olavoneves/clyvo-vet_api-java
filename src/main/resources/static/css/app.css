@@ -24,6 +24,22 @@
 
 * { box-sizing: border-box; }
 
+/*
+  Foco visivel em tudo que recebe foco, e nao so nos tres lugares que alguem
+  lembrou de estilizar. E :focus-visible e nao :focus para o contorno aparecer
+  na navegacao por teclado sem piscar a cada clique de mouse.
+*/
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--cor-primaria);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
 body {
     margin: 0;
     background: var(--cor-fundo);
@@ -345,11 +361,33 @@ a { color: var(--cor-primaria-escura); }
 
 .etiqueta-grande { font-size: 13px; padding: 6px 14px; }
 
-.etiqueta-cumprida, .etiqueta-ativo { background: #e4f3ee; border-color: #b9dfd2; color: #17594f; }
-.etiqueta-agendada, .etiqueta-respondida { background: #e6eefb; border-color: #c2d5f2; color: #1e4b8f; }
-.etiqueta-notificada, .etiqueta-prevista { background: #fdf3e0; border-color: #f0ddb6; color: #8a5a00; }
+/*
+  Cor por SIGNIFICADO, e nao por enum. Ha dois vocabularios de estado no
+  sistema — ObrigacaoStatus e AgendamentoStatus — e eles se sobrepoem: o que a
+  obrigacao chama CUMPRIDA o agendamento chama REALIZADO, e e a mesma coisa
+  para quem olha a tela. Agrupados aqui, o mesmo significado tem a mesma cor no
+  painel, na agenda e na tela do tutor.
+
+  Sem este agrupamento os estados de agendamento caiam no estilo neutro e a
+  agenda ficava com etiquetas sem cor nenhuma, enquanto a mesma situacao
+  aparecia colorida nas outras telas.
+
+  Verde: acabou bem.       Azul: marcado, vai acontecer.
+  Ambar: esperando acao.   Vermelho: perdeu.   Cinza: saiu do fluxo.
+*/
+.etiqueta-cumprida, .etiqueta-realizado,
+.etiqueta-ativo { background: #e4f3ee; border-color: #b9dfd2; color: #17594f; }
+
+.etiqueta-agendada, .etiqueta-confirmado,
+.etiqueta-respondida { background: #e6eefb; border-color: #c2d5f2; color: #1e4b8f; }
+
+.etiqueta-notificada, .etiqueta-prevista,
+.etiqueta-solicitado { background: #fdf3e0; border-color: #f0ddb6; color: #8a5a00; }
+
 .etiqueta-perdida, .etiqueta-obito { background: #fbe9e7; border-color: #f2c6c1; color: #9a2c22; }
-.etiqueta-cancelada, .etiqueta-inativo { background: #eef0ef; border-color: #dcdfde; color: #5b6664; }
+
+.etiqueta-cancelada, .etiqueta-cancelado,
+.etiqueta-inativo { background: #eef0ef; border-color: #dcdfde; color: #5b6664; }
 
 /*
   Compromisso que recupera uma obrigacao vencida. Ambar, e nao vermelho: a
@@ -581,4 +619,123 @@ a { color: var(--cor-primaria-escura); }
     .sessao-nome { display: none; }
     .conteudo { padding: 20px 16px 40px; }
     .destaque-numero { font-size: 38px; }
+}
+
+
+/* ---------- card de coorte ---------- */
+
+/*
+  O delta e o numero que sustenta o produto: ele domina o card, e taxas, base
+  amostral e valor ficam como apoio ao redor. Invertido, viraria mais uma
+  tabela de percentuais e ninguem sairia da tela sabendo o que olhar.
+*/
+.coorte { display: grid; gap: 20px; }
+
+.coorte-delta { display: flex; flex-direction: column; gap: 2px; }
+
+.coorte-delta-valor {
+    font-size: 52px;
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    color: var(--cor-primaria-escura);
+}
+
+.coorte-delta-rotulo { color: var(--cor-texto-suave); font-size: 14px; }
+
+.coorte-apoio {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin: 0;
+    padding: 16px 0 0;
+    border-top: 1px solid var(--cor-borda);
+}
+
+.coorte-apoio div { display: flex; flex-direction: column; gap: 2px; }
+.coorte-apoio dt { font-size: 12px; color: var(--cor-texto-suave); letter-spacing: .03em; }
+.coorte-apoio dd { margin: 0; font-size: 21px; font-weight: 600; }
+.coorte-apoio dd.coorte-base {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cor-texto-suave);
+}
+
+.aviso-amostra {
+    border-left: 3px solid var(--cor-alerta);
+    padding-left: 12px;
+    color: var(--cor-alerta);
+}
+
+
+/* ---------- caixa de entrada do tutor ---------- */
+
+.menu-caixa { display: inline-flex; align-items: center; gap: 7px; }
+
+/*
+  O badge usa a cor de alerta, e nao a primaria: ele compete por atencao com os
+  nomes dos pets ao lado, e na primaria some no meio deles.
+*/
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--cor-alerta);
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.caixa { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+
+.caixa-item {
+    display: grid;
+    gap: 5px;
+    padding: 14px 16px;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    background: var(--cor-superficie);
+    color: inherit;
+    text-decoration: none;
+}
+
+.caixa-item:hover { border-color: var(--cor-primaria); }
+
+/* foco visivel: a lista e navegavel por teclado e o contorno nao pode sumir */
+.caixa-item:focus-visible {
+    outline: 2px solid var(--cor-primaria);
+    outline-offset: 2px;
+}
+
+/* nao lida pesa mais: fundo proprio e barra na lateral, alem do ponto */
+.caixa-nova .caixa-item {
+    background: #fbfdfc;
+    box-shadow: inset 3px 0 0 var(--cor-primaria);
+}
+
+.caixa-lida .caixa-item { opacity: .72; }
+
+.caixa-topo { display: flex; align-items: center; gap: 9px; }
+.caixa-titulo { font-weight: 600; }
+.caixa-mensagem { color: var(--cor-texto-suave); font-size: 14px; }
+
+.caixa-rodape {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--cor-texto-suave);
+}
+
+.caixa-ponto {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cor-primaria);
+    margin-left: auto;
+    flex: none;
 }

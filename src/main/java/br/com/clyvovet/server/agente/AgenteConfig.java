@@ -31,8 +31,16 @@ import tools.jackson.databind.ObjectMapper;
 @EnableConfigurationProperties(AgenteProperties.class)
 public class AgenteConfig {
 
-    /** Qual adaptador atende. Ausente significa Gemini, o provedor ativo. */
-    public static final String PROPRIEDADE_PROVEDOR = "clyvo.agente.provedor";
+    /**
+     * Qual adaptador atende. Ausente significa Gemini, o provedor ativo.
+     *
+     * <p>Mesmo prefixo {@code app.agente} do resto do modulo, mas e o unico
+     * valor dele que nao passa por {@link AgenteProperties}: quem o le e o
+     * {@code @ConditionalOnProperty} abaixo, na criacao do bean, quando ainda
+     * nao ha record ligado. O binder ignora campo desconhecido, entao os dois
+     * convivem sem conflito.
+     */
+    public static final String PROPRIEDADE_PROVEDOR = "app.agente.provedor";
 
     /**
      * Gemini: o provedor ativo, e o padrao quando a propriedade nao esta escrita.

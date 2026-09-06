@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<!--
+  O cabeçalho do tutor, compartilhado pela tela do pet e pela caixa de entrada.
+
+  Não vem de layout.html de propósito: aquele leva ao painel de receita, à agenda
+  e ao prontuário, telas que o tutor não pode abrir. Um menu cheio de links que
+  devolvem 403 é pior que nenhum menu.
+
+  Está num fragmento, e não duplicado nas duas telas, porque o badge de não lidas
+  precisa ser o mesmo número nas duas — duplicado, uma das cópias sairia de sincronia
+  na primeira vez que a consulta mudasse.
+-->
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<header class="topo" th:fragment="topo(pets, petAtual, tutor, naoLidas, secao)">
+    <a class="marca" th:href="@{/tutor}">
+        <span class="marca-ponto"></span>
+        Clyvo<strong>Vet</strong>
+    </a>
+
+    <nav class="menu">
+        <a th:each="p : ${pets}"
+           th:href="@{/tutor/pets/{id}(id=${p.id})}"
+           th:text="${p.nome}"
+           th:classappend="${petAtual != null and petAtual.id == p.id} ? 'ativo'">Pet</a>
+
+        <a th:href="@{/tutor/caixa}"
+           th:classappend="${secao == 'caixa'} ? 'ativo'"
+           class="menu-caixa">
+            Lembretes
+            <!--
+              O badge só aparece quando há o que ver. Um "0" permanente ao lado do
+              link ensina o tutor a ignorar aquele canto da tela, que é justamente
+              onde o produto precisa que ele olhe.
+            -->
+            <span class="badge" th:if="${naoLidas > 0}" th:text="${naoLidas}">0</span>
+        </a>
+    </nav>
+
+    <div class="sessao">
+        <span class="sessao-nome" th:text="${tutor.nome}">Tutor</span>
+        <form th:action="@{/logout}" method="post">
+            <button type="submit" class="botao-texto">Sair</button>
+        </form>
+    </div>
+</header>
+
+</body>
+</html>

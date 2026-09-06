@@ -81,9 +81,9 @@ class AgentePropriedadesTest {
      * a porta vazou.
      */
     @Test
-    @DisplayName("trocar clyvo.agente.provedor troca o adaptador, e so isso")
+    @DisplayName("trocar app.agente.provedor troca o adaptador, e so isso")
     void aPropriedadeTrocaOAdaptador() {
-        contexto.withPropertyValues("clyvo.agente.provedor=anthropic").run(ctx -> {
+        contexto.withPropertyValues("app.agente.provedor=anthropic").run(ctx -> {
             assertThat(ctx).hasSingleBean(ProvedorLlm.class);
             assertThat(ctx.getBean(ProvedorLlm.class))
                     .isInstanceOf(AnthropicAdapter.class);

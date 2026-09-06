@@ -14,7 +14,7 @@ import java.util.List;
  * <p>A motivacao e concreta e vale registrar: o provedor ativo roda em tier
  * gratuito, e tier gratuito muda de limite e de disponibilidade sem avisar.
  * Quando isso acontecer, a resposta e trocar o valor de
- * {@code clyvo.agente.provedor} — nao abrir o laco de execucao.
+ * {@code app.agente.provedor} — nao abrir o laco de execucao.
  *
  * <p><b>O guardrail clinico nao passa por aqui, e isso e deliberado.</b> Ele le
  * a resposta final depois que o adaptador ja devolveu, no

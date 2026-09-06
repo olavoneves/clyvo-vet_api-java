@@ -61,6 +61,7 @@
                     <th>Janela</th>
                     <th>Grupo</th>
                     <th>Status</th>
+                    <th>Lembrete</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -75,9 +76,23 @@
                               th:classappend="'etiqueta-' + ${#strings.toLowerCase(o.status)}"
                               th:text="${o.status}">STATUS</span>
                     </td>
+                    <!--
+                      O botao so existe onde ele faz alguma coisa: PREVISTA e o
+                      unico estado de onde a transicao para NOTIFICADA e legal, e
+                      um botao que devolve 409 e pior que botao nenhum.
+                    -->
+                    <td>
+                        <form th:if="${o.status.name() == 'PREVISTA'}"
+                              th:action="@{/obrigacoes/{id}/lembrete(id=${o.id})}"
+                              method="post">
+                            <button type="submit" class="botao-texto">Enviar lembrete</button>
+                        </form>
+                        <span th:if="${o.status.name() == 'NOTIFICADA'}"
+                              class="subtitulo">enviado</span>
+                    </td>
                 </tr>
                 <tr th:if="${#lists.isEmpty(obrigacoes)}">
-                    <td colspan="6" class="tabela-vazia">
+                    <td colspan="7" class="tabela-vazia">
                         Nenhuma obrigação gerada para este pet ainda.
                     </td>
                 </tr>
