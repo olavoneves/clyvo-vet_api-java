@@ -48,7 +48,11 @@ public class PainelCoorteService {
         Linha controle = doGrupo(linhas, CONTROLE);
 
         BigDecimal delta = delta(tratado, controle);
+        // o piso principal e em obrigacoes resolvidas — e o que sustenta a
+        // comparacao; o de pets fica como guarda contra amostra concentrada num
+        // punhado de animais, onde as observacoes nao sao independentes
         boolean suficiente = tratado != null && controle != null
+                && controle.qtObrigacoes() >= CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE
                 && controle.qtPets() >= CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE;
 
         // sem amostra o delta nao vira dinheiro: um numero em reais tirado de um

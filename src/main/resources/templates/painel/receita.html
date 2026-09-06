@@ -79,9 +79,11 @@
         -->
         <p class="ajuda aviso-amostra" th:unless="${coorte.amostraSuficiente}">
             Amostra insuficiente para comparação: o grupo de controle tem
-            <strong th:text="|${coorte.controle.pets} pet(s)|">0</strong>,
-            e abaixo de [[${coorte.minimoDePetsNoControle}]] um único tutor move a
-            taxa em dezenas de pontos.
+            <strong th:text="|${coorte.controle.obrigacoes} obrigação(ões) resolvida(s)
+                    em ${coorte.controle.pets} pet(s)|">0</strong>.
+            São necessárias [[${coorte.minimoDeObrigacoesNoControle}]] resolvidas em pelo
+            menos [[${coorte.minimoDePetsNoControle}]] pets — abaixo disso um único
+            desfecho move a taxa em pontos inteiros.
         </p>
 
         <div class="coorte" th:if="${coorte.amostraSuficiente}">

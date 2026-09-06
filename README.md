@@ -400,11 +400,33 @@ Delta de **+25,5 pontos** na Vida Animal e **+27,5** na PetCare. As taxas do gru
 (59,2% e 59,0%) batem com os 0,58 que `PR_CLV_SEED_DESFECHOS` sorteia, o que é a
 confirmação de que o denominador agora mede o que diz medir.
 
-> ⚠️ **A amostra da PetCare Zona Sul está no limite.** O card exige no mínimo **10 pets**
-> no controle para exibir um valor em reais (`CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE`),
-> e ela tem **11**. Um pet a menos e o card passa a esconder o número — corretamente, mas
-> de repente. Amostra pequena assim move a taxa em pontos inteiros com um único tutor
-> faltoso; leia o delta dessa clínica como ordem de grandeza, não como medida.
+### O piso de amostra conta obrigações, não pets
+
+Para exibir o valor em reais, o card exige do grupo de controle:
+
+| Critério | Constante | Mínimo |
+|---|---|---|
+| **Principal** — obrigações resolvidas | `CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE` | **50** |
+| Secundário — pets distintos | `CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE` | 5 |
+
+O piso era de **10 pets**, e media a coisa errada. O que sustenta a comparação é a
+quantidade de desfechos observados, não a de animais: as 178 obrigações resolvidas da
+PetCare são amostra confortável mesmo vindo de 11 pets, e o critério antigo as escondia
+por um número que não falava sobre elas.
+
+Pior, era frágil de um jeito invisível. O sorteio é determinístico por pet, mas os pets
+mudam a cada seed — a PetCare tinha 11 contra um piso de 10, e uma base nova podia cair
+em 8. O número principal do painel sumiria da tela sem que nada tivesse piorado, e sem
+nenhum aviso de que aquilo era o piso agindo.
+
+**Cinquenta** porque é onde um desfecho individual para de mover a taxa em ponto inteiro:
+com 50 resolvidas, um caso vale 2 p.p.; com 10, vale 10 p.p. — a mesma ordem de grandeza
+do efeito que se quer medir.
+
+O critério de pets continua existindo, mais baixo, contra a amostra **concentrada**:
+cinquenta obrigações de dois pets não são cinquenta observações independentes, porque as
+obrigações de um mesmo animal sobem e descem juntas com o comportamento de um único
+tutor. Com o novo piso, as duas clínicas passam com folga (312 e 178 resolvidas).
 
 O banco local do docker-compose tem outra amostra (controle com 27 e 18 pets) e chega às
 mesmas taxas — tratado 59,0% e 58,4%, controle 33,9% e 33,7%. As **taxas** são

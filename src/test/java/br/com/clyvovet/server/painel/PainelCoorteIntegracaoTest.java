@@ -303,17 +303,105 @@ class PainelCoorteIntegracaoTest {
     }
 
     /**
-     * A guarda de amostra, provada sem depender do estado do banco.
+     * O piso conta obrigacoes resolvidas, e a coorte fica logo abaixo dele.
+     *
+     * <p>49 resolvidas em 49 pets: passa folgado no criterio secundario, de pets,
+     * e reprova no principal. Se alguem voltar o piso para pets, este teste falha
+     * — que e o ponto. O piso era de dez pets e media a coisa errada: 178
+     * obrigacoes resolvidas sao amostra confortavel mesmo vindo de 11 pets.
+     */
+    @Test
+    @DisplayName("controle abaixo do piso de obrigacoes nao exibe valor em reais")
+    void abaixoDoPisoDeObrigacoesNaoViraNumero() {
+        int abaixo = CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE - 1;
+
+        Long clinica = coorteFabricada(100, 60, abaixo, 10).clinica();
+        TenantContext.set(clinica);
+        CoorteResponse coorte = service.daClinicaLogada();
+
+        assertThat(coorte.controle().obrigacoes())
+                .as("a montagem tem que ficar um caso abaixo do piso")
+                .isEqualTo(abaixo);
+        assertThat(coorte.controle().pets())
+                .as("e folgada no criterio secundario, para isolar o principal")
+                .isGreaterThanOrEqualTo(CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE);
+
+        assertThat(coorte.amostraSuficiente()).isFalse();
+        assertThat(coorte.consultasAtribuiveis()).isZero();
+        assertThat(coorte.vlAtribuivel()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    /** Um caso a mais e o card volta a mostrar o numero. */
+    @Test
+    @DisplayName("no piso de obrigacoes o card volta a exibir o valor")
+    void noPisoDeObrigacoesOValorAparece() {
+        int noPiso = CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE;
+
+        Long clinica = coorteFabricada(100, 60, noPiso, 10).clinica();
+        TenantContext.set(clinica);
+        CoorteResponse coorte = service.daClinicaLogada();
+
+        assertThat(coorte.controle().obrigacoes()).isEqualTo(noPiso);
+        assertThat(coorte.amostraSuficiente())
+                .as("o piso e inclusivo: exatamente no minimo o card exibe")
+                .isTrue();
+        assertThat(coorte.vlAtribuivel())
+                .as("com delta positivo e amostra bastante, tem valor a mostrar")
+                .isGreaterThan(BigDecimal.ZERO);
+    }
+
+    /**
+     * A guarda secundaria: muitas obrigacoes concentradas em poucos pets.
+     *
+     * <p>Passa folgado no piso de obrigacoes e reprova no de pets. E o caso que
+     * justifica o criterio secundario continuar existindo — as obrigacoes de um
+     * mesmo animal nao sao observacoes independentes, sobem e descem juntas com o
+     * comportamento de um unico tutor.
+     */
+    @Test
+    @DisplayName("amostra concentrada em poucos pets tambem nao vira numero")
+    void amostraConcentradaEmPoucosPetsNaoViraNumero() {
+        CenarioClinico.Cenario base = fixture.clinicaCompleta("Clinica concentrada");
+        materializar(base, 100, 60, false);
+
+        // 60 obrigacoes de controle, todas do MESMO pet: sobra no piso principal
+        // e falta no secundario
+        Long unicoPet = fixture.novoPet(base.clinica(), base.tutor());
+        fixture.novaConsulta(unicoPet, base.veterinario());
+        for (int i = 0; i < 60; i++) {
+            fixture.novaObrigacao(base.clinica(), unicoPet,
+                    i < 12 ? "CUMPRIDA" : "PERDIDA", -30, true);
+        }
+        entityManager.flush();
+        entityManager.clear();
+
+        TenantContext.set(base.clinica());
+        CoorteResponse coorte = service.daClinicaLogada();
+
+        assertThat(coorte.controle().obrigacoes())
+                .as("passa folgado no piso principal")
+                .isGreaterThanOrEqualTo(CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE);
+        assertThat(coorte.controle().pets())
+                .as("e reprova no secundario")
+                .isLessThan(CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE);
+        assertThat(coorte.amostraSuficiente()).isFalse();
+    }
+
+    /**
+     * A guarda de amostra sobre o record, sem tocar no banco.
      *
      * <p>O caso degenerado nao existe mais nesta base — e nao deve voltar a
      * existir. Entao ele e montado aqui, no proprio teste, com o piso declarado.
      */
     @Test
-    @DisplayName("controle abaixo do piso de pets nao vira delta nem valor")
+    @DisplayName("coorte marcada como insuficiente nao propaga delta nem valor")
     void amostraPequenaNaoViraNumero() {
+        assertThat(CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE)
+                .as("o piso principal conta obrigacoes resolvidas, que e o que sustenta a taxa")
+                .isGreaterThanOrEqualTo(50);
         assertThat(CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE)
-                .as("o piso e contado em pets, que e a unidade do sorteio")
-                .isGreaterThan(1);
+                .as("o de pets e secundario e mais baixo")
+                .isLessThan(CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE);
 
         CoorteResponse insuficiente = new CoorteResponse(
                 new CoorteResponse.Grupo(300, 177, 40, BigDecimal.valueOf(59.0)),

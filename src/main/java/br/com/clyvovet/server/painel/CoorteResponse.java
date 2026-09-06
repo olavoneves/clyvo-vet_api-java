@@ -31,25 +31,46 @@ public record CoorteResponse(
 ) {
 
     /**
-     * Piso de pets no grupo de controle para o delta ir para a tela.
+     * Piso principal: obrigacoes resolvidas no grupo de controle.
      *
-     * <p>Dez, e contado em <b>pets</b> e nao em obrigacoes, porque o sorteio e
-     * por pet: as obrigacoes de um mesmo animal sobem e descem juntas, entao
-     * trezentas obrigacoes de um pet so continuam sendo uma amostra de tamanho
-     * um. Abaixo disso um unico tutor faltoso move a taxa em dezenas de pontos,
-     * e ja aconteceu — com um pet no controle a base local dizia que o produto
-     * derrubava o comparecimento em vinte pontos.
+     * <p><b>E a quantidade de obrigacoes que sustenta a comparacao, e nao a de
+     * animais.</b> O piso era de dez pets, e media a coisa errada: 178 obrigacoes
+     * resolvidas sao amostra confortavel mesmo vindo de 11 pets, e o card as
+     * escondia por um criterio que nao falava sobre elas. Pior, o criterio era
+     * fragil de um jeito invisivel — o sorteio e deterministico por pet, mas os
+     * pets mudam a cada seed, entao uma base nova podia cair em 8 e o numero
+     * principal do painel simplesmente sumia da tela sem nada ter piorado.
+     *
+     * <p>Cinquenta porque e onde um desfecho individual para de mover a taxa em
+     * ponto percentual inteiro: com 50 resolvidas, um caso vale 2 p.p.; com 10,
+     * vale 10 p.p., que e a ordem de grandeza do proprio efeito que se quer medir.
      */
-    public static final int MINIMO_DE_PETS_NO_CONTROLE = 10;
+    public static final int MINIMO_DE_OBRIGACOES_NO_CONTROLE = 50;
 
     /**
-     * O piso, para a tela poder citar o numero sem repetir o valor.
+     * Piso secundario, em pets, contra a amostra concentrada.
      *
-     * <p>A ressalva de amostra insuficiente diz "abaixo de N um unico tutor move
-     * a taxa". Antes o N estava escrito no HTML, ao lado da constante que o
-     * {@code PainelCoorteService} de fato consulta — duas fontes da mesma verdade,
-     * e a do HTML nao acompanharia uma mudanca do piso.
+     * <p>Cinquenta obrigacoes de dois pets nao sao cinquenta observacoes
+     * independentes: as obrigacoes de um mesmo animal sobem e descem juntas com o
+     * comportamento de um unico tutor. O piso de pets continua existindo por isso,
+     * mas <b>mais baixo</b> — ele deixou de ser o criterio e passou a ser a guarda
+     * contra o caso degenerado que ja aconteceu de verdade, com um pet so no
+     * controle dizendo que o produto derrubava o comparecimento em vinte pontos.
      */
+    public static final int MINIMO_DE_PETS_NO_CONTROLE = 5;
+
+    /**
+     * Os dois pisos, para a tela poder cita-los sem repetir os valores.
+     *
+     * <p>A ressalva de amostra insuficiente nomeia os numeros. Escreve-los no HTML
+     * criaria duas fontes da mesma verdade, e a do HTML nao acompanharia uma
+     * recalibragem do piso — a tela seguiria plausivel dizendo o valor antigo, que
+     * e o pior tipo de erro.
+     */
+    public int minimoDeObrigacoesNoControle() {
+        return MINIMO_DE_OBRIGACOES_NO_CONTROLE;
+    }
+
     public int minimoDePetsNoControle() {
         return MINIMO_DE_PETS_NO_CONTROLE;
     }

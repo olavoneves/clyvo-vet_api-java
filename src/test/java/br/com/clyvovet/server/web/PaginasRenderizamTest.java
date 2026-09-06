@@ -226,14 +226,14 @@ class PaginasRenderizamTest {
     }
 
     /**
-     * O piso da ressalva sai da constante que o serviço consulta.
+     * A ressalva cita os dois pisos, e eles saem das constantes que o serviço usa.
      *
-     * <p>Com o piso e a frase escritos em lugares diferentes, mudar
-     * {@code MINIMO_DE_PETS_NO_CONTROLE} deixaria a tela dizendo o número antigo
-     * — e a tela continuaria plausível, que é o pior tipo de erro.
+     * <p>Com o piso e a frase escritos em lugares diferentes, recalibrar o mínimo
+     * deixaria a tela dizendo o número antigo — e a tela continuaria plausível,
+     * que é o pior tipo de erro.
      */
     @Test
-    void ressalvaDeAmostraCitaOPisoDaConstante() throws Exception {
+    void ressalvaDeAmostraCitaOsPisosDasConstantes() throws Exception {
         given(painelService.doMes(any(LocalDate.class))).willReturn(painelDeExemplo());
         given(coorteService.daClinicaLogada()).willReturn(new CoorteResponse(
                 new CoorteResponse.Grupo(300, 177, 40, new BigDecimal("59.00")),
@@ -243,8 +243,36 @@ class PaginasRenderizamTest {
 
         mockMvc.perform(get("/painel/receita").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "abaixo de " + CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE)));
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        // o que a coorte tem, nas duas unidades
+                        org.hamcrest.Matchers.containsString("10 obrigação(ões) resolvida(s)"),
+                        org.hamcrest.Matchers.containsString("1 pet(s)"),
+                        // e o que faltaria para exibir
+                        org.hamcrest.Matchers.containsString(
+                                String.valueOf(CoorteResponse.MINIMO_DE_OBRIGACOES_NO_CONTROLE)
+                                        + " resolvidas"),
+                        org.hamcrest.Matchers.containsString(
+                                "menos " + CoorteResponse.MINIMO_DE_PETS_NO_CONTROLE + " pets"))));
+    }
+
+    /**
+     * Acima do piso, a ressalva some e o valor em reais aparece.
+     *
+     * <p>O contraponto do teste acima: sem ele, uma ressalva que aparecesse
+     * sempre passaria como se estivesse certa.
+     */
+    @Test
+    void acimaDoPisoOCardExibeODeltaEOValor() throws Exception {
+        given(painelService.doMes(any(LocalDate.class))).willReturn(painelDeExemplo());
+        given(coorteService.daClinicaLogada()).willReturn(coorteDeExemplo());
+
+        mockMvc.perform(get("/painel/receita").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("Amostra insuficiente")),
+                        org.hamcrest.Matchers.containsString("p.p."),
+                        org.hamcrest.Matchers.containsString("R$ 147.442,87"))));
     }
 
     private static CoorteResponse coorteDeExemplo() {
