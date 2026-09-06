@@ -1,9 +1,11 @@
 package br.com.clyvovet.server.painel;
 
+import br.com.clyvovet.server.support.CenarioClinico;
 import br.com.clyvovet.server.tenant.TenantContext;
+import jakarta.persistence.EntityManager;
 import org.assertj.core.data.Offset;
+import org.hibernate.Session;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.CallableStatement;
+import java.sql.Types;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,10 +34,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  * escrever um teste que quebra no proximo seed sem dizer nada sobre a view.
  *
  * <p>O que e estavel, e portanto o que se afirma: as <b>taxas</b>, que saem do
- * sorteio de {@code PR_CLV_SEED_DESFECHOS} (0,58 tratado e 0,36 controle); a
- * <b>aritmetica</b> da view, conferida contra a tabela que ela resume; e a
- * <b>forma</b> — um grupo de cada por clinica, o controle perto dos 10% dos
- * pets, e o tratado acima do controle.
+ * sorteio de {@code PR_CLV_SEED_DESFECHOS}; a <b>aritmetica</b> da view,
+ * conferida contra a tabela que ela resume; e a <b>forma</b> — um grupo de cada
+ * por clinica, e o tratado acima do controle.
+ *
+ * <p><b>Tres dos quatro casos deixaram de depender do que a base tiver.</b> A
+ * aritmetica da view e a conta do card montam a propria coorte, numa clinica so
+ * deste teste — antes eles liam a primeira clinica que existisse, e o caso do
+ * valor em reais desistia por {@code assumeTrue} sempre que a amostra daquela
+ * clinica nao passava do piso, que e justamente a condicao que ele existe para
+ * exercitar. E a proporcao do sorteio passou a ser medida chamando
+ * {@code FN_CLV_GRUPO_CONTROLE} direto, sobre milhares de ids sinteticos, em vez
+ * de contar pets semeados.
+ *
+ * <p>O unico caso que continua exigindo a base semeada e o da calibragem do
+ * seed — nao ha como verificar que {@code PR_CLV_SEED_DESFECHOS} produz as taxas
+ * que declara sem os dados que ele produziu. Esse caso <b>falha</b>, com
+ * mensagem dizendo o que rodar, em vez de se pular em silencio.
  */
 @SpringBootTest
 @Transactional
@@ -84,13 +101,14 @@ class PainelCoorteIntegracaoTest {
     @Autowired
     private PainelCoorteService service;
 
-    private List<Long> clinicas;
+    @Autowired
+    private EntityManager entityManager;
+
+    private CenarioClinico fixture;
 
     @BeforeEach
-    void carregarClinicas() {
-        clinicas = jdbcClient.sql("select id_clinica from TB_CLV_CLINICA order by id_clinica")
-                .query(Long.class).list();
-        Assumptions.assumeFalse(clinicas.isEmpty(), "nenhuma clinica cadastrada");
+    void preparar() {
+        fixture = new CenarioClinico(entityManager);
     }
 
     @AfterEach
@@ -98,10 +116,20 @@ class PainelCoorteIntegracaoTest {
         TenantContext.clear();
     }
 
+    /**
+     * A calibragem do seed, sobre a base semeada.
+     *
+     * <p>Este e o unico caso da classe que precisa dos dados de demonstracao: nao
+     * ha como conferir que {@code PR_CLV_SEED_DESFECHOS} produz as taxas que
+     * declara sem olhar o que ele produziu. Antes ele se pulava quando a base
+     * estava vazia; agora falha dizendo o que rodar, porque um banco de
+     * demonstracao sem demonstracao e um defeito de ambiente, e nao um motivo
+     * para o teste calar.
+     */
     @Test
     @DisplayName("a view devolve um grupo tratado e um controle por clinica, com a taxa do sorteio")
     void viewDevolveOsDoisGruposComATaxaDoSorteio() {
-        List<PainelCoorteService.Linha> linhas = linhasDa(clinicas.getFirst());
+        List<PainelCoorteService.Linha> linhas = linhasDa(primeiraClinicaSemeada());
 
         assertThat(linhas)
                 .as("uma linha por grupo: tratado e controle")
@@ -128,11 +156,17 @@ class PainelCoorteIntegracaoTest {
         }
     }
 
-    /** A aritmetica da view, conferida contra a tabela que ela resume. */
+    /**
+     * A aritmetica da view, conferida contra a tabela que ela resume.
+     *
+     * <p>Sobre uma coorte fabricada: numeros redondos e escolhidos fazem a conta
+     * ser conferivel de cabeca, e a clinica so deste teste garante que nao ha mais
+     * nada na tabela para confundir o total.
+     */
     @Test
     @DisplayName("a taxa da view bate com a contagem crua da tabela")
     void taxaDaViewBateComATabela() {
-        Long clinica = clinicas.getFirst();
+        Long clinica = coorteFabricada(20, 10, 20, 4).clinica();
 
         for (PainelCoorteService.Linha linha : linhasDa(clinica)) {
             String flag = "CONTROLE".equals(linha.dsGrupo()) ? "S" : "N";
@@ -159,29 +193,66 @@ class PainelCoorteIntegracaoTest {
     }
 
     /**
-     * O sorteio mira 10% dos pets.
+     * O sorteio mira o percentual que recebe, e a prova e na propria funcao.
      *
-     * <p>A folga e larga de proposito: com poucas centenas de pets, 10% oscila.
-     * O que este teste barra e o caso degenerado que ja aconteceu de verdade —
-     * o controle com um pet so, que fazia a base local afirmar que o produto
-     * derrubava o comparecimento em vinte pontos.
+     * <p>Antes este caso contava os pets semeados de cada clinica e desistia
+     * quando nao havia nenhum — media a amostra, e nao o sorteador. Sobre umas
+     * poucas centenas de pets a proporcao oscila tanto que a faixa aceita tinha
+     * que ir de 3% a 20%, o que so barrava o caso degenerado.
+     *
+     * <p>Chamando {@code FN_CLV_GRUPO_CONTROLE} direto sobre dez mil ids, a lei
+     * dos grandes numeros aperta a faixa para um ponto percentual e o teste passa
+     * a afirmar o que diz no nome. Nao depende de dado nenhum na base, e ainda
+     * confere que o parametro de percentual e respeitado — o que impede alguem de
+     * "ajustar" o sorteio ignorando o argumento.
      */
     @Test
-    @DisplayName("o grupo de controle fica perto dos 10% dos pets")
-    void controleFicaPertoDeDezPorCentoDosPets() {
-        for (Long clinica : clinicas) {
-            TenantContext.set(clinica);
-            CoorteResponse coorte = service.daClinicaLogada();
+    @DisplayName("o sorteio respeita o percentual que recebe")
+    void sorteioRespeitaOPercentualPedido() {
+        assertThat(proporcaoSorteada(10, 10_000))
+                .as("o padrao do sorteio e 10%%")
+                .isCloseTo(10.0, Offset.offset(1.0));
 
-            long pets = coorte.tratado().pets() + coorte.controle().pets();
-            Assumptions.assumeTrue(pets > 0, "clinica sem pet com obrigacao resolvida");
+        assertThat(proporcaoSorteada(25, 10_000))
+                .as("pedir 25%% tem que mudar o resultado: o parametro nao pode ser decorativo")
+                .isCloseTo(25.0, Offset.offset(1.0));
+    }
 
-            double proporcao = 100.0 * coorte.controle().pets() / pets;
-            assertThat(proporcao)
-                    .as("controle da clinica %s: %s de %s pets",
-                            clinica, coorte.controle().pets(), pets)
-                    .isBetween(3.0, 20.0);
-        }
+    /**
+     * Quantos por cento de {@code quantos} ids caem no controle, segundo a funcao
+     * do banco.
+     *
+     * <p>A funcao tem parametros de saida, e Oracle nao deixa chamar do SQL uma
+     * funcao com OUT. Dai o bloco anonimo: ele roda o laco dentro do banco e
+     * devolve so a contagem, que tambem evita dez mil idas e voltas.
+     */
+    private double proporcaoSorteada(int percentual, int quantos) {
+        long[] sorteados = new long[1];
+
+        entityManager.unwrap(Session.class).doWork(conexao -> {
+            try (CallableStatement bloco = conexao.prepareCall("""
+                    DECLARE
+                      v_seed VARCHAR2(200);
+                      v_hash VARCHAR2(64);
+                      v_qtd  NUMBER := 0;
+                    BEGIN
+                      FOR i IN 1 .. ? LOOP
+                        IF FN_CLV_GRUPO_CONTROLE(1, i, 1, ?, v_seed, v_hash) = 'S' THEN
+                          v_qtd := v_qtd + 1;
+                        END IF;
+                      END LOOP;
+                      ? := v_qtd;
+                    END;
+                    """)) {
+                bloco.setInt(1, quantos);
+                bloco.setInt(2, percentual);
+                bloco.registerOutParameter(3, Types.NUMERIC);
+                bloco.execute();
+                sorteados[0] = bloco.getLong(3);
+            }
+        });
+
+        return 100.0 * sorteados[0] / quantos;
     }
 
     /**
@@ -194,12 +265,17 @@ class PainelCoorteIntegracaoTest {
     @Test
     @DisplayName("consultas atribuiveis e valor saem do delta e do ticket real")
     void valorAtribuivelSaiDoDeltaEDoTicketReal() {
-        Long clinica = clinicas.getFirst();
+        // 60% no tratado contra 20% no controle: delta positivo e amostra
+        // folgada, montados aqui. Antes o teste lia a primeira clinica da base e
+        // desistia quando a amostra dela nao passava do piso — ou seja, desistia
+        // exatamente na condicao que ele existe para exercitar.
+        Long clinica = coorteFabricada(100, 60, 100, 20).clinica();
         TenantContext.set(clinica);
         CoorteResponse coorte = service.daClinicaLogada();
 
-        Assumptions.assumeTrue(coorte.amostraSuficiente(),
-                "amostra de controle insuficiente nesta base");
+        assertThat(coorte.amostraSuficiente())
+                .as("a coorte montada tem que passar do piso, senao o teste nao prova nada")
+                .isTrue();
 
         assertThat(coorte.deltaPontosPercentuais().doubleValue())
                 .as("o produto tem que aparecer: tratado acima do controle")
@@ -260,9 +336,60 @@ class PainelCoorteIntegracaoTest {
     }
 
     /**
+     * A primeira clinica da base semeada, para o unico caso que precisa dela.
+     *
+     * <p>Falha, e nao pula, quando nao ha nenhuma: a mensagem diz o que rodar.
+     */
+    private Long primeiraClinicaSemeada() {
+        List<Long> clinicas = jdbcClient
+                .sql("select id_clinica from TB_CLV_CLINICA order by id_clinica")
+                .query(Long.class).list();
+
+        assertThat(clinicas)
+                .as("este caso confere a calibragem do seed e precisa da base de "
+                        + "demonstracao: rode PR_CLV_SEED_EXECUTAR antes")
+                .isNotEmpty();
+        return clinicas.getFirst();
+    }
+
+    /**
+     * Uma clinica com a coorte que o teste pedir, e nada mais.
+     *
+     * <p>Cada obrigacao vai para um pet proprio, porque {@code qt_pets} da view
+     * conta pets distintos — e o piso de amostra do card olha justamente para
+     * ele. Uma consulta realizada por pet da o ticket medio, sem o qual o valor
+     * em reais seria zero por outro motivo que nao o que se quer testar.
+     */
+    private CenarioClinico.Cenario coorteFabricada(int tratadas, int cumpridasTratado,
+                                                   int controles, int cumpridasControle) {
+        CenarioClinico.Cenario base = fixture.clinicaCompleta("Clinica da coorte");
+
+        materializar(base, tratadas, cumpridasTratado, false);
+        materializar(base, controles, cumpridasControle, true);
+
+        entityManager.flush();
+        entityManager.clear();
+        return base;
+    }
+
+    private void materializar(CenarioClinico.Cenario base, int quantas, int cumpridas,
+                              boolean grupoControle) {
+        for (int i = 0; i < quantas; i++) {
+            Long pet = fixture.novoPet(base.clinica(), base.tutor());
+            fixture.novaConsulta(pet, base.veterinario());
+            fixture.novaObrigacao(base.clinica(), pet,
+                    i < cumpridas ? "CUMPRIDA" : "PERDIDA", -30, grupoControle);
+        }
+    }
+
+    /**
      * A taxa alvo de um dos parametros de {@code PR_CLV_SEED_DESFECHOS}, em
-     * pontos percentuais. Pula o teste se a procedure nao estiver no schema —
-     * um banco sem o seed nao tem o que este teste afirma.
+     * pontos percentuais.
+     *
+     * <p>Falha se a procedure nao estiver no schema. Antes pulava — mas a
+     * procedure nasce na V8 e existe em qualquer schema migrado, entao a ausencia
+     * dela significa migration faltando, que e um defeito para mostrar e nao para
+     * contornar.
      */
     private double taxaDoSeed(String parametro) {
         java.util.Optional<String> literal = jdbcClient.sql(SQL_TAXA_DO_SEED)
@@ -270,8 +397,9 @@ class PainelCoorteIntegracaoTest {
                 .query(String.class)
                 .optional();
 
-        Assumptions.assumeTrue(literal.isPresent() && literal.get() != null,
-                "PR_CLV_SEED_DESFECHOS nao esta no schema: sem seed, sem taxa alvo");
+        assertThat(literal)
+                .as("PR_CLV_SEED_DESFECHOS nasce na V8: sem ela, o schema esta incompleto")
+                .isPresent();
 
         // a procedure guarda a fracao (0,58); a view devolve pontos percentuais
         return new BigDecimal(literal.get().trim())

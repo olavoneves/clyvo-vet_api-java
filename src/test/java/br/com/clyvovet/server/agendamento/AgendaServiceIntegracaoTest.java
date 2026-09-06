@@ -1,10 +1,10 @@
 package br.com.clyvovet.server.agendamento;
 
 import br.com.clyvovet.server.exception.ConflitoDeEstadoException;
+import br.com.clyvovet.server.support.CenarioClinico;
 import br.com.clyvovet.server.tenant.TenantContext;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,9 +30,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * tem que acontecer juntas ou nao acontecer; com mock nao ha o que provar,
  * porque e exatamente a atomicidade entre elas que esta sob teste.
  *
- * <p>A fixture sai dos dados que existirem: uma obrigacao pendente qualquer e o
- * primeiro horario que a propria consulta de disponibilidade oferecer. Fixar
- * data e veterinario transformaria o teste num detector de calendario.
+ * <p><b>A fixture e fabricada, e nao garimpada.</b> A classe montava o cenario
+ * com "uma obrigacao pendente qualquer" e "o primeiro veterinario que existir", e
+ * desistia por {@code assumeFalse} quando a base nao tinha nem uma nem outro —
+ * quatro pontos de desistencia silenciosa numa classe so. Hoje ela cria a propria
+ * clinica, com um veterinario de agenda vazia: os horarios livres passam a existir
+ * por construcao, e nao por sorte.
+ *
+ * <p>O que continua saindo da consulta e <b>qual</b> horario usar — o primeiro que
+ * a disponibilidade oferecer. Fixar data e hora transformaria o teste num detector
+ * de calendario.
  *
  * <p>Roda dentro da transacao do teste e e desfeito ao final: as procedures nao
  * dao COMMIT proprio, entao o rollback alcanca o que elas escreveram.
@@ -46,25 +53,21 @@ class AgendaServiceIntegracaoTest {
     /** Janela varrida em busca de vaga: tres semanas cobrem qualquer feriado. */
     private static final int DIAS_DE_BUSCA = 21;
 
-    /** Marca as linhas que este teste fabrica, para reencontra-las sem ambiguidade. */
-    private static final String CORRELACAO_DO_TESTE = "teste-agenda-vencida";
-
     @Autowired
     private AgendaService agendaService;
 
     @Autowired
     private EntityManager entityManager;
 
+    private CenarioClinico fixture;
+    private CenarioClinico.Cenario cenario;
     private Long clinica;
 
     @BeforeEach
-    void escolherClinica() {
-        List<Long> clinicas = entityManager
-                .createNativeQuery("select id_clinica from TB_CLV_CLINICA order by id_clinica", Long.class)
-                .getResultList();
-        Assumptions.assumeFalse(clinicas.isEmpty(), "nenhuma clinica cadastrada");
-
-        clinica = clinicas.get(0);
+    void montarClinica() {
+        fixture = new CenarioClinico(entityManager);
+        cenario = fixture.clinicaCompleta("Clinica da agenda");
+        clinica = cenario.clinica();
         TenantContext.set(clinica);
     }
 
@@ -247,10 +250,19 @@ class AgendaServiceIntegracaoTest {
         return agendaService.horariosLivres(hoje, hoje.plusDays(DIAS_DE_BUSCA));
     }
 
+    /**
+     * A primeira vaga da clinica que este teste montou.
+     *
+     * <p>Ela existe por construcao: a clinica tem um veterinario e nenhum
+     * agendamento, entao a varredura de tres semanas devolve dezenas de horarios.
+     * Uma lista vazia aqui significa que a disponibilidade quebrou — que e um
+     * defeito, e nao um motivo para pular o teste.
+     */
     private AgendaService.HorarioLivre primeiraVaga() {
         List<AgendaService.HorarioLivre> livres = vagas();
-        Assumptions.assumeFalse(livres.isEmpty(),
-                "a clinica nao tem veterinario cadastrado ou esta com a agenda cheia");
+        assertThat(livres)
+                .as("clinica nova com veterinario e agenda vazia tem que oferecer horario")
+                .isNotEmpty();
         return livres.getFirst();
     }
 
@@ -258,68 +270,22 @@ class AgendaServiceIntegracaoTest {
         return vaga.data().atTime(LocalTime.parse(vaga.hora(), AgendaService.HORA));
     }
 
+    /** Uma obrigacao pendente deste teste, vencendo daqui a 30 dias. */
     private Long umaObrigacaoPendente() {
-        List<Long> pendentes = entityManager.createNativeQuery("""
-                        select id_obrigacao from TB_CLV_OBRIGACAO
-                         where id_clinica = :clinica
-                           and ds_status in ('PREVISTA','NOTIFICADA','RESPONDIDA')
-                         order by id_obrigacao
-                        """, Long.class)
-                .setParameter("clinica", clinica)
-                .setMaxResults(1)
-                .getResultList();
-
-        Assumptions.assumeFalse(pendentes.isEmpty(),
-                "a clinica nao tem obrigacao pendente: rode o motor de protocolo antes");
-        return pendentes.getFirst();
+        return fixture.novaObrigacao(clinica, cenario.pet(), "PREVISTA", 30, false);
     }
 
     /**
-     * Uma obrigacao vencida criada aqui, e nao procurada na base.
+     * Uma obrigacao ja vencida, criada aqui e nao procurada na base.
      *
-     * <p>Antes o teste varria {@code TB_CLV_OBRIGACAO} atras de alguma linha com
-     * {@code dt_prevista} no passado e desistia por {@code assumeFalse} quando
-     * nao achava. Isso o tornava um teste que so existia em base ja envelhecida:
-     * num banco recem-semeado — todo ambiente novo, e o container local depois de
-     * um reseed — ele passava a vida inteira em verde-cinza, sem nunca ter
-     * exercitado nada. Skip silencioso e a mesma coisa que nao ter o teste, com a
-     * agravante de parecer que se tem.
-     *
-     * <p>O vencimento e o unico dado que este caso precisa, entao ele e o unico
-     * fabricado: 30 dias no passado, sobre pet, versao e etapa que ja existem no
-     * catalogo clinico. Roda dentro da transacao do teste, entao nada sobra.
+     * <p>O vencimento e o unico dado que este caso precisa, entao e o unico que o
+     * teste controla: 30 dias no passado. Antes ele varria a tabela atras de
+     * alguma linha vencida e desistia quando nao achava — num banco recem-semeado
+     * nenhuma obrigacao nasce vencida, entao o unico caso que justifica a agenda
+     * listar por data de compromisso nunca era exercitado.
      */
     private Long umaObrigacaoVencida() {
-        Long modelo = idNativo("""
-                select min(id_obrigacao) from TB_CLV_OBRIGACAO where id_clinica = %d
-                """.formatted(clinica));
-        Assumptions.assumeTrue(modelo != null,
-                "a clinica precisa de ao menos uma obrigacao para servir de molde");
-
-        // copia de uma linha existente, com o vencimento no passado e o status de
-        // volta ao inicio do trilho: e o unico jeito de garantir pet, versao e
-        // etapa coerentes entre si sem recriar o catalogo inteiro no teste.
-        entityManager.createNativeQuery("""
-                insert into TB_CLV_OBRIGACAO
-                       (id_clinica, id_pet, id_versao_protocolo, id_etapa,
-                        dt_prevista, dt_janela_inicio, dt_janela_fim,
-                        ds_status, ds_correlation_id, fl_grupo_controle)
-                select id_clinica, id_pet, id_versao_protocolo, id_etapa,
-                       TRUNC(SYSDATE) - 30, TRUNC(SYSDATE) - 37, TRUNC(SYSDATE) - 23,
-                       'PREVISTA', '%s', 'N'
-                  from TB_CLV_OBRIGACAO where id_obrigacao = %d
-                """.formatted(CORRELACAO_DO_TESTE, modelo)).executeUpdate();
-        entityManager.flush();
-
-        return idNativo("""
-                select max(id_obrigacao) from TB_CLV_OBRIGACAO
-                 where ds_correlation_id = '%s'
-                """.formatted(CORRELACAO_DO_TESTE));
-    }
-
-    private Long idNativo(String sql) {
-        Object resultado = entityManager.createNativeQuery(sql).getSingleResult();
-        return resultado == null ? null : ((Number) resultado).longValue();
+        return fixture.novaObrigacao(clinica, cenario.pet(), "PREVISTA", -30, false);
     }
 
     private static LocalDate proximoSabado() {
