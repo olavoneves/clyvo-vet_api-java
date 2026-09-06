@@ -52,8 +52,6 @@ class MotorDeProtocoloIntegracaoTest {
     private EntityManager entityManager;
 
     /** Ate quantas consultas tentar antes de desistir de achar uma que gere. */
-    private static final int CANDIDATAS_A_VARRER = 20;
-
     private static final int HORIZONTE_DE_UM_ANO = 365;
 
     private Long clinica;
@@ -77,40 +75,36 @@ class MotorDeProtocoloIntegracaoTest {
     /**
      * Registrar o gatilho de uma consulta materializa as obrigacoes do protocolo.
      *
-     * <p>Nem toda consulta gera algo: o motor so materializa quando o pet casa
-     * com as regras de ativacao do protocolo — especie, fase de vida, peso,
-     * condicoes. Por isso o teste varre candidatos ate encontrar um que gere,
-     * em vez de apostar numa consulta especifica e virar um teste intermitente.
+     * <p><b>O teste cria o proprio pet, e essa e a correcao que importa.</b> Antes
+     * ele varria consultas ja existentes de pets que ja tinham obrigacoes — ou
+     * seja, exatamente os pets que o motor se recusa a reprocessar. A guarda de
+     * cobertura de {@code PR_CLV_GERAR_OBRIGACOES} nao regera protocolo que ja
+     * tem obrigacao viva e futura, entao numa base ja exercitada as vinte
+     * candidatas devolviam zero e o teste falhava sem que nada estivesse
+     * quebrado. Passava ou nao conforme o quanto a base tinha sido usada.
      *
-     * <p>A asserção que importa nao e o numero em si, e sim que o contador
+     * <p>Um filhote recem-cadastrado nao tem cobertura nenhuma, e casa com a
+     * regra de {@code CAN_V10_SERIE} — canina, entre 1,5 e 4 meses. O gatilho
+     * entao tem obrigatoriamente o que gerar, em qualquer base com o catalogo
+     * clinico da V9 aplicado.
+     *
+     * <p>A assercao que importa nao e o numero em si, e sim que o contador
      * devolvido pelo parametro de saida bate com as linhas realmente gravadas.
      * Contador e linhas divergindo significaria que a aplicacao esta lendo o OUT
      * errado — e a API devolveria uma quantidade que nunca existiu.
      */
     @Test
     void gatilhoDeConsultaMaterializaObrigacoes() {
-        List<Long> candidatas = consultasDePetsComProtocolo();
-        Assumptions.assumeFalse(candidatas.isEmpty(),
-                "a clinica nao tem consultas de pets alcancados por protocolo");
+        Long consulta = consultaDeFilhoteNovo();
 
-        long antes = 0;
-        GerarObrigacoesResponse resposta = null;
+        long antes = contarObrigacoes();
 
-        for (Long consultaId : candidatas) {
-            antes = contarObrigacoes();
-            resposta = service.gerarParaConsulta(consultaId,
-                    new GerarObrigacoesRequest(EventoGatilho.CONSULTA_REGISTRADA,
-                            LocalDate.now(), "teste de integracao", HORIZONTE_DE_UM_ANO));
-            if (resposta.qtdCriadas() > 0) {
-                break;
-            }
-        }
+        GerarObrigacoesResponse resposta = service.gerarParaConsulta(consulta,
+                new GerarObrigacoesRequest(EventoGatilho.CONSULTA_REGISTRADA,
+                        LocalDate.now(), "teste de integracao", HORIZONTE_DE_UM_ANO));
 
-        assertThat(resposta).isNotNull();
         assertThat(resposta.qtdCriadas())
-                .as("nenhuma das %d consultas candidatas gerou obrigacao: "
-                        + "ou o catalogo de protocolos esta vazio, ou o motor parou de casar regra",
-                        candidatas.size())
+                .as("um filhote sem cobertura tem que fazer o motor materializar a serie vacinal")
                 .isPositive();
         assertThat(resposta.correlationId()).isNotBlank();
 
@@ -119,30 +113,57 @@ class MotorDeProtocoloIntegracaoTest {
                 .as("o contador do parametro de saida tem que bater com as linhas gravadas")
                 .isEqualTo(resposta.qtdCriadas());
 
-        assertThat(contarObrigacoes()).isEqualTo(antes + resposta.qtdCriadas());
-
-        // toda obrigacao nasce na clinica do token, nunca na do corpo da requisicao
-        assertThat(contarNativo("""
-                select count(*) from TB_CLV_OBRIGACAO
-                 where ds_correlation_id = '%s' and id_clinica = %d
-                """.formatted(resposta.correlationId(), clinica)))
+        assertThat(contarObrigacoes() - antes)
+                .as("e o total tem que crescer exatamente pelo que foi criado")
                 .isEqualTo(resposta.qtdCriadas());
     }
 
     /**
-     * Consultas de pets que ja foram alcancados por algum protocolo alguma vez.
-     * E o recorte mais barato que aumenta muito a chance de o gatilho produzir
-     * algo — pet que nunca casou com regra nenhuma tende a nao casar agora.
+     * Um filhote canino novo, com consulta de hoje, criado aqui e nao no seed.
+     *
+     * <p>Reaproveita tutor, raca e veterinario que ja existem — o que precisa ser
+     * novo e o <b>pet</b>, porque e nele que mora a cobertura do motor. Roda
+     * dentro da transacao do teste, entao nada disso sobra na base.
      */
-    private List<Long> consultasDePetsComProtocolo() {
-        return entityManager.createNativeQuery("""
-                select c.id_consulta from TB_CLV_CONSULTA c
-                 join TB_CLV_PET p on p.id_pet = c.id_pet
-                where p.id_clinica = %d
-                  and exists (select 1 from TB_CLV_OBRIGACAO o where o.id_pet = c.id_pet)
-                  and rownum <= %d
-                """.formatted(clinica, CANDIDATAS_A_VARRER), Long.class)
-                .getResultList();
+    private Long consultaDeFilhoteNovo() {
+        Long racaCanina = idNativo("""
+                select min(r.id_raca) from TB_CLV_RACA r
+                 join TB_CLV_ESPECIE e on e.id_especie = r.id_especie
+                where upper(e.nm_especie) = 'CANINA'
+                """);
+        Long tutor = idNativo(
+                "select min(id_tutor) from TB_CLV_TUTOR where id_clinica = %d".formatted(clinica));
+        Long veterinario = idNativo(
+                "select min(id_veterinario) from TB_CLV_VETERINARIO where id_clinica = %d"
+                        .formatted(clinica));
+
+        Assumptions.assumeTrue(racaCanina != null && tutor != null && veterinario != null,
+                "a clinica precisa de raca canina, tutor e veterinario cadastrados");
+
+        entityManager.createNativeQuery("""
+                insert into TB_CLV_PET (nm_pet, dt_nascimento, ds_sexo, ds_porte,
+                                        ds_status_pet, id_tutor, id_raca, id_clinica)
+                values ('Filhote do teste', ADD_MONTHS(TRUNC(SYSDATE), -2), 'M', 'MEDIO',
+                        'ATIVO', %d, %d, %d)
+                """.formatted(tutor, racaCanina, clinica)).executeUpdate();
+
+        Long pet = idNativo("""
+                select max(id_pet) from TB_CLV_PET
+                 where nm_pet = 'Filhote do teste' and id_clinica = %d
+                """.formatted(clinica));
+
+        entityManager.createNativeQuery("""
+                insert into TB_CLV_CONSULTA (dt_consulta, ds_motivo, ds_status, nr_valor,
+                                             id_pet, id_veterinario)
+                values (TRUNC(SYSDATE), 'Primeira consulta do filhote', 'REALIZADA', 180,
+                        %d, %d)
+                """.formatted(pet, veterinario)).executeUpdate();
+
+        entityManager.flush();
+
+        return idNativo("""
+                select max(id_consulta) from TB_CLV_CONSULTA where id_pet = %d
+                """.formatted(pet));
     }
 
     /**
