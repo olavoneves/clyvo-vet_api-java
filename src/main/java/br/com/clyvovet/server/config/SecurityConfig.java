@@ -133,7 +133,10 @@ public class SecurityConfig {
             "/",
             "/painel/**",
             "/pets/**",
-            "/agenda/**"
+            "/agenda/**",
+            // o botao de enviar lembrete, servido pela cadeia de sessao como o
+            // resto das telas — nao confundir com /api/obrigacoes/**
+            "/obrigacoes/**"
     };
 
     /** HSTS de um ano: abaixo disso os navegadores ignoram o cabecalho. */

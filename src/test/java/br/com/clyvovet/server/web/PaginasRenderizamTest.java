@@ -15,12 +15,18 @@ import br.com.clyvovet.server.exception.EntityNotFoundException;
 import br.com.clyvovet.server.obrigacao.ObrigacaoResponse;
 import br.com.clyvovet.server.agendamento.AgendaService;
 import br.com.clyvovet.server.painel.CoorteResponse;
+import br.com.clyvovet.server.notificacao.NotificacaoResponse;
+import br.com.clyvovet.server.notificacao.web.NotificacaoWebController;
+import br.com.clyvovet.server.obrigacao.web.LembreteWebController;
+import br.com.clyvovet.server.notificacao.NotificacaoService;
 import br.com.clyvovet.server.painel.PainelCoorteService;
 import br.com.clyvovet.server.agendamento.CompromissoDaAgenda;
 import br.com.clyvovet.server.enums.AgendamentoStatus;
 import br.com.clyvovet.server.enums.CanalPreferencial;
 import br.com.clyvovet.server.enums.ObrigacaoStatus;
+import br.com.clyvovet.server.obrigacao.ObrigacaoDetalheResponse;
 import br.com.clyvovet.server.obrigacao.ObrigacaoService;
+import br.com.clyvovet.server.obrigacao.TransicaoRequest;
 import br.com.clyvovet.server.obrigacao.web.AgendaWebController;
 import br.com.clyvovet.server.painel.PainelReceitaResponse;
 import br.com.clyvovet.server.painel.PainelReceitaService;
@@ -32,6 +38,7 @@ import br.com.clyvovet.server.pet.web.PetWebController;
 import br.com.clyvovet.server.auth.web.LoginWebController;
 import br.com.clyvovet.server.tutor.web.TutorWebController;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -45,6 +52,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -52,7 +60,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -73,7 +83,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         PainelWebController.class,
         PetWebController.class,
         AgendaWebController.class,
-        TutorWebController.class
+        TutorWebController.class,
+        NotificacaoWebController.class,
+        LembreteWebController.class
 })
 @Import({SecurityConfig.class, WebMvcConfig.class, JwtService.class})
 @TestPropertySource(properties = {
@@ -109,6 +121,9 @@ class PaginasRenderizamTest {
 
     @MockitoBean
     private PainelCoorteService coorteService;
+
+    @MockitoBean
+    private NotificacaoService notificacaoService;
 
     @Test
     void loginRenderizaSemAutenticacao() throws Exception {
@@ -355,6 +370,77 @@ class PaginasRenderizamTest {
                         org.hamcrest.Matchers.containsString("/api/agente/mensagens"))));
     }
 
+    /**
+     * A caixa de entrada: o elo "lembrete" chegando onde o tutor ve.
+     *
+     * <p>Nao lidas primeiro e a ordem do repositorio, nao da tela — aqui se
+     * verifica que a lista chega renderizada com o que o tutor precisa para
+     * decidir: de qual pet, o que e, ate quando.
+     */
+    @Test
+    void caixaDoTutorListaOsLembretes() throws Exception {
+        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(petDeExemplo())));
+        given(notificacaoService.caixaDo(3L)).willReturn(List.of(
+                new NotificacaoResponse(1L, "Rex: Reforço anual",
+                        "O prazo vai até 20/09. Toque para agendar com o assistente.",
+                        "Rex", 9L, LocalDate.now().plusDays(9),
+                        LocalDateTime.now(), false),
+                new NotificacaoResponse(2L, "Rex: Vermifugação",
+                        "O prazo venceu em 01/09. Ainda dá para remarcar — toque para agendar.",
+                        "Rex", 9L, LocalDate.now().minusDays(5),
+                        LocalDateTime.now().minusDays(2), true)));
+        given(notificacaoService.naoLidasDo(3L)).willReturn(1L);
+
+        mockMvc.perform(get("/tutor/caixa").with(user(TUTOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Rex: Reforço anual"),
+                        org.hamcrest.Matchers.containsString("Rex: Vermifugação"),
+                        // o prazo vencido vem marcado, que e o que faz o tutor abrir
+                        org.hamcrest.Matchers.containsString("prazo vencido"),
+                        // a linha inteira e o link para abrir
+                        org.hamcrest.Matchers.containsString("/tutor/caixa/1"),
+                        // e o badge de nao lidas no cabecalho
+                        org.hamcrest.Matchers.containsString("badge"))));
+    }
+
+    /** Caixa vazia e o estado normal de quem esta em dia: explica, nao da erro. */
+    @Test
+    void caixaVaziaExplicaEmVezDeFicarEmBranco() throws Exception {
+        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(petDeExemplo())));
+        given(notificacaoService.caixaDo(3L)).willReturn(List.of());
+        given(notificacaoService.naoLidasDo(3L)).willReturn(0L);
+
+        mockMvc.perform(get("/tutor/caixa").with(user(TUTOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Nenhum lembrete por enquanto"),
+                        // sem nao lidas o badge some: um "0" fixo ensina a ignorar o canto
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("class=\"badge\"")))));
+    }
+
+    /**
+     * O clique da caixa leva ao fluxo que ja existe, sem passo manual no meio.
+     *
+     * <p>E o criterio de aceite da cadeia: da notificacao para a conversa com o
+     * agente sobre aquele pet.
+     */
+    @Test
+    void abrirLembreteLevaAoPetEMarcaComoLido() throws Exception {
+        given(notificacaoService.abrir(5L, 3L)).willReturn("/tutor/pets/9");
+
+        mockMvc.perform(get("/tutor/caixa/5").with(user(TUTOR)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/tutor/pets/9"));
+
+        // marcar como lido acontece no servico, no mesmo metodo que resolve o
+        // destino: chamar abrir e o que garante as duas coisas
+        org.mockito.Mockito.verify(notificacaoService).abrir(5L, 3L);
+    }
+
     /** /tutor sem id escolhe o primeiro pet: e para onde o login manda o tutor. */
     @Test
     void tutorSemIdCaiNoPrimeiroPet() throws Exception {
@@ -445,6 +531,61 @@ class PaginasRenderizamTest {
                 "982000123456789", "RGA-77", "Curta", PetPorte.MEDIO, true,
                 PetStatus.ATIVO, "Pet dócil.", 3L, "Joana Ribeiro",
                 "joana@exemplo.com", "11999990000", 5L, "Labrador", 1L, "Canina");
+    }
+
+    /**
+     * O botao que fecha a cadeia de valor na tela.
+     *
+     * <p>Sem ele o lembrete so saia por chamada de API na mao — o elo existia no
+     * codigo e nao na tela, e a demonstracao tinha um passo manual no meio.
+     */
+    @Test
+    void fichaOfereceEnviarLembreteSoOndeATransicaoELegal() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(
+                        obrigacaoDeExemplo(),
+                        comStatus(ObrigacaoStatus.NOTIFICADA),
+                        comStatus(ObrigacaoStatus.CUMPRIDA))));
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        // PREVISTA: o botao existe
+                        org.hamcrest.Matchers.containsString("Enviar lembrete"),
+                        org.hamcrest.Matchers.containsString("/obrigacoes/101/lembrete"),
+                        // NOTIFICADA: ja saiu, e a tela diz isso em vez de repetir o botao
+                        org.hamcrest.Matchers.containsString("enviado"))));
+    }
+
+    /**
+     * O botao nao emite nada por conta propria: faz a transicao, e o lembrete
+     * nasce dentro dela. Dois caminhos para a mesma coisa divergiriam.
+     */
+    @Test
+    void enviarLembreteTransitaParaNotificadaEVoltaParaAFicha() throws Exception {
+        given(obrigacaoService.transitar(eq(101L), any(TransicaoRequest.class)))
+                .willReturn(new ObrigacaoDetalheResponse(obrigacaoDeExemplo(),
+                        "corr-1", null, null, null, null, List.of()));
+
+        mockMvc.perform(post("/obrigacoes/101/lembrete").with(user(COLABORADOR)).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/pets/9"));
+
+        ArgumentCaptor<TransicaoRequest> pedido =
+                ArgumentCaptor.forClass(TransicaoRequest.class);
+        org.mockito.Mockito.verify(obrigacaoService).transitar(eq(101L), pedido.capture());
+        org.assertj.core.api.Assertions.assertThat(pedido.getValue().novoStatus())
+                .isEqualTo(ObrigacaoStatus.NOTIFICADA);
+    }
+
+    private static ObrigacaoResponse comStatus(ObrigacaoStatus status) {
+        ObrigacaoResponse base = obrigacaoDeExemplo();
+        return new ObrigacaoResponse(base.id(), base.petId(), base.petNome(), base.etapaId(),
+                base.etapaNome(), base.protocoloCodigo(), base.protocoloNome(),
+                base.protocoloCategoria(), status, base.dtPrevista(), base.dtJanelaInicio(),
+                base.dtJanelaFim(), base.grupoControle(), base.valorEstimado(),
+                base.valorRealizado());
     }
 
     private static ObrigacaoResponse obrigacaoDeExemplo() {

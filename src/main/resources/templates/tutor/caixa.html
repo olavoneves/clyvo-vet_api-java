@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Lembretes · Clyvo Vet</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<div th:replace="~{tutor/cabecalho :: topo(${pets}, null, ${tutor}, ${naoLidas}, 'caixa')}"></div>
+
+<main class="conteudo">
+
+    <div class="cabecalho-tela">
+        <div>
+            <h1>Lembretes</h1>
+            <p class="subtitulo" th:if="${naoLidas > 0}"
+               th:text="|${naoLidas} não lido(s)|">não lidos</p>
+            <p class="subtitulo" th:if="${naoLidas == 0}">Tudo em dia por aqui.</p>
+        </div>
+    </div>
+
+    <section class="bloco">
+        <ul class="caixa" th:if="${not #lists.isEmpty(notificacoes)}">
+            <!--
+              A linha inteira e o link, e nao um botao no canto: numa lista de
+              lembretes o alvo de toque tem que ser a linha, ainda mais numa tela
+              que vai ser vista no celular.
+            -->
+            <li th:each="n : ${notificacoes}"
+                th:classappend="${n.lida} ? 'caixa-lida' : 'caixa-nova'">
+                <a th:href="@{/tutor/caixa/{id}(id=${n.id})}" class="caixa-item">
+                    <span class="caixa-topo">
+                        <span class="caixa-titulo" th:text="${n.titulo}">Pet: etapa</span>
+                        <span class="etiqueta etiqueta-recuperada"
+                              th:if="${n.vencida}">prazo vencido</span>
+                        <span class="caixa-ponto" th:unless="${n.lida}"
+                              title="Não lido"></span>
+                    </span>
+                    <span class="caixa-mensagem" th:text="${n.mensagem}">mensagem</span>
+                    <span class="caixa-rodape">
+                        <span th:if="${n.dataLimite != null}"
+                              th:text="|até ${#temporals.format(n.dataLimite, 'dd/MM/yyyy')}|">até</span>
+                        <span th:text="${#temporals.format(n.dtEmissao, 'dd/MM HH:mm')}">quando</span>
+                    </span>
+                </a>
+            </li>
+        </ul>
+
+        <!--
+          Caixa vazia nao e erro nem tela morta: e o estado normal de quem esta em
+          dia, e diz o que aconteceria se nao estivesse.
+        -->
+        <p class="ajuda" th:if="${#lists.isEmpty(notificacoes)}">
+            Nenhum lembrete por enquanto. Quando um cuidado do seu pet estiver
+            perto do prazo, ele aparece aqui e você agenda por aqui mesmo.
+        </p>
+    </section>
+
+</main>
+
+<footer class="rodape">
+    <span>Clyvo Vet · dados de demonstração</span>
+</footer>
+
+</body>
+</html>

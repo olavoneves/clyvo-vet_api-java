@@ -1,6 +1,7 @@
 package br.com.clyvovet.server.obrigacao;
 
 import br.com.clyvovet.server.consulta.Consulta;
+import br.com.clyvovet.server.notificacao.EmissorDeLembretes;
 import br.com.clyvovet.server.consulta.ConsultaRepository;
 import br.com.clyvovet.server.enums.ObrigacaoStatus;
 import br.com.clyvovet.server.exception.EntityNotFoundException;
@@ -25,6 +26,7 @@ public class ObrigacaoService {
     private final ObrigacaoTransicaoRepository transicaoRepository;
     private final ConsultaRepository consultaRepository;
     private final MotorProtocolo motor;
+    private final EmissorDeLembretes emissor;
     private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
@@ -70,6 +72,12 @@ public class ObrigacaoService {
         motor.transitar(id, request.novoStatus(), request.motivo(),
                 obrigacao.getDsCorrelationId(), request.agendamentoId(),
                 request.consultaId(), request.valor());
+
+        // O lembrete e consequencia da transicao, e nasce aqui: mesmo metodo,
+        // mesma transacao. Antes do clear() porque a entidade carregada acima
+        // ainda tem pet, tutor e etapa alcancaveis — depois dele, montar a
+        // mensagem custaria recarregar tudo.
+        emissor.aoTransitar(obrigacao, request.novoStatus());
 
         // a procedure escreveu direto no banco: o que esta na sessao do Hibernate
         // envelheceu no mesmo instante

@@ -7,6 +7,7 @@ import br.com.clyvovet.server.enums.ProtocoloCategoria;
 import br.com.clyvovet.server.exception.EntityNotFoundException;
 import br.com.clyvovet.server.exception.UnauthorizedException;
 import br.com.clyvovet.server.obrigacao.ObrigacaoResponse;
+import br.com.clyvovet.server.notificacao.NotificacaoService;
 import br.com.clyvovet.server.obrigacao.ObrigacaoService;
 import br.com.clyvovet.server.pet.PetResponse;
 import br.com.clyvovet.server.pet.PetService;
@@ -53,6 +54,7 @@ public class TutorWebController {
     private final PetService petService;
     private final ObrigacaoService obrigacaoService;
     private final JwtService jwtService;
+    private final NotificacaoService notificacaoService;
 
     @GetMapping("/tutor")
     public String inicio(Model model) {
@@ -74,6 +76,9 @@ public class TutorWebController {
 
         model.addAttribute("tutor", tutor);
         model.addAttribute("pets", pets);
+        // o badge e do cabecalho, que e o mesmo fragmento das duas telas:
+        // ele precisa do numero aqui tambem, e nao so na caixa
+        model.addAttribute("naoLidas", notificacaoService.naoLidasDo(tutor.id()));
 
         PetResponse selecionado = escolher(pets, idPedido);
         if (selecionado == null) {

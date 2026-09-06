@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <!--
-  A tela do tutor. Nao usa layout.html de proposito: aquele cabecalho leva ao
-  painel de receita, a agenda e ao prontuario, telas que o tutor nao pode abrir.
-  Um menu cheio de links que devolvem 403 e pior que nenhum menu.
+  A tela do tutor. O cabecalho vem de tutor/cabecalho e nao de layout.html: o
+  daquele leva ao painel de receita, a agenda e ao prontuario, telas que o tutor
+  nao pode abrir, e um menu cheio de links que devolvem 403 e pior que nenhum
+  menu. O fragmento e compartilhado com a caixa de entrada.
 -->
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -13,26 +14,7 @@
 </head>
 <body>
 
-<header class="topo">
-    <a class="marca" th:href="@{/tutor}">
-        <span class="marca-ponto"></span>
-        Clyvo<strong>Vet</strong>
-    </a>
-
-    <nav class="menu">
-        <a th:each="p : ${pets}"
-           th:href="@{/tutor/pets/{id}(id=${p.id})}"
-           th:text="${p.nome}"
-           th:classappend="${pet != null and pet.id == p.id} ? 'ativo'">Pet</a>
-    </nav>
-
-    <div class="sessao">
-        <span class="sessao-nome" th:text="${tutor.nome}">Tutor</span>
-        <form th:action="@{/logout}" method="post">
-            <button type="submit" class="botao-texto">Sair</button>
-        </form>
-    </div>
-</header>
+<div th:replace="~{tutor/cabecalho :: topo(${pets}, ${pet}, ${tutor}, ${naoLidas}, 'pet')}"></div>
 
 <main class="conteudo">
 
