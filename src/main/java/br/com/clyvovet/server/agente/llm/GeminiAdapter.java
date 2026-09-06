@@ -19,7 +19,7 @@ import java.util.Map;
  * <p>Escolhido por custo: o tier gratuito atende a demonstracao inteira sem
  * cartao. Essa escolha e tambem a razao de existir {@link ProvedorLlm} — um tier
  * gratuito pode mudar limite ou sumir, e quando isso acontecer trocar de
- * provedor tem que ser mudar {@code clyvo.agente.provedor}, e nao reescrever o
+ * provedor tem que ser mudar {@code app.agente.provedor}, e nao reescrever o
  * modulo.
  *
  * <p>RestClient direto, sem SDK, pelo mesmo motivo do adaptador da Anthropic: o

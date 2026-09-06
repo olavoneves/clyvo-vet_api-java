@@ -16,7 +16,7 @@ import java.util.List;
  * Fala com a API de mensagens da Anthropic. Provedor alternativo.
  *
  * <p>Foi o provedor original deste modulo e continua inteiro, atras de
- * {@code clyvo.agente.provedor=anthropic}. Nao esta aqui por nostalgia: e o que
+ * {@code app.agente.provedor=anthropic}. Nao esta aqui por nostalgia: e o que
  * torna a porta verificavel. Uma interface com uma implementacao so e uma
  * hipotese sobre desacoplamento; com duas, o teste que roda o mesmo laco contra
  * os dois formatos de fio prova que o {@code AgenteService} nao sabe quem esta
