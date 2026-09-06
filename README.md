@@ -42,8 +42,13 @@ A plataforma conecta tutores de pets, clínicas veterinárias e o ecossistema de
 - Agendamento de consultas e registro de anamneses
 - Controle de vacinação e prescrições médicas
 - Monitoramento via sensores IoT com alertas inteligentes
-- Autenticação JWT (access token 15min + refresh token 7 dias)
-- Agente de agendamento conversacional, que fecha o ciclo do lembrete até a receita
+- Autenticação JWT (access token 15min + refresh token 7 dias) e multi-tenancy por clínica
+- **Motor de protocolo em PL/SQL**: registrar uma consulta materializa as obrigações
+  futuras de cuidado, com máquina de estados, auditoria encadeada e outbox
+- **Lembrete automático**: um job diário persegue a obrigação e leva o aviso ao tutor
+- **Agente de agendamento conversacional**, que fecha o ciclo do lembrete até a consulta
+- **Painel de receita recuperada**, com grupo de controle para separar o que o produto
+  causou do que teria acontecido de qualquer jeito
 - Documentação interativa via Swagger
 
 ---
@@ -55,8 +60,13 @@ A plataforma conecta tutores de pets, clínicas veterinárias e o ecossistema de
 | Linguagem | Java 21 |
 | Framework | Spring Boot 4.0.6 |
 | Banco de Dados | Oracle XE 21c (Docker) / Oracle FIAP |
-| Autenticação | JWT manual — JJWT 0.12.6 (HS256) |
+| Migrations | Flyway (core + `flyway-database-oracle`) |
+| Telas | Thymeleaf + `thymeleaf-extras-springsecurity6`, CSS próprio, Chart.js 4.4.7 |
+| Autenticação | JWT manual — JJWT 0.12.6 (HS256) + `formLogin` para as telas |
 | Criptografia | BCrypt via spring-security-crypto |
+| Cache | Caffeine (só o catálogo de protocolos) |
+| Rate limit | Bucket4j 8.7.0, em memória, por IP |
+| LLM do agente | Porta `ProvedorLlm` — Gemini (ativo) ou Anthropic, por propriedade |
 | Documentação | SpringDoc OpenAPI 2.8.9 (Swagger UI) |
 | Build | Maven 3.9 (wrapper `mvnw`) |
 | Containerização | Docker multi-stage + Docker Compose |
@@ -69,8 +79,16 @@ A plataforma conecta tutores de pets, clínicas veterinárias e o ecossistema de
 ```
 br.com.clyvovet.server
 ├── agente/         # Agente de agendamento: laço, ferramentas, guardrail clínico
-├── auth/           # Login, RefreshToken, JwtService, AuthService
-├── config/         # AppConfig, AuthInterceptor, WebConfig, DataInitializer
+│   └── llm/        # Porta ProvedorLlm + adaptadores Gemini e Anthropic
+├── obrigacao/      # Motor de protocolo: obrigações, transições, web/
+├── protocolo/      # Catálogo clínico: protocolo, versão, etapa, regra de ativação
+├── notificacao/    # Caixa do tutor, emissor e a varredura agendada de lembretes
+├── painel/         # Receita recuperada e coorte tratado × controle
+├── outbox/         # OutboxEvent — fila de integração escrita pelo motor
+├── tenant/         # TenantContext, TenantFilter e as condições do @Filter
+├── ratelimit/      # Bucket4j por IP, com teto menor nas rotas de auth
+├── auth/           # Login, RefreshToken, JwtService, AuthService, web/
+├── config/         # SecurityConfig, WebMvcConfig, CacheConfig, OpenApiConfig, DataInitializer
 ├── exception/      # GlobalExceptionHandler, exceções customizadas
 ├── converter/      # SimNaoConverter (Boolean ↔ 'S'/'N')
 ├── enums/          # Todos os enums do domínio
@@ -276,6 +294,17 @@ A documentação completa está disponível via Swagger em `/swagger-ui.html`.
 > aplicado no handler mapping (`WebMvcConfig`), para que as telas Thymeleaf possam
 > ocupar `/pets`, `/agenda` e `/painel/receita` sem colidir com a API.
 
+### Telas (Thymeleaf, fora do `/api`)
+
+| Rota | Perfil | Tela |
+|---|---|---|
+| `/painel/receita` | equipe | Funil do mês, receita recuperada e coorte tratado × controle |
+| `/agenda` | equipe | Compromissos por data do compromisso, com a obrigação atrás |
+| `/pets`, `/pets/{id}` | equipe | Lista e ficha, com as obrigações do protocolo |
+| `POST /obrigacoes/{id}/lembrete` | equipe | Antecipa o lembrete de uma obrigação |
+| `/tutor/pets/{id}` | tutor | Ficha do pet e a conversa com o agente |
+| `/tutor/caixa` | tutor | Caixa de entrada dos lembretes |
+
 ### Exemplo de uso via curl
 
 ```bash
@@ -417,8 +446,8 @@ obrigação e entra no painel de receita recuperada.
 
 ### Como funciona
 
-Sem framework de agente. Um `RestClient` chamando a API de mensagens da
-Anthropic, com ferramentas declaradas e laço de execução próprio:
+Sem framework de agente. Um `RestClient` chamando a API do provedor de LLM, com
+ferramentas declaradas e laço de execução próprio:
 
 1. Recebe a mensagem do tutor
 2. Monta a requisição com o histórico e a lista de ferramentas
@@ -427,7 +456,33 @@ Anthropic, com ferramentas declaradas e laço de execução próprio:
 4. Quando a resposta é texto, entrega ao tutor
 5. Teto de 6 voltas por turno; ao estourar, escala para o veterinário
 
-Modelo: `claude-sonnet-4-6`. A chave vem de `ANTHROPIC_API_KEY`, nunca do código.
+### Qual LLM atende
+
+O módulo não sabe quem está do outro lado. Há uma porta — `ProvedorLlm` — e dois
+adaptadores; `app.agente.provedor` escolhe qual bean sobe, e é a **única** mudança
+necessária para trocar de fornecedor.
+
+| | Ativo | Alternativo |
+|---|---|---|
+| Provedor | **Gemini** | Anthropic |
+| Modelo | `gemini-3.1-flash-lite` | `claude-sonnet-4-6` |
+| Chave | `GEMINI_API_KEY` | `ANTHROPIC_API_KEY` |
+
+**Gemini por custo**, e não por qualidade: o tier gratuito cobre a demonstração
+inteira e este projeto não pode ter custo. A escolha do modelo dentro do Gemini
+também é de cota — no tier gratuito o limite é por modelo e por dia, e nos `flash`
+ele é de **20 requisições/dia**, que uma única conversa consome (cada volta do laço
+é uma requisição). Os `flash-lite` têm cota folgada, e são a única família que
+sustenta uma demonstração inteira.
+
+Duas armadilhas do Gemini que custaram uma sessão cada, registradas no código:
+
+- **Listar o modelo não prova que ele atende.** `gemini-2.5-flash` aparece em
+  `/v1beta/models` e o `generateContent` o recusa para chaves novas
+  (*"no longer available to new users"*).
+- **O `thoughtSignature` da chamada de ferramenta tem que voltar.** Sem devolvê-lo
+  junto do `functionResponse`, a segunda volta do laço leva `400` — e só a segunda,
+  então o erro não aparece em nenhuma conversa de uma pergunta só.
 
 ### Ferramentas
 
@@ -474,9 +529,16 @@ outbox.
 
 ### Resiliência
 
-- Timeout de 30s; ao estourar, mensagem de indisponibilidade e escalonamento
-- Retry com backoff apenas em `429` e `5xx`, no máximo 2 tentativas extras
-- **Sem `ANTHROPIC_API_KEY` a aplicação sobe normalmente** e apenas
+- Timeout de **60s**; ao estourar, mensagem de indisponibilidade e escalonamento.
+  Não são 30s porque o teto tem que ser maior que a pior resposta aceitável, e não
+  igual a ela: com 30s o modelo estourava em parte das voltas e o tutor via a
+  mensagem de indisponibilidade no meio de uma conversa que ia bem
+- Retry com backoff apenas em `429` e `5xx`, no máximo 2 tentativas extras;
+  timeout escala direto, sem retentar
+- **Falha do provedor nunca vira `500`.** Timeout na leitura chega como
+  `RestClientException` e não como `ResourceAccessException` — escapava do `catch`
+  e vazava stack trace. Hoje qualquer falha do provedor sai como indisponibilidade
+- **Sem a chave do provedor ativo a aplicação sobe normalmente** e apenas
   `/api/agente/**` responde `503`. Nada mais no sistema depende disso.
 - Concorrência: `criar_agendamento` trava a linha do veterinário
   (`SELECT ... FOR UPDATE`) e revalida a disponibilidade dentro da transação; o
@@ -493,10 +555,23 @@ Não é o app do tutor: é a tela que fecha o laço da demonstração.
 
 ### Roteiro da demonstração
 
-Veterinário registra consulta no painel → a obrigação futura aparece, gerada pelo
-motor → tutor abre `/tutor/pets/{id}`, vê a pendência → escreve pedindo horário →
-o agente propõe, o tutor escolhe, confirma → o agendamento aparece na agenda do
-veterinário → o painel de receita recuperada sobe.
+A cadeia inteira, sem passo manual no meio:
+
+1. Veterinário registra a consulta → o **motor de protocolo** materializa as
+   obrigações futuras de cuidado daquele pet
+2. A **varredura diária** encontra a obrigação cuja janela de antecedência abriu e
+   a leva a `NOTIFICADA` — e a transição faz nascer o lembrete
+3. O tutor abre `/tutor/caixa`, vê o lembrete, e daí vai para `/tutor/pets/{id}`
+4. Escreve pedindo horário → o **agente** consulta a agenda real, propõe, o tutor
+   escolhe e confirma
+5. O agendamento aparece na **agenda do veterinário**, com a obrigação atrás
+6. O **painel de receita recuperada** sobe, e o card de coorte mostra quanto disso
+   o produto causou
+
+> Para apresentar sem esperar o cron das 8h, use o botão **Antecipar lembrete** na
+> ficha do pet — ele faz exatamente a mesma transição que o job faria. Ele não
+> aparece para pet do grupo de controle, o que também é parte do que há para
+> mostrar.
 
 ### Testes
 
@@ -507,8 +582,11 @@ tutor. A qualidade da escolha do modelo não é testável com stub, e o Javadoc 
 `AgenteServiceTest` diz isso explicitamente.
 
 ```bash
-./mvnw test -Dtest='Agente*,GuardrailClinicoTest'
+./mvnw test -Dtest='Agente*,GuardrailClinicoTest,PortabilidadeDoProvedorTest'
 ```
+
+`PortabilidadeDoProvedorTest` roda o mesmo diálogo contra os dois adaptadores: é o
+que impede a porta de vazar o formato de um fornecedor para dentro do laço.
 
 ---
 
@@ -579,7 +657,8 @@ Swagger: `http://localhost:8080/swagger-ui.html`
 | `SPRING_DATASOURCE_PASSWORD` | Senha Oracle | — (obrigatória) |
 | `JWT_SECRET` | Secret HS256 (mín. 32 chars) | — (obrigatória) |
 | `CORS_ALLOWED_ORIGINS` | Origens autorizadas a chamar `/api` de um navegador, separadas por vírgula | vazio (nenhuma) |
-| `ANTHROPIC_API_KEY` | Chave da API da Anthropic, usada pelo agente de agendamento | vazio (agente desligado) |
+| `GEMINI_API_KEY` | Chave do Gemini — **o provedor ativo** do agente | vazio (agente responde 503) |
+| `ANTHROPIC_API_KEY` | Chave da Anthropic, para o provedor alternativo | vazio |
 | `PORT` | Porta HTTP | `8080` |
 | `SPRING_JPA_HIBERNATE_DDL_AUTO` | DDL auto | `none` |
 

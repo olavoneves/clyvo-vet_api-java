@@ -6,20 +6,42 @@
   graficos usem a mesma paleta que o resto da pagina em vez de cores soltas.
 */
 
+/*
+  A paleta da marca e azul, e os neutros sao levemente azulados para acompanhar.
+
+  A troca veio do verde-petroleo anterior e foi calibrada por CONTRASTE, e nao
+  por matiz: azul e perceptualmente mais escuro que verde na mesma luminosidade
+  de HSL, entao uma rotacao pura de matiz teria deixado a interface visivelmente
+  mais pesada. Os dois tons da marca foram escolhidos para bater a razao de
+  contraste dos que substituem — 5,2:1 e 8,1:1 sobre branco, os mesmos do
+  #1f7a6b e do #17594f. O peso da tela nao muda; so a cor.
+
+  O matiz da marca e 204 (azul-oceano), e nao os ~217 do azul de "agendada" mais
+  abaixo: as etiquetas de estado tem vocabulario proprio de cor, e a marca nao
+  pode se confundir com um significado. Verde continua existindo na tela — mas
+  agora so onde quer dizer "acabou bem".
+*/
 :root {
-    --cor-primaria: #1f7a6b;
-    --cor-primaria-escura: #17594f;
-    --cor-neutra: #b9c4c2;
-    --cor-grade: #e7ecea;
-    --cor-texto: #16221f;
-    --cor-texto-suave: #61726e;
-    --cor-fundo: #f4f7f6;
+    --cor-primaria: #2773a5;
+    --cor-primaria-escura: #1d5478;
+    /* superficies tingidas da marca: menu ativo, cartao, fala do tutor */
+    --cor-primaria-tenue: #e8eff5;
+    --cor-primaria-tenue-borda: #bcd5e6;
+    --cor-neutra: #b9c0c4;
+    --cor-grade: #e7eaec;
+    --cor-texto: #161d22;
+    --cor-texto-suave: #616b72;
+    --cor-fundo: #f4f6f7;
     --cor-superficie: #ffffff;
-    --cor-borda: #dfe6e4;
+    --cor-borda: #dfe3e6;
     --cor-erro: #b3261e;
     --cor-alerta: #b06d00;
+    /* verde de "acabou bem": nao e mais cor de marca, e so significado */
+    --cor-sucesso: #17594f;
+    --cor-sucesso-tenue: #e4f3ee;
+    --cor-sucesso-tenue-borda: #b9dfd2;
     --raio: 10px;
-    --sombra: 0 1px 2px rgba(22, 34, 31, .06), 0 4px 12px rgba(22, 34, 31, .04);
+    --sombra: 0 1px 2px rgba(22, 29, 34, .06), 0 4px 12px rgba(22, 29, 34, .04);
 }
 
 * { box-sizing: border-box; }
@@ -99,7 +121,7 @@ a { color: var(--cor-primaria-escura); }
 
 .menu a:hover { background: var(--cor-fundo); color: var(--cor-texto); }
 
-.menu a.ativo { background: #e8f2f0; color: var(--cor-primaria-escura); }
+.menu a.ativo { background: var(--cor-primaria-tenue); color: var(--cor-primaria-escura); }
 
 .sessao { display: flex; align-items: center; gap: 14px; }
 .sessao form { margin: 0; }
@@ -295,7 +317,7 @@ a { color: var(--cor-primaria-escura); }
 .grupo-taxa.vazio { font-size: 16px; font-weight: 500; color: var(--cor-texto-suave); }
 .grupo-detalhe { font-size: 12.5px; color: var(--cor-texto-suave); }
 
-.cartao-lift { background: #e8f2f0; }
+.cartao-lift { background: var(--cor-primaria-tenue); }
 
 /* Nota de metodo: precisa ser legivel, nao invisivel — quem apresenta tem que
    poder apontar para ela quando perguntarem de onde vem o numero. */
@@ -376,7 +398,7 @@ a { color: var(--cor-primaria-escura); }
   Ambar: esperando acao.   Vermelho: perdeu.   Cinza: saiu do fluxo.
 */
 .etiqueta-cumprida, .etiqueta-realizado,
-.etiqueta-ativo { background: #e4f3ee; border-color: #b9dfd2; color: #17594f; }
+.etiqueta-ativo { background: var(--cor-sucesso-tenue); border-color: var(--cor-sucesso-tenue-borda); color: var(--cor-sucesso); }
 
 .etiqueta-agendada, .etiqueta-confirmado,
 .etiqueta-respondida { background: #e6eefb; border-color: #c2d5f2; color: #1e4b8f; }
@@ -387,7 +409,7 @@ a { color: var(--cor-primaria-escura); }
 .etiqueta-perdida, .etiqueta-obito { background: #fbe9e7; border-color: #f2c6c1; color: #9a2c22; }
 
 .etiqueta-cancelada, .etiqueta-cancelado,
-.etiqueta-inativo { background: #eef0ef; border-color: #dcdfde; color: #5b6664; }
+.etiqueta-inativo { background: #eef0f2; border-color: #dcdfe2; color: #5b646a; }
 
 /*
   Compromisso que recupera uma obrigacao vencida. Ambar, e nao vermelho: a
@@ -482,7 +504,7 @@ a { color: var(--cor-primaria-escura); }
 }
 
 .aviso-erro { background: #fbe9e7; border: 1px solid #f2c6c1; color: var(--cor-erro); }
-.aviso-ok { background: #e4f3ee; border: 1px solid #b9dfd2; color: var(--cor-primaria-escura); }
+.aviso-ok { background: var(--cor-sucesso-tenue); border: 1px solid var(--cor-sucesso-tenue-borda); color: var(--cor-sucesso); }
 
 /* ---------- rodape ---------- */
 
@@ -568,8 +590,8 @@ a { color: var(--cor-primaria-escura); }
 
 .fala-tutor {
     align-self: flex-end;
-    background: #e8f2f0;
-    border: 1px solid #b9dfd2;
+    background: var(--cor-primaria-tenue);
+    border: 1px solid var(--cor-primaria-tenue-borda);
     color: var(--cor-primaria-escura);
 }
 
@@ -602,7 +624,7 @@ a { color: var(--cor-primaria-escura); }
 .conversa-envio input:focus {
     outline: none;
     border-color: var(--cor-primaria);
-    box-shadow: 0 0 0 3px rgba(31, 122, 107, .12);
+    box-shadow: 0 0 0 3px rgba(39, 115, 165, .14);
 }
 
 .conversa-envio .botao-principal { width: auto; margin: 0; padding: 11px 20px; }
@@ -714,7 +736,7 @@ a { color: var(--cor-primaria-escura); }
 
 /* nao lida pesa mais: fundo proprio e barra na lateral, alem do ponto */
 .caixa-nova .caixa-item {
-    background: #fbfdfc;
+    background: #fbfcfd;
     box-shadow: inset 3px 0 0 var(--cor-primaria);
 }
 
