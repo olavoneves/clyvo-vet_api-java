@@ -61,46 +61,63 @@
         </p>
     </section>
 
-    <!-- 3. Tratado vs. controle: a unica leitura honesta do quanto o produto causou -->
+    <!-- 3. Coorte: a unica leitura honesta do quanto o produto causou -->
     <section class="bloco">
         <h2 class="titulo-bloco">Tratado vs. grupo de controle</h2>
         <p class="ajuda">
-            O grupo de controle é sorteado para não receber lembrete. A diferença entre as
-            duas taxas é a parte do resultado que o produto causou — o resto teria acontecido
-            de qualquer forma.
-            <strong th:if="${painel.comparacao.janelaInicio != null}"
-                    th:text="|Recorte: toda a janela disponível, de ${#temporals.format(painel.comparacao.janelaInicio, 'MM/yyyy')} a ${#temporals.format(painel.comparacao.janelaFim, 'MM/yyyy')} — não apenas o mês acima.|">Recorte</strong>
+            O grupo de controle é sorteado para não receber lembrete e não passa pelo
+            agente de agendamento. A diferença entre as duas taxas é a parte do resultado
+            que o produto causou — o resto teria acontecido de qualquer forma.
+            Contam aqui só as obrigações que já se resolveram: uma que ainda vai vencer
+            não é uma falta.
         </p>
 
-        <div class="comparacao">
-            <div class="comparacao-numeros">
-                <div class="grupo-cartao">
-                    <span class="grupo-nome">Tratado</span>
-                    <span class="grupo-taxa" th:if="${painel.comparacao.tratado.pcComparecimento != null}"
-                          th:text="${#numbers.formatDecimal(painel.comparacao.tratado.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
-                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.tratado.pcComparecimento == null}">sem dados</span>
-                    <span class="grupo-detalhe"
-                          th:text="|${painel.comparacao.tratado.cumpridas} de ${painel.comparacao.tratado.obrigacoes} obrigações cumpridas|">0 de 0</span>
-                </div>
+        <!--
+          Sem amostra o card nao mostra numero nenhum. Um delta tirado de meia
+          duzia de pets parece medido e nao e: com um pet no controle esta base
+          chegou a dizer que o produto derrubava o comparecimento em vinte pontos.
+        -->
+        <p class="ajuda aviso-amostra" th:unless="${coorte.amostraSuficiente}">
+            Amostra insuficiente para comparação: o grupo de controle tem
+            <strong th:text="|${coorte.controle.pets} pet(s)|">0</strong>,
+            e abaixo de 10 um único tutor move a taxa em dezenas de pontos.
+        </p>
 
-                <div class="grupo-cartao">
-                    <span class="grupo-nome">Controle</span>
-                    <span class="grupo-taxa" th:if="${painel.comparacao.controle.pcComparecimento != null}"
-                          th:text="${#numbers.formatDecimal(painel.comparacao.controle.pcComparecimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</span>
-                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.controle.pcComparecimento == null}">sem dados</span>
-                    <span class="grupo-detalhe"
-                          th:text="|${painel.comparacao.controle.cumpridas} de ${painel.comparacao.controle.obrigacoes} obrigações cumpridas|">0 de 0</span>
-                </div>
-
-                <div class="grupo-cartao cartao-lift">
-                    <span class="grupo-nome">Diferença</span>
-                    <span class="grupo-taxa lift" th:if="${painel.comparacao.deltaPontosPercentuais != null}"
-                          th:text="(${painel.comparacao.deltaPontosPercentuais.signum() > 0} ? '+' : '') + ${#numbers.formatDecimal(painel.comparacao.deltaPontosPercentuais, 1, 'POINT', 1, 'COMMA')} + ' p.p.'">+0 p.p.</span>
-                    <span class="grupo-taxa vazio" th:if="${painel.comparacao.deltaPontosPercentuais == null}">sem comparação</span>
-                    <span class="grupo-detalhe"
-                          th:text="|sobre ${painel.comparacao.tratado.obrigacoes + painel.comparacao.controle.obrigacoes} obrigações|">base</span>
-                </div>
+        <div class="coorte" th:if="${coorte.amostraSuficiente}">
+            <!-- o delta e o numero da banca: e o maior elemento do card -->
+            <div class="coorte-delta">
+                <span class="coorte-delta-valor"
+                      th:text="(${coorte.deltaPontosPercentuais.signum() > 0} ? '+' : '')
+                             + ${#numbers.formatDecimal(coorte.deltaPontosPercentuais, 1, 'POINT', 1, 'COMMA')}
+                             + ' p.p.'">+0 p.p.</span>
+                <span class="coorte-delta-rotulo">a mais de comparecimento no grupo tratado</span>
             </div>
+
+            <dl class="coorte-apoio">
+                <div>
+                    <dt>Tratado</dt>
+                    <dd th:text="${#numbers.formatDecimal(coorte.tratado.pcCumprimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</dd>
+                    <dd class="coorte-base"
+                        th:text="|${coorte.tratado.cumpridas} de ${coorte.tratado.obrigacoes} · ${coorte.tratado.pets} pets|">base</dd>
+                </div>
+                <div>
+                    <dt>Controle</dt>
+                    <dd th:text="${#numbers.formatDecimal(coorte.controle.pcCumprimento, 1, 'POINT', 1, 'COMMA')} + '%'">0%</dd>
+                    <dd class="coorte-base"
+                        th:text="|${coorte.controle.cumpridas} de ${coorte.controle.obrigacoes} · ${coorte.controle.pets} pets|">base</dd>
+                </div>
+                <div>
+                    <dt>Consultas atribuíveis</dt>
+                    <dd th:text="${coorte.consultasAtribuiveis}">0</dd>
+                    <dd class="coorte-base">que não teriam acontecido</dd>
+                </div>
+                <div>
+                    <dt>Valor</dt>
+                    <dd th:text="'R$ ' + ${#numbers.formatDecimal(coorte.vlAtribuivel, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</dd>
+                    <dd class="coorte-base"
+                        th:text="|ticket médio de R$ ${#numbers.formatDecimal(coorte.vlTicketMedio, 1, 'POINT', 2, 'COMMA')}|">ticket</dd>
+                </div>
+            </dl>
 
             <div class="grafico-caixa grafico-comparacao">
                 <canvas id="graficoComparacao" height="200"></canvas>
@@ -151,7 +168,10 @@
         })
     });
 
-    new Chart(document.getElementById('graficoComparacao'), {
+    // o canvas da coorte so existe quando ha amostra: sem esta guarda o Chart
+    // recebe null e o erro derruba o resto do script, inclusive o funil acima
+    const canvasCoorte = document.getElementById('graficoComparacao');
+    if (canvasCoorte) new Chart(canvasCoorte, {
         type: 'bar',
         data: {
             // o n vai no proprio rotulo do eixo: quem olha so o grafico

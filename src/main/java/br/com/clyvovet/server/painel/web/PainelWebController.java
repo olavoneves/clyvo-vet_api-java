@@ -2,6 +2,8 @@ package br.com.clyvovet.server.painel.web;
 
 import br.com.clyvovet.server.painel.PainelReceitaResponse;
 import br.com.clyvovet.server.painel.PainelReceitaService;
+import br.com.clyvovet.server.painel.CoorteResponse;
+import br.com.clyvovet.server.painel.PainelCoorteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
@@ -24,6 +26,7 @@ import java.time.LocalDate;
 public class PainelWebController {
 
     private final PainelReceitaService service;
+    private final PainelCoorteService coorteService;
 
     /** A clinica entra pelo painel: e o que ela quer ver ao abrir o sistema. */
     @GetMapping("/")
@@ -45,7 +48,9 @@ public class PainelWebController {
         // as duas listas alimentam ao mesmo tempo o HTML e os graficos: um so
         // recorte dos dados, para a barra nunca contar algo diferente do texto
         model.addAttribute("etapasFunil", FunilView.de(painel.funil()));
-        model.addAttribute("gruposComparacao", ComparacaoView.de(painel));
+        CoorteResponse coorte = coorteService.daClinicaLogada();
+        model.addAttribute("coorte", coorte);
+        model.addAttribute("gruposComparacao", ComparacaoView.de(coorte));
         model.addAttribute("mesAtual", referencia);
         model.addAttribute("mesAnterior", referencia.minusMonths(1));
         // o mes seguinte so faz sentido enquanto nao passa do mes corrente:

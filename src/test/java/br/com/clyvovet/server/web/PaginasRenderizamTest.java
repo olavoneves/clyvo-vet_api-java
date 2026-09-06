@@ -14,6 +14,8 @@ import br.com.clyvovet.server.enums.TipoUsuario;
 import br.com.clyvovet.server.exception.EntityNotFoundException;
 import br.com.clyvovet.server.obrigacao.ObrigacaoResponse;
 import br.com.clyvovet.server.agendamento.AgendaService;
+import br.com.clyvovet.server.painel.CoorteResponse;
+import br.com.clyvovet.server.painel.PainelCoorteService;
 import br.com.clyvovet.server.agendamento.CompromissoDaAgenda;
 import br.com.clyvovet.server.enums.AgendamentoStatus;
 import br.com.clyvovet.server.enums.CanalPreferencial;
@@ -105,6 +107,9 @@ class PaginasRenderizamTest {
     @MockitoBean
     private AgendaService agendaService;
 
+    @MockitoBean
+    private PainelCoorteService coorteService;
+
     @Test
     void loginRenderizaSemAutenticacao() throws Exception {
         mockMvc.perform(get("/login"))
@@ -122,6 +127,7 @@ class PaginasRenderizamTest {
     @Test
     void painelRenderizaComFunilNumeroEComparacao() throws Exception {
         given(painelService.doMes(any(LocalDate.class))).willReturn(painelDeExemplo());
+        given(coorteService.daClinicaLogada()).willReturn(coorteDeExemplo());
 
         mockMvc.perform(get("/painel/receita").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
@@ -130,22 +136,75 @@ class PaginasRenderizamTest {
                         org.hamcrest.Matchers.containsString("graficoFunil"),
                         org.hamcrest.Matchers.containsString("graficoComparacao"),
                         // o delta precisa chegar formatado na tela, nao so no JSON do grafico
-                        org.hamcrest.Matchers.containsString("p.p."),
+                        org.hamcrest.Matchers.containsString("+26,3 p.p."),
                         // base amostral visivel: delta sem denominador ao lado nao se defende
-                        org.hamcrest.Matchers.containsString("833 de 1411"),
-                        org.hamcrest.Matchers.containsString("66 de 202"),
+                        org.hamcrest.Matchers.containsString("1633 de 2764 · 218 pets"),
+                        org.hamcrest.Matchers.containsString("100 de 305 · 27 pets"),
+                        // as duas metades do numero em reais
+                        org.hamcrest.Matchers.containsString("727"),
+                        org.hamcrest.Matchers.containsString("R$ 147.442,87"),
                         // e a origem do numero declarada na propria tela
-                        org.hamcrest.Matchers.containsString("sorteio determinístico por pet"))));
+                        org.hamcrest.Matchers.containsString("sorteio determinístico por pet"),
+                        org.hamcrest.Matchers.containsString("Dados de demonstração"))));
     }
 
-    /** Painel de mes sem movimento: as divisoes do funil nao podem estourar. */
+    /**
+     * A guarda de amostra na tela.
+     *
+     * <p>Com o controle pequeno, o card nao pode mostrar delta nem valor — foi
+     * assim que a base local chegou a afirmar que o produto derrubava o
+     * comparecimento em vinte pontos, sobre um pet.
+     */
     @Test
-    void painelRenderizaMesZerado() throws Exception {
-        given(painelService.doMes(any(LocalDate.class))).willReturn(painelVazio());
+    void painelTrocaODeltaPelaRessalvaQuandoAAmostraENpequena() throws Exception {
+        given(painelService.doMes(any(LocalDate.class))).willReturn(painelDeExemplo());
+        given(coorteService.daClinicaLogada()).willReturn(new CoorteResponse(
+                new CoorteResponse.Grupo(300, 177, 40, new BigDecimal("59.00")),
+                new CoorteResponse.Grupo(10, 8, 1, new BigDecimal("80.00")),
+                new BigDecimal("-21.00"), 0, BigDecimal.ZERO,
+                new BigDecimal("200.00"), false));
 
         mockMvc.perform(get("/painel/receita").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("sem dados")));
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Amostra insuficiente"),
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("p.p.")),
+                        // a ressalva nao dispensa o rodape de metodo
+                        org.hamcrest.Matchers.containsString("sorteio determinístico por pet"))));
+    }
+
+    private static CoorteResponse coorteDeExemplo() {
+        return new CoorteResponse(
+                new CoorteResponse.Grupo(2764, 1633, 218, new BigDecimal("59.08")),
+                new CoorteResponse.Grupo(305, 100, 27, new BigDecimal("32.79")),
+                new BigDecimal("26.29"),
+                727,
+                new BigDecimal("147442.87"),
+                new BigDecimal("202.81"),
+                true);
+    }
+
+    /**
+     * Painel de mes sem movimento: as divisoes do funil nao podem estourar, e a
+     * coorte sem nenhum grupo tambem nao pode derrubar a pagina — clinica nova
+     * comeca exatamente assim.
+     */
+    @Test
+    void painelRenderizaMesZerado() throws Exception {
+        given(painelService.doMes(any(LocalDate.class))).willReturn(painelVazio());
+        given(coorteService.daClinicaLogada()).willReturn(new CoorteResponse(
+                CoorteResponse.Grupo.vazio(), CoorteResponse.Grupo.vazio(),
+                null, 0, BigDecimal.ZERO, BigDecimal.ZERO, false));
+
+        mockMvc.perform(get("/painel/receita").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        // clinica sem coorte cai na ressalva, que substituiu o
+                        // "sem dados" do bloco antigo de comparacao
+                        org.hamcrest.Matchers.containsString("Amostra insuficiente"),
+                        org.hamcrest.Matchers.containsString("0 pet(s)"),
+                        org.hamcrest.Matchers.containsString("Receita recuperada este mês"))));
     }
 
     @Test
