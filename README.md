@@ -21,6 +21,9 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 - [Agente de Agendamento](#-agente-de-agendamento)
 - [Rodando Localmente](#-rodando-localmente)
 - [Variáveis de Ambiente](#-variáveis-de-ambiente)
+- [Mapa dos Requisitos](#-mapa-dos-requisitos)
+- [Decisões de Arquitetura](#-decisões-de-arquitetura)
+- [Uso de IA no Desenvolvimento](#-uso-de-ia-no-desenvolvimento)
 - [Deploy — Render](#-deploy--render)
 - [Git Flow](#-git-flow)
 - [Screenshots](#-screenshots)
@@ -346,6 +349,28 @@ que o produziram. Toda leitura usa a flag gravada — nunca recalcula em Java, n
 a função de novo. Duas fontes da mesma verdade divergiriam no dia em que os parâmetros do
 sorteio mudassem, e aí ninguém saberia qual delas o número da tela usou.
 
+### ⚠️ O que é real e o que é simulado
+
+Este é um projeto acadêmico e não tem 18 meses de clínica de verdade atrás dele. A
+distinção importa, e é melhor deixá-la escrita do que deixá-la subentendida:
+
+| | Situação |
+|---|---|
+| Sorteio do grupo de controle | **Real.** `FN_CLV_GRUPO_CONTROLE` usa `SHA256` sobre um seed determinístico por pet, persiste flag e hash, e é auditável depois do fato |
+| Separação de caminho no motor | **Real.** A varredura de lembretes exclui o controle no `WHERE`, o botão da ficha não aparece para ele e a rota recusa o POST. Um pet de controle não recebe lembrete nem entra no agente |
+| Agregação e aritmética do painel | **Reais.** `VW_CLV_PAINEL_COORTE` conta as linhas que existem, e o delta, as consultas atribuíveis e o valor saem dessa contagem |
+| **Os desfechos dos 18 meses** | **Simulados.** `PR_CLV_SEED_DESFECHOS` sorteia quem cumpriu e quem perdeu com taxas **declaradas nos parâmetros da própria procedure** — hoje `p_taxa_tratado => 0.58` e `p_taxa_controle => 0.36` |
+
+Ou seja: **o mecanismo é real, o histórico é sintético.** Os +25 p.p. que o painel mostra
+não são uma descoberta — são, aproximadamente, a diferença que o seed foi instruído a
+produzir, e é por isso que o teste de integração confere a taxa da view contra o parâmetro
+da procedure em vez de contra um número escrito no teste.
+
+O que o painel demonstra de verdade é que **a instrumentação está de pé**: se estas
+clínicas fossem reais, o número apareceria por este caminho, medido deste jeito, com o
+controle protegido por estas guardas. É o encanamento que está pronto para receber dados
+de verdade — não a evidência clínica.
+
 ### O denominador são as obrigações resolvidas
 
 `VW_CLV_PAINEL_COORTE` conta apenas `CUMPRIDA` e `PERDIDA`. Uma obrigação que ainda está
@@ -641,16 +666,198 @@ que impede a porta de vazar o formato de um fornecedor para dentro do laço.
 
 ---
 
+## 🗺️ Mapa dos Requisitos
+
+Onde cada item avaliado está no código.
+
+### 1. Camada de visualização
+
+Thymeleaf, templates em `src/main/resources/templates/`, folha de estilo única em
+`src/main/resources/static/css/app.css`. Não há framework de CSS: o conjunto de
+componentes é pequeno e cabe inteiro numa folha.
+
+| Tela | Template | Controller |
+|---|---|---|
+| Login (equipe e tutor) | `login.html` | `auth/web/LoginWebController` |
+| Painel de receita e coorte | `painel/receita.html` | `painel/web/PainelWebController` |
+| Agenda da clínica | `agenda/lista.html` | `obrigacao/web/AgendaWebController` |
+| Lista de pets | `pets/lista.html` | `pet/web/PetWebController` |
+| Ficha do pet | `pets/detalhe.html` | `pet/web/PetWebController` |
+| Antecipar lembrete | — (só POST) | `obrigacao/web/LembreteWebController` |
+| Caixa de lembretes do tutor | `tutor/caixa.html` | `notificacao/web/NotificacaoWebController` |
+| Pet e conversa do tutor | `tutor/pet.html` | `tutor/web/TutorWebController` |
+| Layout e cabeçalhos | `layout.html`, `tutor/cabecalho.html` | — |
+| Erro | `error.html` | — |
+
+Os gráficos do painel são Chart.js alimentados pelo modelo — série, rótulos e escala saem
+de consulta, nunca de array literal (`FunilView`, `ComparacaoView`).
+
+### 2. Flyway
+
+`src/main/resources/db/migration/`, **V0 a V13**. A tabela completa está em
+[Banco de Dados](#-banco-de-dados); em faixas:
+
+| Faixa | O que faz |
+|---|---|
+| `V0` – `V0.1` | Schema base: 23 tabelas e, em passo separado, as foreign keys |
+| `V1` – `V6` | Autenticação, colaborador, multi-tenancy (`id_clinica`) e campos de negócio |
+| `V7` | **Motor de protocolo**: catálogo, obrigações, outbox, auditoria encadeada, funções, procedures e a view do painel |
+| `V8` | Gerador de dados de demonstração (`PR_CLV_SEED_*`) — nada aqui é chamado pela aplicação |
+| `V9` | Catálogo clínico: espécies, raças e 26 protocolos, com correções de regra do motor |
+| `V10` – `V13` | Senhas do seed em BCrypt válido, view da coorte, caixa do tutor e a antecedência do lembrete |
+
+A observação sobre **repair de objeto PL/SQL exigir regravação do objeto como segundo
+passo** está em [Banco de Dados](#-banco-de-dados), com o procedimento e a armadilha do
+`SET TAB OFF`.
+
+### 3. Spring Security — dois perfis, rotas separadas
+
+`TipoUsuario` tem três valores: **`COLABORADOR`**, **`VETERINARIO`** e **`TUTOR`**. Os
+dois primeiros são a equipe da clínica; o terceiro é o dono do pet. A proteção por perfil
+está declarada em **`config/SecurityConfig`**, em duas `SecurityFilterChain` separadas —
+a da API, por token JWT, e a das telas, por sessão de formulário.
+
+| Perfil | Alcança nas telas | Alcança na API |
+|---|---|---|
+| `COLABORADOR` | `/`, `/painel/**`, `/pets/**`, `/agenda/**`, `/obrigacoes/**` | Prontuário e gestão (`/api/consultas/**`, `/api/anamneses/**`, `/api/prescricoes/**`, `/api/exames/**`, `/api/vacinas/**`, `/api/alergias-pet/**`, `/api/condicoes-pet/**`, `/api/obrigacoes/**`, `/api/painel/**`) e, **só ele**, `POST /api/veterinarios` |
+| `VETERINARIO` | as mesmas telas de gestão | as mesmas rotas de prontuário e gestão |
+| `TUTOR` | `/tutor`, `/tutor/**` — e **nada** das telas da clínica | `/api/agente/**` (o agente de agendamento) |
+| anônimo | `/login`, `/error`, CSS, Swagger, `/actuator/health` | `/api/auth/**`, `POST /api/clinicas`, `POST /api/tutores` |
+
+Três coisas que a tabela não mostra e importam:
+
+- **`anyRequest().authenticated()`** fecha as duas cadeias: rota nova nasce protegida, e
+  não aberta por esquecimento.
+- **Multi-tenancy é ortogonal ao perfil.** Ter o papel certo não basta: o
+  `TenantContext`, alimentado pelo JWT ou pela sessão, entra num `@Filter` do Hibernate
+  ligado por `autoEnabled` que recorta **toda** consulta pela clínica. Um colaborador da
+  clínica A não enxerga o pet da B nem sabendo o id — `applyToLoadByKey` estende o filtro
+  ao `findById`. Coberto por `IsolamentoMultiTenantIntegracaoTest`.
+- **Rate limit por IP** (`ratelimit/RateLimitFilter`, Bucket4j) com teto muito menor nas
+  rotas de autenticação: 5 por minuto contra 100.
+
+Testes: `VeterinarioControllerSecurityTest` e `AgenteControllerSecurityTest` afirmam que
+o perfil errado leva 403 e que o anônimo leva 401.
+
+### 4. Funcionalidades completas (não-CRUD)
+
+**Fluxo 1 — Do atendimento à obrigação cobrada.** A clínica registra a consulta; o motor
+de protocolo em PL/SQL materializa as obrigações futuras de cuidado daquele pet segundo o
+catálogo clínico; a varredura diária encontra as que entraram na janela de antecedência e
+as leva a `NOTIFICADA`; a transição faz nascer o lembrete na caixa do tutor.
+
+> Telas: `/pets/{id}` (a ficha, onde as obrigações aparecem e onde fica o botão
+> **Antecipar lembrete**) → `/tutor/caixa` (o lembrete chegando).
+> Código: `obrigacao/MotorProtocolo`, `notificacao/VarreduraDeLembretes`,
+> `notificacao/EmissorDeLembretes`.
+
+**Fluxo 2 — Do lembrete à consulta marcada.** O tutor abre o lembrete, conversa em
+linguagem natural com o agente de agendamento; o agente consulta a disponibilidade real,
+propõe horários, o tutor escolhe, e o agendamento é gravado — o que devolve a obrigação
+ao trilho e faz o compromisso aparecer na agenda do veterinário.
+
+> Telas: `/tutor/caixa` → `/tutor/pets/{id}` (a conversa) → `/agenda` (o compromisso na
+> agenda da clínica).
+> Código: `agente/AgenteService`, `agente/ferramentas/*`, `agendamento/AgendaService`.
+
+Nenhum dos dois é cadastro: o primeiro é uma máquina de estados com disparo automático, o
+segundo é um diálogo com ferramentas e escrita transacional. O painel de receita
+recuperada mede o efeito dos dois.
+
+**Validações.**
+
+| Onde | Como |
+|---|---|
+| Formulário / corpo da requisição | Bean Validation nos `*Request` (`@NotBlank`, `@NotNull`, `@Email`, `@Size`, `@Positive`), acionada por `@Valid` nos controllers |
+| Resposta de erro | `exception/GlobalExceptionHandler` traduz violação em `400` com os campos, sem vazar stack trace |
+| Regra de negócio na aplicação | `AgendaService` recusa fim de semana, fora do expediente e horário não múltiplo de 30 min |
+| Regra clínica | No banco: `PR_CLV_TRANSITAR_OBRIGACAO` recusa salto ilegal de estado com `ORA-20010`, traduzido em `409` por `MotorProtocolo` |
+| Guardrail do agente | `agente/GuardrailClinico` barra dosagem, diagnóstico e prescrição na saída do modelo |
+| Integridade | Constraints no schema: `CHECK` de estado, `UNIQUE` de CNPJ, e-mail, CRMV e microchip |
+
+---
+
+## 🏛️ Decisões de Arquitetura
+
+**Package-by-feature, e não por camada.** `obrigacao/` tem entidade, repositório,
+serviço, controller e DTOs juntos. Uma mudança de funcionalidade toca um diretório em vez
+de cinco, e o que é interno pode continuar sendo — pacote por camada obriga tudo a ser
+público para o pacote de cima enxergar.
+
+**PL/SQL é o motor; Java não reimplementa regra clínica.** Quando gerar obrigação, qual
+transição de estado é legal, como calcular a data prevista e quem cai no grupo de
+controle vivem no banco, junto com a auditoria encadeada e o outbox, na mesma transação.
+`MotorProtocolo` é o único ponto da aplicação que fala com as procedures, e só traduz
+`ORA-20010` em erro de domínio. Reimplementar a regra em Java criaria duas fontes de
+verdade que divergiriam na primeira regra nova.
+
+**Hexagonal onde há troca real, e não em toda parte.** Só duas fronteiras têm porta e
+adaptador: `ProvedorLlm`, com Gemini e Anthropic atrás dela, e `MotorProtocolo`, sobre as
+procedures. Nos dois casos existe um fornecedor externo que pode mudar. O resto do
+sistema é Spring MVC direto — abstrair o que não vai trocar é custo sem contrapartida.
+
+**Multi-tenancy por `TenantContext` + `@Filter`, e não por `where` em cada consulta.** O
+filtro é `autoEnabled`: nasce ligado em toda sessão do Hibernate, então um repositório
+novo já vem recortado sem que ninguém precise lembrar. O preço é que o isolamento não
+está escrito em nenhuma consulta e por isso precisa de teste de integração próprio, que
+existe.
+
+**Thymeleaf server-side, e não SPA.** As telas existem para mostrar a cadeia de valor
+funcionando; um front separado dobraria a superfície sem acrescentar nada ao que está
+sendo avaliado.
+
+---
+
+## 🤖 Uso de IA no Desenvolvimento
+
+Duas coisas diferentes, que vale separar.
+
+**IA no produto.** O agente de agendamento conversa com o tutor usando um LLM externo,
+hoje o **Gemini** (`gemini-3.1-flash-lite`), atrás da porta `ProvedorLlm`. Não há
+framework de agente: o laço de execução, o catálogo de ferramentas, a memória da conversa
+e o guardrail clínico são código nosso — o modelo escolhe qual ferramenta chamar, e a
+ferramenta é um método Java sobre serviços que já existiam. O guardrail roda **fora** do
+adaptador, sobre a resposta já traduzida, para que trocar de fornecedor não possa
+desligá-lo por esquecimento.
+
+**IA no desenvolvimento.** O projeto foi desenvolvido com apoio do **Claude Code**
+(Anthropic) como par de programação — os commits registram isso em `Co-Authored-By`. O
+uso foi de escrita e refatoração assistidas: descrição do problema e das restrições,
+código proposto, revisão e decisão minhas. As decisões de arquitetura desta seção, o
+recorte do domínio e o desenho do experimento de coorte foram definidos por mim e
+mantidos ao longo das sessões.
+
+Onde a assistência mais rendeu foi em varredura e conferência — comparar o PL/SQL do
+banco contra as migrations, achar testes que se puliam em silêncio, rastrear número de
+tela que não vinha de consulta. Onde ela menos rendeu foi em regra clínica e em decisão
+de produto, que exigem contexto que não está no repositório.
+
+---
+
 ## 💻 Rodando Localmente
+
+### Pré-requisitos
+
+| Ferramenta | Versão | Necessária para |
+|---|---|---|
+| **Docker Desktop** | 24+ (com Compose v2) | Caminho recomendado — sobe Oracle e API juntos |
+| **JDK** | **21** | Compilar e rodar sem Docker; o `pom.xml` fixa `<java.version>21` |
+| **Maven** | não precisa instalar | O wrapper `mvnw` / `mvnw.cmd` baixa a versão certa |
+| **Oracle** | XE 21c ou o da FIAP | O container já traz o XE; sem Docker, aponte para o seu |
+
+Não é preciso instalar Flyway: ele roda dentro da aplicação, no arranque.
 
 ### Com Docker Compose (recomendado)
 
 ```bash
+git clone <url-do-repositorio>
+cd server
+cp .env.example .env      # preencha GEMINI_API_KEY se quiser o agente ligado
 docker compose up --build
 ```
 
 Aguarde o Oracle ficar healthy (~2 min). O banco sobe **vazio**: o Flyway executa a cadeia
-`V0 → V0.1 → V1 … → V10` e cria o schema inteiro — tabelas, foreign keys, índices, o motor
+`V0 → V0.1 → V1 … → V13` e cria o schema inteiro — tabelas, foreign keys, índices, o motor
 de protocolo em PL/SQL e a view do painel. Nenhum passo manual.
 
 Para popular com dados de demonstração depois que a API subir:
@@ -665,13 +872,19 @@ BEGIN PR_CLV_SEED_EXECUTAR(p_qtd_pets => 400); END;
 Ninguém "cria" esses usuários: eles nascem do seed, todos com a senha
 **`Clyvo@2026`**. Não são credenciais de produção.
 
-| Perfil | E-mail | Clínica |
-|---|---|---|
-| Colaborador | `patricia@vidaanimal.com.br` | Vida Animal |
-| Colaborador | `diego@petcare.com.br` | PetCare |
-| Veterinário | `helena@vidaanimal.com.br` | Vida Animal |
-| Tutor (Thor) | `camila.ferreira@exemplo.com` | Vida Animal |
-| Tutor (Nala) | `roberto.almeida@exemplo.com` | Vida Animal |
+| Perfil | E-mail | Clínica | Cai em | Enxerga |
+|---|---|---|---|---|
+| Colaborador | `patricia@vidaanimal.com.br` | Vida Animal | `/painel/receita` | Painel, agenda, pets da **sua** clínica; pode antecipar lembrete |
+| Colaborador | `diego@petcare.com.br` | PetCare | `/painel/receita` | O mesmo, com os dados da PetCare — serve para ver o isolamento entre clínicas |
+| Veterinário | `helena@vidaanimal.com.br` | Vida Animal | `/painel/receita` | As mesmas telas de gestão do colaborador |
+| Tutor (Thor) | `camila.ferreira@exemplo.com` | Vida Animal | `/tutor` | Só os próprios pets, a caixa de lembretes e a conversa com o agente |
+| Tutor (Nala) | `roberto.almeida@exemplo.com` | Vida Animal | `/tutor` | O mesmo, para o outro pet |
+
+Nenhum tutor alcança as telas de gestão, e nenhum membro da equipe alcança `/tutor/**` —
+a separação está em `SecurityConfig` e o mapa completo de rota por perfil está em
+[Mapa dos Requisitos](#-mapa-dos-requisitos). **Entrar com `diego@petcare.com.br` é a
+forma mais rápida de ver o multi-tenancy funcionando:** os números do painel mudam
+inteiros, porque ele é de outra clínica.
 
 O fluxo completo atravessa duas telas e dois logins — use uma janela anônima
 para a segunda sessão, senão uma derruba a outra. Entre como Patricia ou
@@ -679,8 +892,11 @@ Helena, registre uma consulta para o Thor e veja a obrigação nascer; entre com
 Camila em `/tutor/pets/{id}`, converse com o agente e agende; volte para a
 Helena e o agendamento está na agenda.
 
-Base semeada antes de 2026-09-04 carrega o hash quebrado da V8 antiga — a
-**V10** corrige, basta subir a aplicação.
+Base semeada antes de 2026-09-04 carrega o hash quebrado da V8 antiga — a **V10**
+corrige as linhas, basta subir a aplicação. Se o login falhar num banco **resemeado**
+depois disso, o problema é outro e está descrito em
+[Repair de migration](#️-repair-de-migration-que-cria-objeto-plsql-exige-um-segundo-passo):
+a procedure do seed pode ter ficado com o corpo antigo.
 
 API: `http://localhost:8080`  
 Swagger: `http://localhost:8080/swagger-ui.html`
@@ -696,6 +912,33 @@ Swagger: `http://localhost:8080/swagger-ui.html`
 ./mvnw spring-boot:run        # Linux/macOS
 .\mvnw.cmd spring-boot:run    # Windows
 ```
+
+### Rodando os testes
+
+A suíte tem **129 testes** e passa inteira, **sem nenhum pulado**. Os testes de
+integração exigem o Oracle configurado nas variáveis de ambiente; sem elas, as classes
+que precisam de banco são desabilitadas por `@EnabledIfEnvironmentVariable` e o resto
+roda normalmente.
+
+```bash
+# com o Oracle do docker-compose de pé
+export SPRING_DATASOURCE_URL='jdbc:oracle:thin:@localhost:1521/PETFLOWDB'
+export SPRING_DATASOURCE_USERNAME=petflow
+export SPRING_DATASOURCE_PASSWORD=PetFlow2026
+export JWT_SECRET='qualquer-segredo-com-mais-de-32-caracteres!!'
+
+./mvnw test                                    # tudo
+./mvnw test -Dtest='Agente*,Guardrail*'        # só o agente
+./mvnw test -Dtest='*IntegracaoTest'           # só o que toca o banco
+```
+
+Nenhum teste chama a API do provedor de LLM: o diálogo roda contra um stub HTTP
+(`MockRestServiceServer`), então a suíte não gasta cota nem exige chave.
+
+> **Teste pulado conta como falha aqui.** Os testes de integração fabricam o próprio
+> cenário — clínica, tutor, veterinário, pet e obrigação — dentro da transação, que é
+> desfeita ao final (`CenarioClinico`, em `src/test/.../support/`). Nenhum deles depende
+> de o banco já ter o dado certo, e por isso nenhum se pula em silêncio.
 
 ---
 
