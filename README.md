@@ -28,8 +28,8 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 - [Git Flow](#-git-flow)
 - [Screenshots](#-screenshots)
 - [Benefícios para o Negócio](#-benefícios-para-o-negócio)
-- [Arquitetura Macro](#-arquitetura-macro)
-- [Instalação da Solução — Azure VM (How to)](#-instalação-da-solução--azure-vm-how-to)
+- [Arquitetura da Solução](#-arquitetura-da-solução)
+- [Deploy na Azure — ACR + ACI (How to)](#-deploy-na-azure--acr--aci-how-to)
 - [Scripts DevOps](#-scripts-devops)
 - [Equipe](#-equipe)
 
@@ -924,7 +924,7 @@ roda normalmente.
 # com o Oracle do docker-compose de pé
 export SPRING_DATASOURCE_URL='jdbc:oracle:thin:@localhost:1521/PETFLOWDB'
 export SPRING_DATASOURCE_USERNAME=petflow
-export SPRING_DATASOURCE_PASSWORD=PetFlow2026
+export SPRING_DATASOURCE_PASSWORD="$APP_USER_PASSWORD"   # definida no .env, nunca commitada
 export JWT_SECRET='qualquer-segredo-com-mais-de-32-caracteres!!'
 
 ./mvnw test                                    # tudo
@@ -1025,156 +1025,249 @@ develop   ← desenvolvimento
 
 ---
 
-## 🏗️ Arquitetura Macro
+## 🏗️ Arquitetura da Solução
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  📱 App Mobile  │     │ 🖥️ Dashboard    │     │ 🔌 IoT/Sensores │
-│  (React Native) │     │ (.NET / React)  │     │ (Python/CV)     │
-│  Tutor do Pet   │     │ Clínica Vet     │     │ Wearable Pet    │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         └───────────┬───────────┘───────────────────────┘
-                     │
-                 🌐 Internet
-                     │
-    ┌────────────────┴─────────────────────────────────────┐
-    │  ☁️  Microsoft Azure (North Central US)              │
-    │  ┌─────────────────────────────────────────────────┐ │
-    │  │  🐧 VM: vm-clyvovet                            │ │
-    │  │      Ubuntu 22.04 · Standard_B2als_v2 · 4GB    │ │
-    │  │  ┌───────────────────────────────────────────┐  │ │
-    │  │  │  🐳 Docker Engine + Compose               │  │ │
-    │  │  │      rede: clyvovet-network               │  │ │
-    │  │  │                                           │  │ │
-    │  │  │  ┌─────────────────────────────────────┐  │  │ │
-    │  │  │  │ ☕ api-clyvovet                     │  │  │ │
-    │  │  │  │ Spring Boot 4.0.6 · Java 21        │  │  │ │
-    │  │  │  │ Porta: 8080                        │  │  │ │
-    │  │  │  │ Usuário: appuser (não-root)        │  │  │ │
-    │  │  │  └──────────────┬──────────────────────┘  │  │ │
-    │  │  │                 │ JDBC :1521               │  │ │
-    │  │  │  ┌──────────────┴──────────────────────┐  │  │ │
-    │  │  │  │ 🗄️ oracle-clyvovet                 │  │  │ │
-    │  │  │  │ Oracle XE 21c (gvenzl/oracle-xe)   │  │  │ │
-    │  │  │  │ Porta: 1521 · DB: PETFLOWDB        │  │  │ │
-    │  │  │  │ Volume: oracle-data (persistência)  │  │  │ │
-    │  │  │  └─────────────────────────────────────┘  │  │ │
-    │  │  └───────────────────────────────────────────┘  │ │
-    │  │  🔒 NSG: Portas 22 · 8080 · 1521               │ │
-    │  └─────────────────────────────────────────────────┘ │
-    └──────────────────────────────────────────────────────┘
-```
+![Arquitetura ACR + ACI](docs/arquitetura.png)
+
+A solução usa **containerização completa** — aplicação e banco, cada um em seu
+próprio Azure Container Instance — com as imagens vindas de um Azure Container
+Registry privado. Todos os recursos são criados por Azure CLI, nenhum pelo Portal.
+
+### Recursos
+
+| Recurso | Nome | Configuração |
+|---|---|---|
+| Resource Group | `rg-petflow-rm561940` | Brazil South |
+| Container Registry | `acrpetflowrm561940` | SKU Basic, admin habilitado |
+| Key Vault | `kv-petflow-rm561940` | 3 segredos gerados em runtime |
+| ACI — Banco | `rm561940-aci-db` | Oracle XE 21c · 2 vCPU / 4 GB · porta 1521 |
+| ACI — Aplicação | `rm561940-aci-app` | Spring Boot / Java 21 · 1 vCPU / 2 GB · porta 8080 |
+
+### Fluxos
+
+| # | Fluxo | O que acontece |
+|---|---|---|
+| 1 | Desenvolvedor → Azure | Os scripts `01` a `06` criam todos os recursos via Azure CLI |
+| 2 | Desenvolvedor → ACR | `docker build` e `docker push` das duas imagens |
+| 3 | Scripts → Key Vault | As três senhas são geradas com `openssl rand` e guardadas no cofre |
+| 4 | ACR → ACI Banco | O container puxa a imagem e recebe as senhas por variável de ambiente segura |
+| 5 | ACR → ACI Aplicação | Idem, com a senha do banco e o segredo do JWT |
+| 6 | Aplicação → Banco | Conexão JDBC pelo **FQDN público** na porta 1521 |
+| 7 | Aplicação → Banco | O Flyway aplica 15 migrations e cria as 37 tabelas no primeiro boot |
+| 8 | Usuário final → Aplicação | HTTP/REST pelo FQDN público na porta 8080 |
+
+### Três decisões que o diagrama registra
+
+**Dois container groups separados, não um multi-container.** Como não compartilham
+rede interna, a aplicação alcança o banco pelo **FQDN público** — é a seta 6, e por
+isso ela aparece destacada. Não há `localhost` em lugar nenhum da configuração.
+
+**O container da aplicação roda como `appuser` (uid 999), nunca root.** Requisito
+8.2 do enunciado. A imagem base é `eclipse-temurin:21-jre-jammy`, que tem shell —
+sem shell não haveria `az container exec` para provar o não-root na gravação.
+
+**O banco não tem volume.** O spike de 25–26/08 mostrou que o Oracle sobre Azure
+Files falha com `ORA-01990` no primeiro boot, e a validação local de 09/09 confirmou
+que sem mount o boot é limpo. O enunciado não exige persistência em disco — exige
+evidenciar o dado gravado via `SELECT`. **Consequência: recriar o ACI do banco zera
+os dados.**
 
 ---
 
-## 🚀 Instalação da Solução — Azure VM (How to)
+## 🚀 Deploy na Azure — ACR + ACI (How to)
+
+> Esta é a entrega da **Sprint 3**: containerização completa (App e Banco) com
+> Azure Container Registry e Azure Container Instance, todos os recursos criados
+> via Azure CLI. O roteiro abaixo é executável de ponta a ponta — o vídeo da
+> entrega segue exatamente estes passos.
 
 ### Pré-requisitos
 
-- Azure CLI instalado e autenticado (`az login`)
-- Git Bash ou terminal Unix-like
-- Acesso à subscription Azure for Students
+- Azure CLI autenticado (`az login`)
+- Docker em execução
+- Git Bash, WSL ou terminal Unix-like
+- `openssl` e `curl` no PATH
 
-### Passo 1 — Provisionar a infraestrutura
-
-```bash
-bash scripts/setup-clyvovet.sh
-```
-
-Este script cria o Resource Group, a VM Ubuntu 22.04 (Standard_B2als_v2, 4GB RAM), abre as portas 22, 8080 e 1521, instala Docker e ferramentas (Git, nano, curl, wget, htop).
-
-### Passo 2 — Validar a infraestrutura (opcional)
+### Passo 0 — Clonar o repositório
 
 ```bash
-bash scripts/validate-clyvovet.sh
-```
-
-Verifica 7 itens: Resource Group, VM rodando, IP público, portas 8080 e 1521, Docker instalado, ferramentas.
-
-### Passo 3 — Conectar na VM
-
-```bash
-ssh azureuser@<IP_PUBLICO>
-```
-
-> As credenciais de acesso são exibidas ao final da execução do `setup-clyvovet.sh`.
-
-### Passo 4 — Clonar o repositório na VM
-
-```bash
-cd ~
 git clone https://github.com/olavoneves/clyvo-vet_api-java.git
 cd clyvo-vet_api-java
 ```
 
-### Passo 5 — Subir os containers
+### Passo 1 — Conferir as variáveis
+
+Todos os nomes de recurso vivem em `scripts/00_variables.sh`. **Nenhuma senha
+está lá** — as três são geradas em runtime no passo 3 e guardadas no Key Vault.
 
 ```bash
-docker compose up -d --build
+cat scripts/00_variables.sh
 ```
 
-O Docker Compose sobe dois containers:
-- **oracle-clyvovet** — Oracle XE 21c com healthcheck (~2-3 min para inicializar)
-- **api-clyvovet** — API Java Spring Boot (inicia somente após o Oracle estar saudável)
-
-As tabelas são criadas automaticamente pelo JPA (`ddl-auto: update`).
-
-### Passo 6 — Verificar containers
+### Passo 2 — Infraestrutura base
 
 ```bash
-docker compose ps                  # Containers rodando em background
-docker exec api-clyvovet whoami    # Deve retornar: appuser (não-root)
-docker volume ls                   # Deve aparecer: oracle-data
+bash scripts/01_resource-group.sh    # Resource Group
+bash scripts/02_acr.sh               # Azure Container Registry (Basic)
 ```
 
-### Passo 7 — Testar a API
-
-```
-http://<IP_PUBLICO>:8080/swagger-ui.html
-```
-
-### Passo 8 — Remover recursos (obrigatório ao final)
+### Passo 3 — Segredos
 
 ```bash
-bash scripts/cleanup-clyvovet.sh
+bash scripts/03_key-vault.sh
 ```
 
-Ou diretamente:
+Gera com `openssl rand` e grava no cofre: senha do SYS do Oracle, senha do
+usuário `petflow` e o segredo de assinatura do JWT. Os valores nunca são
+impressos nem gravados em disco.
+
+### Passo 4 — Build e push das imagens 
 
 ```bash
-az group delete --name rg-clyvovet-devops --yes --no-wait
+bash scripts/04_build-push.sh
+```
+
+Os comandos que este script executa:
+
+```bash
+az acr login --name acrpetflowrm561940
+
+docker build --platform linux/amd64 \
+    -t acrpetflowrm561940.azurecr.io/rm561940-db-petflow:v1 ./db
+
+docker build --platform linux/amd64 \
+    -t acrpetflowrm561940.azurecr.io/rm561940-app-petflow:v1 .
+
+docker push acrpetflowrm561940.azurecr.io/rm561940-db-petflow:v1
+docker push acrpetflowrm561940.azurecr.io/rm561940-app-petflow:v1
+
+az acr repository list --name acrpetflowrm561940 --output table
+```
+
+> `--platform linux/amd64` é obrigatório: o ACI só executa amd64, e uma imagem
+> arm64 falha com `exec format error`.
+
+### Passo 5 — Banco de dados no ACI
+
+```bash
+bash scripts/05_aci-db.sh
+```
+
+Cria o container group do Oracle XE (2 vCPU / 4 GB) e espera o log chegar em
+`DATABASE IS READY TO USE!`. Leva cerca de 2 minutos.
+
+### Passo 6 — Aplicação no ACI
+
+```bash
+bash scripts/06_aci-app.sh
+```
+
+Descobre o FQDN público do banco, monta a URL JDBC e sobe a aplicação. No
+primeiro boot o Flyway aplica 15 migrations e cria as 37 tabelas.
+
+### Passo 7 — Bootstrap dos dados iniciais
+
+```bash
+bash scripts/07_bootstrap.sh
+```
+
+**Passo obrigatório.** O Flyway cria o schema, mas o banco nasce sem dados — e
+o usuário `master` só é criado se já existir uma clínica. O script cria a
+clínica pela rota pública, reinicia o app para o `DataInitializer` rodar e
+confirma o login.
+
+### Passo 8 — Smoke tests
+
+```bash
+bash scripts/08_smoke-tests.sh
+```
+
+Exercita o CRUD completo em `/api/tutores` e `/api/pets` contra o **FQDN
+público**, incluindo o 409 ao tentar apagar um tutor com pet vinculado.
+
+### Passo 9 — Evidência no banco
+
+O enunciado exige demonstrar cada operação do CRUD **por SELECT dentro do
+banco**. De um terminal interativo:
+
+```bash
+az container exec \
+  --resource-group rg-petflow-rm561940 \
+  --name rm561940-aci-db \
+  --exec-command "/bin/bash"
+```
+
+Dentro do container:
+
+```sql
+sqlplus petflow/<senha>@localhost:1521/XEPDB1
+
+SET LINESIZE 200
+SET PAGESIZE 50
+SELECT id_tutor, nm_tutor, ds_email FROM TB_CLV_TUTOR;
+SELECT id_pet, nm_pet, id_tutor FROM TB_CLV_PET;
+```
+
+> `az container exec` abre um websocket que **exige TTY real**: rode de um
+> terminal interativo, não de script.
+
+### Passo 10 — Encerramento
+
+Ao terminar a sessão, pare os ACIs para não consumir a quota:
+
+```bash
+az container stop -g rg-petflow-rm561940 -n rm561940-aci-app
+az container stop -g rg-petflow-rm561940 -n rm561940-aci-db
+```
+
+Para remover tudo (**somente após a nota sair**):
+
+```bash
+bash scripts/99_cleanup.sh
 ```
 
 ---
 
 ## 🖥️ Scripts DevOps
 
-Os scripts de infraestrutura estão na pasta `scripts/` e as cenas de demonstração em `scenes/`:
-
-| Script | Descrição |
+| Script | Finalidade |
 |---|---|
-| `scripts/setup-clyvovet.sh` | Provisiona toda a infraestrutura Azure (VM, NSG, Docker, ferramentas) |
-| `scripts/validate-clyvovet.sh` | Valida 7 itens da infraestrutura |
-| `scripts/cleanup-clyvovet.sh` | Remove todos os recursos Azure com confirmação |
-| `scenes/c1.sh` | Cena 1: Executa setup + validate (Git Bash local) |
-| `scenes/c2.sh` | Cena 2: SSH → clone → docker compose up (VM) |
-| `scenes/c3.sh` | Cena 3: Valida containers, appuser, volume (VM) |
-| `scenes/c4.sh` | Cena 4: CRUD completo via curl com IP público (VM) |
-| `scenes/c5.sh` | Cena 5: Consulta Oracle → cleanup (VM → local) |
+| `scripts/00_variables.sh` | Nomes dos recursos e funções auxiliares. Carregado com `source` pelos demais. **Sem senhas** |
+| `scripts/01_resource-group.sh` | Cria o Resource Group com tags |
+| `scripts/02_acr.sh` | Cria o Azure Container Registry (Basic, admin habilitado) |
+| `scripts/03_key-vault.sh` | Cria o Key Vault e gera os três segredos com `openssl rand` |
+| `scripts/04_build-push.sh` | `docker build` + `docker push` das duas imagens para o ACR |
+| `scripts/05_aci-db.sh` | ACI do Oracle XE — 2 vCPU / 4 GB, sem volume |
+| `scripts/06_aci-app.sh` | ACI da API — 1 vCPU / 2 GB, conecta no banco pelo FQDN público |
+| `scripts/07_bootstrap.sh` | Cria a clínica, reinicia o app e confirma o login |
+| `scripts/08_smoke-tests.sh` | CRUD completo nas duas tabelas via FQDN público |
+| `scripts/99_cleanup.sh` | Remove o Resource Group (confirmação digitada) |
 
-### Configuração Azure CLI
+### Documentação do banco
 
-| Variável | Valor |
+| Arquivo | Conteúdo |
 |---|---|
-| RESOURCE_GROUP | rg-clyvovet-devops |
-| LOCATION | northcentralus |
-| VM_NAME | vm-clyvovet |
-| VM_SIZE | Standard_B2als_v2 (4GB RAM) |
-| IMAGE | Ubuntu 22.04 |
-| Portas abertas | 22 (SSH), 8080 (Java), 1521 (Oracle) |
+| `docs/script_bd.sql` | DDL do núcleo da solução — tabelas, colunas, chaves, constraints e comentários, mais a carga mínima de demonstração e as consultas de evidência |
+| `src/main/resources/db/migration/` | As 15 migrations Flyway (V0 → V13) que criam as 37 tabelas do schema completo |
+| `docs/VALIDACAO_LOCAL.md` | Evidências da validação em Docker local, antes do deploy |
 
----
+Todos são idempotentes: verificam se o recurso existe antes de criar e podem
+ser reexecutados sem destruir o ambiente.
+
+### Dockerfiles
+
+| Arquivo | Imagem |
+|---|---|
+| `Dockerfile` | API Java — multi-stage (Maven → JRE), roda como `appuser` (uid 999), não root |
+| `db/Dockerfile` | Oracle XE 21c — sem senha em `ENV`, sem `init.sql` (o schema é do Flyway) |
+
+### Execução local (Docker Compose)
+
+```bash
+cp .env.example .env      # preencha as senhas
+docker compose up -d
+```
+
 
 ## 👥 Equipe
 
@@ -1188,4 +1281,4 @@ Os scripts de infraestrutura estão na pasta `scripts/` e as cenas de demonstra�
 
 **Equipe:** PetFlow  
 **Curso:** Tecnologia em Desenvolvimento de Sistemas — FIAP  
-**Challenge:** Clyvo Vet — 1º e 2º Sprint (2025/2026)
+**Challenge:** Clyvo Vet — Sprint 3 (2026)
