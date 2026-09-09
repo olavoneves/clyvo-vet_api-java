@@ -76,11 +76,25 @@ az keyvault secret show --vault-name kv-petflow-rm561940   --name oracle-app-pas
 
 Não são comandos a executar — são coisas a **evitar** enquanto grava.
 
-**Não deixe `az container logs` do banco parado na tela.** O entrypoint da imagem
-Oracle ecoa `ALTER USER SYS IDENTIFIED BY "..."` em texto claro. Descoberto no
-spike de 25/08. Se precisar mostrar o log, filtre:
+**Cuidado com o log do BANCO — o da aplicação é seguro.**
+
+| Container | Tem segredo no log? | |
+|---|---|---|
+| `rm561940-aci-app` | não | ✅ pode mostrar à vontade |
+| `rm561940-aci-db` | **sim** | ⚠️ filtre ou evite |
+
+O entrypoint da imagem Oracle ecoa `ALTER USER SYS IDENTIFIED BY "..."` em texto
+claro, logo depois de `Database opened`. Descoberto no spike de 25/08.
+`--secure-environment-variables` protege o `az container show`, mas **não** o log.
+
+Você não precisa do log do banco em nenhuma cena: o `05_aci-db.sh` já imprime
+`Oracle pronto após aproximadamente 50 segundos`, e isso basta como evidência.
+
+Se quiser mostrar assim mesmo, a senha aparece no **começo** — então o fim é
+seguro:
 
 ```bash
+az container logs -g rg-petflow-rm561940 -n rm561940-aci-db | tail -20
 az container logs -g rg-petflow-rm561940 -n rm561940-aci-db | grep -v "ALTER USER"
 ```
 
@@ -192,7 +206,12 @@ bash scripts/06_aci-app.sh
 Chame atenção para a URL JDBC impressa: aponta para o **FQDN público** do banco,
 não para `localhost`. É o que prova que são dois container groups distintos.
 
-No log, mostre o Flyway aplicando as 15 migrations.
+No log, mostre o Flyway aplicando as 15 migrations — **este log é seguro**, a
+aplicação não ecoa segredo nenhum:
+
+```bash
+az container logs -g rg-petflow-rm561940 -n rm561940-aci-app | grep -i "migrat\|Started"
+```
 
 ### Cena 9 · Prova de não-root (~1 min) 🔵 requisito 8.2
 
