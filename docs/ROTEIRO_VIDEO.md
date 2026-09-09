@@ -426,8 +426,16 @@ vazia** — é o efeito do `--secure-environment-variables`.
 Retome: containerização completa, recursos por CLI, CRUD nas duas tabelas
 evidenciado no banco, aplicação não-root, nenhum segredo exposto.
 
-**Não execute o `99_cleanup.sh` no vídeo.** O professor precisa conseguir acessar
-a solução para corrigir.
+**Não execute o `99_cleanup.sh` no vídeo** — não há por que apagar tudo na frente
+da câmera, e o enunciado não pede evidência de remoção.
+
+> **Depois de publicar o vídeo e o PDF, pode apagar.** O enunciado não exige que
+> a solução continue no ar: a correção é feita assistindo ao vídeo, e o acesso
+> que ele cobra é ao **repositório** e ao **vídeo**, não ao FQDN.
+>
+> Mantenha de pé só até o vídeo estar publicado e o link no PDF — enquanto isso,
+> o ambiente é a rede de segurança para regravar. Depois disso, `99_cleanup.sh`
+> economiza a quota: dois ACIs ligados custam cerca de R$ 21 por dia.
 
 ---
 

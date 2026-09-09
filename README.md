@@ -1239,7 +1239,7 @@ az container stop -g rg-petflow-rm561940 -n rm561940-aci-app
 az container stop -g rg-petflow-rm561940 -n rm561940-aci-db
 ```
 
-Para remover tudo (**somente após a nota sair**):
+Para remover tudo, depois que o vídeo estiver publicado e o link no PDF:
 
 ```bash
 bash scripts/99_cleanup.sh

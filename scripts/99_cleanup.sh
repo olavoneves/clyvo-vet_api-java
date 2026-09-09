@@ -2,9 +2,15 @@
 #
 # 99 - Remove todos os recursos do projeto.
 #
-# NAO EXECUTE ANTES DA NOTA SAIR. Diferente do CP1, a Sprint 3 nao exige
-# evidencia de remocao dos recursos - e o professor precisa conseguir
-# acessar a solucao para corrigir.
+# QUANDO EXECUTAR: depois que o video estiver publicado e o link no PDF.
+#
+# Diferente do CP1, a Sprint 3 nao exige evidencia de remocao - e tambem
+# nao exige que a solucao continue no ar. A correcao e feita assistindo
+# ao video; o acesso que o enunciado cobra e ao repositorio e ao video.
+#
+# Antes disso, mantenha de pe: e a rede de seguranca para regravar. Dois
+# ACIs ligados custam cerca de R$ 21 por dia, entao nao deixe correndo
+# depois que a entrega saiu.
 #
 # Exige confirmacao digitada: `az group delete` e irreversivel.
 #
