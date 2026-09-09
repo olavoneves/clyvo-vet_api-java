@@ -110,12 +110,19 @@ public class SecurityConfig {
     /**
      * Rotas do aplicativo do tutor.
      *
-     * <p>O agente de agendamento e a unica superficie que so o tutor alcanca:
-     * veterinario e colaborador tem a agenda inteira nas telas de gestao, e nao
-     * precisam conversar com um assistente para marcar o que ja podem marcar.
+     * <p>Duas superficies que so o tutor alcanca. O agente de agendamento, porque
+     * veterinario e colaborador tem a agenda inteira nas telas de gestao e nao
+     * precisam conversar com um assistente para marcar o que ja podem marcar. E
+     * {@code /tutor/**}, o CRUD do aplicativo, onde o dono do pet e derivado do
+     * usuario autenticado e nunca aceito como parametro.
+     *
+     * <p>Nao confundir com {@code /tutores}, que e o cadastro de tutor da API de
+     * gestao e continua sendo outra coisa: {@code /api/tutor/**} nao tem como
+     * endereçar um tutor que nao seja o do token.
      */
     private static final String[] API_ROTAS_DO_TUTOR = {
-            "/agente/**"
+            "/agente/**",
+            "/tutor/**"
     };
 
     /** Documentacao da API. Fora de /api: quem a serve e o springdoc. */
