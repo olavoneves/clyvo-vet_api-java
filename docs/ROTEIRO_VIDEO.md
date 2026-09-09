@@ -46,8 +46,8 @@ automática do YouTube antes de publicar.
 - [ ] Microfone testado
 - [ ] Uma aba do navegador aberta no Portal do Azure, autenticada
 - [ ] Este roteiro aberto numa segunda tela
-- [ ] **SQL Developer já conectado** ao ACI do banco — conecte antes de gravar,
-      para a senha não aparecer na tela
+- [ ] **SQL Developer aberto**, com a janela de nova conexão pronta — mas **ainda
+      não conectado**: o banco só existe depois da Cena 7
 - [ ] [`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) aberto numa aba do SQL Developer
 
 ### Conexão do SQL Developer
@@ -65,10 +65,16 @@ automática do YouTube antes de publicar.
 az keyvault secret show --vault-name kv-petflow-rm561940   --name oracle-app-password --query value -o tsv
 ```
 
-> A conexão só existe depois do `05_aci-db.sh`. Nas Cenas 1 a 7 o banco ainda
-> não está no ar — conecte durante a Cena 7, enquanto o Oracle sobe.
+> **Não rode nada disso antes de gravar.** O cofre nasce na Cena 5 e o banco na
+> Cena 7 — antes disso o comando falha e a conexão não tem destino.
+>
+> **O momento é a Cena 7:** enquanto o `05_aci-db.sh` espera o Oracle subir
+> (~50 s), você recupera a senha e conecta o SQL Developer. Na Cena 11 ele já
+> está pronto.
 
-### ⚠️ Dois cuidados que evitam retrabalho
+### ⚠️ Dois cuidados durante a gravação
+
+Não são comandos a executar — são coisas a **evitar** enquanto grava.
 
 **Não deixe `az container logs` do banco parado na tela.** O entrypoint da imagem
 Oracle ecoa `ALTER USER SYS IDENTIFIED BY "..."` em texto claro. Descoberto no
@@ -164,8 +170,18 @@ Ao final, mostre:
 bash scripts/05_aci-db.sh
 ```
 
-O script faz poll até `DATABASE IS READY TO USE!`. Leva cerca de 2 minutos.
+O script faz poll até `DATABASE IS READY TO USE!` — no ensaio levou **50 s**.
 Enquanto espera, explique: 2 vCPU / 4 GB, sem volume, imagem vinda do ACR.
+
+> **Aproveite esta janela para conectar o SQL Developer.** Numa segunda tela,
+> fora do enquadramento:
+>
+> ```bash
+> az keyvault secret show --vault-name kv-petflow-rm561940 >   --name oracle-app-password --query value -o tsv
+> ```
+>
+> Cole a senha na conexão descrita no topo deste roteiro. Se conectar aqui, na
+> Cena 11 basta trazer a janela para a tela — sem senha aparecendo em vídeo.
 
 ### Cena 8 · ACI da aplicação (~3 min)
 
