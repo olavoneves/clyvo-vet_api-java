@@ -63,8 +63,13 @@ SELECT SYS_CONTEXT('USERENV','SERVER_HOST') AS servidor,
 SELECT COUNT(*) AS total_tabelas FROM user_tables;
 
 -- As migrations aplicadas, na ordem. A ultima e a V13.
+--
+-- ASPAS DUPLAS SAO OBRIGATORIAS. O Flyway cria a tabela como
+-- "PETFLOW"."flyway_schema_history", em minusculas. Sem as aspas o Oracle
+-- normaliza o identificador para maiusculas, procura FLYWAY_SCHEMA_HISTORY
+-- e responde ORA-00942: a tabela ou view nao existe.
 SELECT installed_rank, version, description, success
-  FROM flyway_schema_history
+  FROM "flyway_schema_history"
  ORDER BY installed_rank;
 
 -- As duas tabelas do CRUD, com a carga que o 07_bootstrap.sh criou pela API.
