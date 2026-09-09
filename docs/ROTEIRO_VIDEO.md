@@ -88,7 +88,16 @@ Diga em voz:
 - Que a entrega é a **Opção 1: ACR + ACI**, com containerização completa
 - O que a aplicação faz, em duas frases
 
-Mostre `docs/arquitetura.png` na tela e percorra os 8 fluxos numerados.
+Mostre `docs/arquitetura_sprint3.png` na tela e percorra o caminho:
+
+1. Do ambiente local: build das imagens e push para o ACR (badges ① e ②)
+2. Dentro do Resource Group: ACR guarda as duas imagens, Key Vault guarda os
+   três segredos
+3. Setas laranja: cada ACI puxa sua imagem do ACR e recebe os segredos do cofre
+4. Seta vermelha entre os dois ACIs: **JDBC pelo FQDN público** — são container
+   groups separados, não há rede interna
+5. Seta verde: o Flyway aplica as 15 migrations e cria as 37 tabelas
+6. Seta roxa à direita: o usuário final chega pela internet na porta 8080
 
 > Isto também alimenta o item 9.1. Explique as três decisões: dois container
 > groups separados, container da aplicação não-root, e banco sem volume.

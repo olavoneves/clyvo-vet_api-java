@@ -1027,7 +1027,7 @@ develop   ← desenvolvimento
 
 ## 🏗️ Arquitetura da Solução
 
-![Arquitetura ACR + ACI](docs/arquitetura.png)
+![Arquitetura ACR + ACI](docs/arquitetura_sprint3.png)
 
 A solução usa **containerização completa** — aplicação e banco, cada um em seu
 próprio Azure Container Instance — com as imagens vindas de um Azure Container
