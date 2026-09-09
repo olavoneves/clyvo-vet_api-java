@@ -78,8 +78,23 @@ public class SecurityConfig {
             "/tutores"
     };
 
-    /** Prontuario, consulta e anamnese: tutor le pelo /pets/**, mas nao escreve aqui. */
+    /**
+     * A API de gestao da clinica. So {@code VETERINARIO} e {@code COLABORADOR}.
+     *
+     * <p>{@code /pets/**} e {@code /agendamentos/**} entraram aqui porque estavam
+     * caindo no {@code anyRequest().authenticated()}, e isso bastava para um token
+     * de tutor alcanca-las. Nenhuma delas verifica dono: o id do tutor vinha da
+     * URL em {@code /pets/tutor/{id}} e do corpo no cadastro, entao trocar o
+     * numero era ler e escrever no nome de outro tutor da mesma clinica. O
+     * isolamento entre clinicas nunca esteve em jogo — o que faltava era o
+     * isolamento dentro de uma.
+     *
+     * <p>O tutor nao fica sem superficie: o aplicativo dele passa a falar com
+     * {@code /api/tutor/**}, onde o dono sai do token e nao do parametro.
+     */
     private static final String[] API_ROTAS_CLINICAS = {
+            "/pets/**",
+            "/agendamentos/**",
             "/consultas/**",
             "/anamneses/**",
             "/prescricoes/**",
