@@ -110,6 +110,14 @@ siga **exatamente** os passos do README — e ele segue.
 
 ### Cena 1 · Abertura (~1 min)
 
+> **O diagrama no vídeo é opcional.** O item 9.1 avalia o desenho como entregável
+> separado — ele vive no README e é lá que o professor o corrige. O item 9.2 lista
+> o que o vídeo precisa mostrar, e diagrama não está na lista.
+>
+> Ainda assim vale um minuto: o 9.1 pede "explicação do funcionamento", e narrar
+> os fluxos reforça o que a imagem estática só sugere. Se preferir enxugar o
+> vídeo, pule direto para a Cena 2 — não há penalidade.
+
 Diga em voz:
 - Nome e RM dos integrantes
 - Que a entrega é a **Opção 1: ACR + ACI**, com containerização completa
