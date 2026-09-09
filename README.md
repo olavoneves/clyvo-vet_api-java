@@ -29,6 +29,7 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 - [Screenshots](#-screenshots)
 - [Benefícios para o Negócio](#-benefícios-para-o-negócio)
 - [Arquitetura da Solução](#-arquitetura-da-solução)
+- [Arquitetura de Destino — Sprint 4](#-arquitetura-de-destino--o-desenho-da-sprint-4)
 - [Deploy na Azure — ACR + ACI (How to)](#-deploy-na-azure--acr--aci-how-to)
 - [Scripts DevOps](#-scripts-devops)
 - [Equipe](#-equipe)
@@ -1161,6 +1162,68 @@ Files falha com `ORA-01990` no primeiro boot, e a validação local de 09/09 con
 que sem mount o boot é limpo. O enunciado não exige persistência em disco — exige
 evidenciar o dado gravado via `SELECT`. **Consequência: recriar o ACI do banco zera
 os dados.**
+
+---
+
+## 🧭 Arquitetura de Destino — o desenho da Sprint 4
+
+> **Este diagrama é a utopia, não o estado atual.** É onde o produto quer chegar, e a
+> meta é a **Sprint 4**. A arquitetura que de fato está no ar é a da seção anterior,
+> [Arquitetura da Solução](#-arquitetura-da-solução): dois container groups na Azure,
+> um deles este `clyvo-core`. Leia o desenho como intenção e a tabela depois dele como
+> o inventário honesto — **mais da metade das caixas ainda não existe.**
+
+![Arquitetura de destino do Clyvo Vet](docs/arquitetura/clyvo-vet-arquitetura.png)
+
+Três peças sustentam o desenho, e o que liga uma à outra é justamente o que falta.
+
+**`clyvo-core` é o sistema de registro, e existe.** É este repositório: a fonte da
+verdade sobre pet, tutor, consulta e obrigação de cuidado. A regra clínica não mora no
+Java — mora no **motor de protocolo em PL/SQL, dentro do Oracle**, que materializa as
+obrigações futuras a partir de uma consulta realizada, valida cada transição por
+procedure, encadeia a auditoria e escreve no outbox. É o lado de escrita: quem muda o
+mundo passa por aqui.
+
+**`clyvo-insights` é o lado de leitura, e existe** — em repositório separado, ASP.NET
+Core sobre MongoDB, com projeções e auditoria. **O que não existe é a seta entre os
+dois.** No desenho, `clyvo-core` publica eventos do outbox num Azure Service Bus e o
+`insights` consome por assinatura. Hoje o outbox é uma tabela que o motor escreve e
+que **ninguém lê**: não há publisher, não há broker, não há assinatura. A view
+`VW_CLV_PAINEL_COORTE` (migration `V11`) também não é o elo com o `insights` — quem a
+consome é o painel deste próprio repositório, em `PainelCoorteService`.
+
+**O aplicativo do tutor consome `/api/tutor`, e a superfície existe.** O dono sai do
+token, nenhuma rota aceita `tutorId` por parâmetro e recurso de outro tutor devolve
+404 — ver [API do tutor](#api-do-tutor-tutor). **O aplicativo em si não foi
+construído.** A Sprint 3 entregou o contrato que ele vai consumir; quem faz o papel
+dele na demonstração são as telas Thymeleaf.
+
+### O que está construído e o que é projeção
+
+| Caixa do diagrama | Estado | Evidência |
+|---|---|---|
+| `clyvo-core` — Spring Boot, Java 21, escrita e domínio clínico | **Construído** | Este repositório |
+| Oracle — sistema de registro, PL/SQL | **Construído** | Migrations `V7` e `V9`: procedures, máquina de estados, auditoria encadeada |
+| Painel da clínica no navegador (Thymeleaf) | **Construído** | `*/web/`, telas de painel, agenda e ficha |
+| `clyvo-insights` — ASP.NET Core, leitura e projeções | **Construído**, fora deste repo | Repositório separado |
+| MongoDB — projeções e logs | **Construído**, fora deste repo | Usado pelo `insights` |
+| Container Registry — imagens versionadas | **Construído** na Sprint 3 | `scripts/02_acr.sh` |
+| Key Vault — segredos | **Construído** na Sprint 3 | `scripts/03_key-vault.sh` |
+| **Azure Service Bus** — tópicos, assinaturas, DLQ | **Projeção** | `outbox/` tem tabela e entidade, escritas pelo motor. **Nenhum publisher, consumidor ou broker** — o outbox não é lido por ninguém |
+| **App mobile Expo** | **Projeção — Sprint 4** | Só o contrato `/api/tutor` existe |
+| **Notification Hubs — push mobile** | **Projeção** | Nada no `pom.xml`, nada no código |
+| **Adaptadores WhatsApp, SMS e e-mail** | **Projeção** (o próprio diagrama os rotula "futuros") | A porta `CanalDeNotificacao` existe com **uma** implementação, `CanalApp` — a caixa de lembretes dentro do produto |
+| **Redis — cache e sessão** | **Projeção** | O cache é **Caffeine em memória**, o rate limit também, e a sessão é a do servlet container |
+| **Blob Storage — retenção 20 anos** | **Projeção** | Nada implementado |
+| **Azure Monitor — Log Analytics e tracing** | **Projeção** | Há `/actuator/health`, `info` e `metrics`; não há exportação para Log Analytics |
+| **GitHub Actions — CI/CD** | **Projeção** | Não existe `.github/workflows/` no repositório |
+
+As linhas de projeção têm um padrão em comum, e ele é intencional: o repositório
+preparou o **lugar** delas sem fingir que estão prontas. O outbox é escrito e não é
+lido; a porta de notificação tem uma implementação só. São costuras deixadas à mostra
+para que acrescentar um canal seja escrever uma classe, e não mexer onde a obrigação
+muda de estado. Mas costura não é entrega — e um diagrama que promete mais do que o
+repositório cumpre é pior do que não ter diagrama.
 
 ---
 
