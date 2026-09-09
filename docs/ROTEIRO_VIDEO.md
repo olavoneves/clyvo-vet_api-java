@@ -270,7 +270,8 @@ O servidor aparece como `SandboxHost-...` — é o host do ACI.
 Depois rode, uma por vez (Ctrl+Enter):
 
 - `SELECT COUNT(*) FROM user_tables` → **37 tabelas**, criadas pelo Flyway
-- `SELECT ... FROM flyway_schema_history` → as **15 migrations**, terminando na V13
+- `SELECT ... FROM "flyway_schema_history"` → as **15 migrations**, terminando na V13
+  (as aspas são obrigatórias: o Flyway cria a tabela em minúsculas)
 - Os dois `SELECT` de `TB_CLV_TUTOR` e `TB_CLV_PET` → a carga do bootstrap
 - O `JOIN` das duas tabelas → o relacionamento 1:N do requisito 4
 
