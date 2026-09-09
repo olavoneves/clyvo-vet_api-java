@@ -1187,25 +1187,44 @@ público**, incluindo o 409 ao tentar apagar um tutor com pet vinculado.
 
 ### Passo 9 — Evidência no banco
 
-O enunciado exige demonstrar cada operação do CRUD **por SELECT dentro do
-banco**. De um terminal interativo:
+O enunciado exige demonstrar cada operação do CRUD **por SELECT dentro do banco**.
+O banco fica exposto na porta 1521 com FQDN público, então qualquer cliente Oracle
+conecta nele de fora — o que também prova que não é um banco local.
+
+**SQL Developer** (ou DBeaver, SQLcl — qualquer cliente Oracle):
+
+| Campo | Valor |
+|---|---|
+| Tipo de conexão | Básico |
+| Hostname | `rm561940-db-petflow.brazilsouth.azurecontainer.io` |
+| Porta | `1521` |
+| **Nome do serviço** | `PETFLOWDB` — serviço, **não** SID |
+| Usuário | `petflow` |
+| Senha | recupere do Key Vault: |
 
 ```bash
-az container exec \
-  --resource-group rg-petflow-rm561940 \
-  --name rm561940-aci-db \
-  --exec-command "/bin/bash"
+az keyvault secret show --vault-name kv-petflow-rm561940   --name oracle-app-password --query value -o tsv
 ```
 
-Dentro do container:
+Conectado, o arquivo [`docs/EVIDENCIAS_VIDEO.sql`](docs/EVIDENCIAS_VIDEO.sql) traz
+todas as consultas na ordem, pareadas com os `curl` que as antecedem.
+
+A primeira delas confirma que a conexão é com o container na Azure:
 
 ```sql
-sqlplus petflow/<senha>@localhost:1521/PETFLOWDB
+SELECT SYS_CONTEXT('USERENV','SERVER_HOST') AS servidor,
+       SYS_CONTEXT('USERENV','CON_NAME')    AS pdb,
+       USER                                  AS usuario
+  FROM dual;
+```
 
-SET LINESIZE 200
-SET PAGESIZE 50
-SELECT id_tutor, nm_tutor, ds_email FROM TB_CLV_TUTOR;
-SELECT id_pet, nm_pet, id_tutor FROM TB_CLV_PET;
+**Alternativa por linha de comando**, se preferir não usar cliente gráfico:
+
+```bash
+az container exec   --resource-group rg-petflow-rm561940   --name rm561940-aci-db   --exec-command "/bin/bash"
+
+# dentro do container:
+sqlplus petflow/<senha>@localhost:1521/PETFLOWDB
 ```
 
 > `az container exec` abre um websocket que **exige TTY real**: rode de um
@@ -1250,6 +1269,7 @@ bash scripts/99_cleanup.sh
 | `docs/script_bd.sql` | DDL do núcleo da solução — tabelas, colunas, chaves, constraints e comentários, mais a carga mínima de demonstração e as consultas de evidência |
 | `src/main/resources/db/migration/` | As 15 migrations Flyway (V0 → V13) que criam as 37 tabelas do schema completo |
 | `docs/VALIDACAO_LOCAL.md` | Evidências da validação em Docker local, antes do deploy |
+| `docs/EVIDENCIAS_VIDEO.sql` | Consultas da gravação, pareadas com os `curl` que as antecedem |
 
 Todos são idempotentes: verificam se o recurso existe antes de criar e podem
 ser reexecutados sem destruir o ambiente.

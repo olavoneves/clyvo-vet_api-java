@@ -39,6 +39,27 @@ automática do YouTube antes de publicar.
 - [ ] Microfone testado
 - [ ] Uma aba do navegador aberta no Portal do Azure, autenticada
 - [ ] Este roteiro aberto numa segunda tela
+- [ ] **SQL Developer já conectado** ao ACI do banco — conecte antes de gravar,
+      para a senha não aparecer na tela
+- [ ] [`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) aberto numa aba do SQL Developer
+
+### Conexão do SQL Developer
+
+| Campo | Valor |
+|---|---|
+| Tipo de conexão | Básico |
+| Hostname | `rm561940-db-petflow.brazilsouth.azurecontainer.io` |
+| Porta | `1521` |
+| **Nome do serviço** | `PETFLOWDB` — serviço, **não** SID |
+| Usuário | `petflow` |
+| Senha | do Key Vault (comando abaixo) |
+
+```bash
+az keyvault secret show --vault-name kv-petflow-rm561940   --name oracle-app-password --query value -o tsv
+```
+
+> A conexão só existe depois do `05_aci-db.sh`. Nas Cenas 1 a 7 o banco ainda
+> não está no ar — conecte durante a Cena 7, enquanto o Oracle sobe.
 
 ### ⚠️ Dois cuidados que evitam retrabalho
 
@@ -168,39 +189,37 @@ do enunciado.
 
 ### Cena 11 · SELECT inicial no banco (~2 min) 🔵 daqui em diante, SEM CORTES
 
-Abra um terminal no container do banco:
+Traga o **SQL Developer** para a tela, já conectado, com o
+[`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) aberto.
 
-```bash
-az container exec \
-  --resource-group rg-petflow-rm561940 \
-  --name rm561940-aci-db \
-  --exec-command "/bin/bash"
-```
-
-Dentro dele:
+Diga em voz que a conexão é com o **FQDN público do ACI**, pela porta 1521 — não
+é um banco local. A primeira consulta do arquivo prova isso:
 
 ```sql
-sqlplus petflow/<senha>@localhost:1521/PETFLOWDB
-
-SET LINESIZE 200
-SET PAGESIZE 50
-COL nm_tutor FORMAT A26
-COL nm_pet FORMAT A14
-
-SELECT id_tutor, nm_tutor, ds_email FROM TB_CLV_TUTOR ORDER BY id_tutor;
-SELECT id_pet, nm_pet, id_tutor FROM TB_CLV_PET ORDER BY id_pet;
+SELECT SYS_CONTEXT('USERENV','SERVER_HOST') AS servidor,
+       SYS_CONTEXT('USERENV','CON_NAME')    AS pdb,
+       USER                                  AS usuario
+  FROM dual;
 ```
 
-Este é o estado inicial. Deixe **esta janela aberta** — ela será usada a cada
-operação a seguir.
+O servidor aparece como `SandboxHost-...` — é o host do ACI.
 
-> A senha está no Key Vault:
-> `az keyvault secret show --vault-name kv-petflow-rm561940 --name oracle-app-password --query value -o tsv`
-> Recupere **antes** de começar a gravar e tenha à mão.
+Depois rode, uma por vez (Ctrl+Enter):
+
+- `SELECT COUNT(*) FROM user_tables` → **37 tabelas**, criadas pelo Flyway
+- `SELECT ... FROM flyway_schema_history` → as **15 migrations**, terminando na V13
+- Os dois `SELECT` de `TB_CLV_TUTOR` e `TB_CLV_PET` → a carga do bootstrap
+- O `JOIN` das duas tabelas → o relacionamento 1:N do requisito 4
+
+**Deixe o SQL Developer aberto.** Daqui até a Cena 15 a tela se divide: `curl` de
+um lado, SQL Developer do outro.
 
 ### Cena 12 · CRUD de TUTOR (~5 min) 🔵 item 9.3 — cada operação com SELECT
 
-Trabalhe com **duas janelas lado a lado**: `curl` numa, `sqlplus` na outra.
+Trabalhe com **duas janelas lado a lado**: `curl` numa, SQL Developer na outra.
+Todos os comandos e consultas desta cena e das seguintes estao em
+[`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql), na ordem de execucao — ele e a
+fonte unica, este roteiro so narra.
 
 Autentique primeiro:
 
