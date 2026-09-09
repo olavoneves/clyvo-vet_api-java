@@ -98,7 +98,9 @@ br.com.clyvovet.server
 ├── colaborador/    # Entidade interna (admin/master)
 ├── clinica/
 ├── veterinario/
-├── tutor/
+├── tutor/          # Cadastro de tutor (gestão)
+│   ├── app/        # A superfície do aplicativo: /api/tutor/**, posse pelo token
+│   └── web/        # As telas do tutor, por sessão
 ├── especie/
 ├── raca/
 ├── pet/
@@ -259,7 +261,10 @@ autenticada (telas).
 
 ## 🔀 Rotas da API
 
-### Rotas protegidas (requerem `Authorization: Bearer <token>`)
+### API de gestão da clínica (`VETERINARIO` e `COLABORADOR`)
+
+Um token de tutor recebe **403** em qualquer rota desta tabela. O aplicativo do
+tutor fala com `/api/tutor/**`, logo abaixo.
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -284,12 +289,35 @@ autenticada (telas).
 | `GET` | `/api/leituras-iot` | Listar leituras IoT |
 | `GET` | `/api/alertas-iot` | Listar alertas IoT |
 
-### Rotas do tutor
+### API do tutor (`TUTOR`)
 
-| Método | Rota | Perfil | Descrição |
-|---|---|---|---|
-| `POST` | `/api/agente/mensagens` | `TUTOR` | Conversa com o agente de agendamento |
-| `GET` | `/api/agente/conversas/{idPet}` | `TUTOR` | Histórico da conversa sobre um pet |
+Superfície própria do aplicativo do tutor. **O dono é derivado do token e nunca
+recebido por parâmetro:** nenhuma rota aqui aceita `tutorId` por path, query ou corpo,
+e não existe `/api/tutor/{id}` — a superfície não tem como endereçar outro tutor.
+
+| Método | Rota | Devolve |
+|---|---|---|
+| `GET` | `/api/tutor/me` | O tutor autenticado (`TutorResponse`) |
+| `GET` | `/api/tutor/pets` | Página de `PetResponse` — só os pets do tutor |
+| `GET` | `/api/tutor/pets/{id}` | `PetResponse` |
+| `POST` | `/api/tutor/pets` | `201` + `PetResponse`; o corpo (`PetDoTutorRequest`) não tem `tutorId` |
+| `PUT` | `/api/tutor/pets/{id}` | `PetResponse`, ainda vinculado ao tutor do token |
+| `DELETE` | `/api/tutor/pets/{id}` | `204` |
+| `GET` | `/api/tutor/pets/{id}/ficha-tecnica` | `PetFichaTecnicaResponse` |
+| `GET` | `/api/tutor/pets/{id}/consultas` | Página de `ConsultaResponse` |
+| `GET` | `/api/tutor/pets/{id}/vacinas` | Página de `AplicacaoVacinaResponse` |
+| `GET` | `/api/tutor/agendamentos` | Página de `AgendamentoResponse` — só dos pets do tutor |
+| `GET` | `/api/tutor/agendamentos/{id}` | `AgendamentoResponse` |
+| `POST` | `/api/tutor/agendamentos` | `201` + `AgendamentoResponse`; o `petId` do corpo precisa ser do tutor |
+| `PUT` | `/api/tutor/agendamentos/{id}` | `AgendamentoResponse` (remarcação) |
+| `DELETE` | `/api/tutor/agendamentos/{id}` | `204` — cancela por transição de status; a linha permanece |
+| `POST` | `/api/agente/mensagens` | Resposta do agente de agendamento |
+| `GET` | `/api/agente/conversas/{idPet}` | Histórico da conversa sobre um pet |
+
+> **Recurso de outro tutor devolve `404`, não `403`.** Um 403 confirmaria que o recurso
+> existe, e a diferença entre as duas respostas deixaria enumerar ids; o 404 não conta
+> nada a quem está sondando. O 403 fica reservado ao caso em que o perfil inteiro não
+> alcança a rota, que é decisão da `SecurityConfig` e não depende de qual id foi pedido.
 
 A documentação completa está disponível via Swagger em `/swagger-ui.html`.
 
@@ -710,7 +738,7 @@ A observação sobre **repair de objeto PL/SQL exigir regravação do objeto com
 passo** está em [Banco de Dados](#-banco-de-dados), com o procedimento e a armadilha do
 `SET TAB OFF`.
 
-### 3. Spring Security — dois perfis, rotas separadas
+### 3. Spring Security — dois perfis, três superfícies
 
 `TipoUsuario` tem três valores: **`COLABORADOR`**, **`VETERINARIO`** e **`TUTOR`**. Os
 dois primeiros são a equipe da clínica; o terceiro é o dono do pet. A proteção por perfil
@@ -719,10 +747,26 @@ a da API, por token JWT, e a das telas, por sessão de formulário.
 
 | Perfil | Alcança nas telas | Alcança na API |
 |---|---|---|
-| `COLABORADOR` | `/`, `/painel/**`, `/pets/**`, `/agenda/**`, `/obrigacoes/**` | Prontuário e gestão (`/api/consultas/**`, `/api/anamneses/**`, `/api/prescricoes/**`, `/api/exames/**`, `/api/vacinas/**`, `/api/alergias-pet/**`, `/api/condicoes-pet/**`, `/api/obrigacoes/**`, `/api/painel/**`) e, **só ele**, `POST /api/veterinarios` |
-| `VETERINARIO` | as mesmas telas de gestão | as mesmas rotas de prontuário e gestão |
-| `TUTOR` | `/tutor`, `/tutor/**` — e **nada** das telas da clínica | `/api/agente/**` (o agente de agendamento) |
+| `COLABORADOR` | `/`, `/painel/**`, `/pets/**`, `/agenda/**`, `/obrigacoes/**` | A API de gestão (`/api/pets/**`, `/api/agendamentos/**`, `/api/consultas/**`, `/api/anamneses/**`, `/api/prescricoes/**`, `/api/exames/**`, `/api/vacinas/**`, `/api/alergias-pet/**`, `/api/condicoes-pet/**`, `/api/obrigacoes/**`, `/api/painel/**`) e, **só ele**, `POST /api/veterinarios` |
+| `VETERINARIO` | as mesmas telas de gestão | as mesmas rotas de gestão |
+| `TUTOR` | `/tutor`, `/tutor/**` — e **nada** das telas da clínica | `/api/tutor/**` (a superfície do aplicativo) e `/api/agente/**` (o agente de agendamento) |
 | anônimo | `/login`, `/error`, CSS, Swagger, `/actuator/health` | `/api/auth/**`, `POST /api/clinicas`, `POST /api/tutores` |
+
+**A API de gestão é da clínica; o tutor tem superfície própria.** `/api/pets/**` e
+`/api/agendamentos/**` aceitam o dono como parâmetro — o `tutorId` na URL de
+`GET /api/pets/tutor/{id}`, o `tutorId` no corpo do cadastro — e nenhum dos dois
+controllers verifica de quem é o recurso. Enquanto essas rotas caíam no
+`anyRequest().authenticated()`, um token de tutor as alcançava, e trocar um número
+bastava para ler e escrever no nome de outro tutor da mesma clínica. Hoje elas são da
+equipe, e o aplicativo do tutor fala com `/api/tutor/**`, onde **a posse é derivada do
+token e nunca recebida por parâmetro** — a mesma recusa que o `clyvo-insights` faz com
+o id de clínica. Quem confere é `tutor/app/PosseDoTutor`, e não uma anotação: não há
+`@PreAuthorize` nem SpEL de segurança no projeto.
+
+**Nela, recurso de outro tutor devolve `404` e não `403`,** porque um 403 confirmaria
+que o recurso existe e permitiria enumerar ids pela diferença entre as duas respostas.
+O 403 continua sendo a resposta de perfil — quem não é tutor não entra na rota — e essa
+não depende de qual id foi pedido.
 
 Três coisas que a tabela não mostra e importam:
 
@@ -736,8 +780,13 @@ Três coisas que a tabela não mostra e importam:
 - **Rate limit por IP** (`ratelimit/RateLimitFilter`, Bucket4j) com teto muito menor nas
   rotas de autenticação: 5 por minuto contra 100.
 
-Testes: `VeterinarioControllerSecurityTest` e `AgenteControllerSecurityTest` afirmam que
-o perfil errado leva 403 e que o anônimo leva 401.
+Testes: `VeterinarioControllerSecurityTest`, `AgenteControllerSecurityTest` e
+`TutorApiRotasSecurityTest` afirmam que o perfil errado leva 403 e que o anônimo leva
+401. `PosseNaSuperficieDoTutorIntegracaoTest` cobre o outro eixo, que nenhum deles
+alcança: **dois tutores da mesma clínica**, contra o banco, com o pedido do tutor A
+sobre o recurso do tutor B terminando em 404 na leitura, na alteração, na remoção e no
+agendamento — e o mesmo pedido sobre o próprio recurso terminando em 200, para que um
+404 por rota quebrada não passe por segurança.
 
 ### 4. Funcionalidades completas (não-CRUD)
 
