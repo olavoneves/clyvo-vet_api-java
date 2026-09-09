@@ -50,6 +50,19 @@ public class PetService {
         return repository.findByTutorId(tutorId, pageable).map(PetResponse::from);
     }
 
+    /**
+     * Os pets do tutor, sem os que ele removeu do aplicativo.
+     *
+     * <p>Separado de {@link #findByTutor} de proposito: aquele atende a clinica,
+     * em {@code GET /api/pets/tutor/{id}}, e a clinica precisa continuar
+     * enxergando o pet inativado — a remocao e do aplicativo do tutor, nao do
+     * prontuario.
+     */
+    @Transactional(readOnly = true)
+    public Page<PetResponse> findAtivosDoTutor(Long idTutor, Pageable pageable) {
+        return repository.ativosDoTutor(idTutor, pageable).map(PetResponse::from);
+    }
+
     @Transactional(readOnly = true)
     public Page<PetResponse> findByStatus(PetStatus status, Pageable pageable) {
         return repository.findByStatus(status, pageable).map(PetResponse::from);
@@ -76,6 +89,27 @@ public class PetService {
     public void delete(Long id) {
         if (!repository.existsById(id)) throw new EntityNotFoundException("Pet", id);
         repository.deleteById(id);
+    }
+
+    /**
+     * Tira o pet do aplicativo do tutor sem tirar nada do prontuario.
+     *
+     * <p>E o que {@code DELETE /api/tutor/pets/{id}} faz, e a razao e que
+     * {@link #delete} nao servia ali. Nenhuma das sete tabelas que apontam para
+     * TB_CLV_PET tem ON DELETE CASCADE e o Pet nao tem colecao mapeada, entao a
+     * remocao fisica nunca chegou a perder historico — ela simplesmente falhava
+     * com ORA-02292 em qualquer pet que ja tivesse consulta, vacina ou
+     * obrigacao. Um botao que so funciona em pet sem historico nao e um botao.
+     *
+     * <p>Idempotente: inativar o que ja esta inativo grava o mesmo valor. O
+     * aplicativo pode repetir o DELETE sem receber erro.
+     */
+    @Transactional
+    public void inativar(Long id) {
+        Pet p = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Pet", id));
+        p.setStatus(PetStatus.INATIVO);
+        repository.save(p);
     }
 
     private void mapRequest(Pet p, PetRequest r) {

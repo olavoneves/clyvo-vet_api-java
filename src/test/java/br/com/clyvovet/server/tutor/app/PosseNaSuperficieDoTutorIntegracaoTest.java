@@ -2,6 +2,8 @@ package br.com.clyvovet.server.tutor.app;
 
 import br.com.clyvovet.server.auth.JwtService;
 import br.com.clyvovet.server.enums.TipoUsuario;
+import br.com.clyvovet.server.pet.PetResponse;
+import br.com.clyvovet.server.pet.PetService;
 import br.com.clyvovet.server.support.CenarioClinico;
 import br.com.clyvovet.server.tenant.TenantContext;
 import jakarta.persistence.EntityManager;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -68,6 +71,9 @@ class PosseNaSuperficieDoTutorIntegracaoTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private PetService petService;
 
     private CenarioClinico fixture;
 
@@ -193,6 +199,66 @@ class PosseNaSuperficieDoTutorIntegracaoTest {
         assertThat(resultado.getResponse().getContentAsString())
                 .as("o tutorId do corpo nao pode ter chegado ao banco")
                 .doesNotContain("\"tutorId\":" + tutorB);
+    }
+
+    /**
+     * A remocao do aplicativo nao pode custar o prontuario.
+     *
+     * <p>Este teste so passa porque o DELETE do tutor inativa. Com a remocao
+     * fisica que estava aqui antes, um pet com consulta e obrigacao nem chegava
+     * a ser removido: as FKs de TB_CLV_PET nao tem ON DELETE CASCADE e o Oracle
+     * recusava com ORA-02292, que a aplicacao traduzia em 409. O historico nunca
+     * correu risco — o botao e que nao funcionava em nenhum pet de verdade.
+     *
+     * <p>A obrigacao e a parte que importa: e dela que sai a taxa de cumprimento
+     * do painel de coorte. Um pet removido pelo tutor tem que continuar contando.
+     */
+    @Test
+    @DisplayName("remover o pet no aplicativo o esconde do tutor e preserva o historico")
+    void removerInativaEPreservaOHistorico() throws Exception {
+        Long consulta = fixture.novaConsulta(petDeA, veterinario);
+        Long obrigacao = fixture.novaObrigacao(clinica, petDeA, "PREVISTA", 30, false);
+        entityManager.flush();
+
+        mockMvc.perform(delete("/api/tutor/pets/" + petDeA)
+                        .header(HttpHeaders.AUTHORIZATION, tokenDeA))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/tutor/pets").header(HttpHeaders.AUTHORIZATION, tokenDeA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == " + petDeA + ")]").doesNotExist());
+
+        assertThat(contar("""
+                select count(*) from TB_CLV_PET
+                 where id_pet = %d and ds_status_pet = 'INATIVO'
+                """.formatted(petDeA)))
+                .as("o pet tem que continuar existindo, inativado")
+                .isEqualTo(1);
+
+        assertThat(contar("select count(*) from TB_CLV_CONSULTA where id_consulta = %d"
+                .formatted(consulta)))
+                .as("a consulta do pet removido nao pode sumir")
+                .isEqualTo(1);
+
+        assertThat(contar("select count(*) from TB_CLV_OBRIGACAO where id_obrigacao = %d"
+                .formatted(obrigacao)))
+                .as("a obrigacao sustenta a coorte do painel: nao pode sumir")
+                .isEqualTo(1);
+    }
+
+    /** A clinica continua enxergando o que o tutor escondeu do proprio aplicativo. */
+    @Test
+    @DisplayName("o pet inativado continua visivel para a clinica")
+    void oPetInativadoContinuaNaGestao() throws Exception {
+        mockMvc.perform(delete("/api/tutor/pets/" + petDeA)
+                        .header(HttpHeaders.AUTHORIZATION, tokenDeA))
+                .andExpect(status().isNoContent());
+
+        TenantContext.set(clinica);
+        assertThat(petService.findByTutor(tutorA, PageRequest.of(0, 20)).getContent())
+                .as("a rota de gestao nao muda: /api/pets/tutor/{id} devolve o pet inativado")
+                .extracting(PetResponse::id)
+                .contains(petDeA);
     }
 
     @Test

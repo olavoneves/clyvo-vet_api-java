@@ -54,7 +54,7 @@ public class TutorPetController {
     @Operation(summary = "Listar os pets do tutor autenticado",
             description = "Paginado. O tutor sai do token; não há filtro por dono.")
     public Page<PetResponse> listar(Pageable pageable) {
-        return petService.findByTutor(posse.id(), pageable);
+        return petService.findAtivosDoTutor(posse.id(), pageable);
     }
 
     @GetMapping("/{id}")
@@ -93,14 +93,27 @@ public class TutorPetController {
         return petService.update(id, request.comTutor(posse.id()));
     }
 
+    /**
+     * Remover aqui e inativar, e nao apagar.
+     *
+     * <p>Esta rota fazia remocao fisica, herdada do {@code PetService}. O que
+     * ela nao fazia era perder historico: sem ON DELETE CASCADE em nenhuma das
+     * sete tabelas filhas, o Oracle recusava. O que ela fazia era pior de outro
+     * jeito — so funcionava em pet sem consulta, sem vacina e sem obrigacao, e
+     * devolvia 409 em qualquer pet real.
+     *
+     * <p>O verbo continua DELETE e a resposta continua 204: para o aplicativo,
+     * nada muda. O pet sai das listagens do tutor e continua inteiro para a
+     * clinica — inclusive as obrigacoes dele, que sustentam a coorte do painel.
+     */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Remover um pet do tutor autenticado",
-            description = "Mesma semântica de remoção da API de gestão.")
+    @Operation(summary = "Remover um pet do aplicativo",
+            description = "Inativa o pet: ele sai das listagens do tutor e o histórico permanece.")
     @ApiResponse(responseCode = "204", description = "Sem conteúdo")
     @ApiResponse(responseCode = "404", description = "O pet não existe ou não é deste tutor")
     public ResponseEntity<Void> remover(@PathVariable Long id) {
         posse.exigirPet(id);
-        petService.delete(id);
+        petService.inativar(id);
         return ResponseEntity.noContent().build();
     }
 

@@ -438,7 +438,7 @@ class PaginasRenderizamTest {
      */
     @Test
     void telaDoTutorRenderiza() throws Exception {
-        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(petDeExemplo())));
         given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
         given(obrigacaoService.doPetComStatus(eq(9L), any(), any(Pageable.class)))
@@ -465,7 +465,7 @@ class PaginasRenderizamTest {
      */
     @Test
     void caixaDoTutorListaOsLembretes() throws Exception {
-        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(petDeExemplo())));
         given(notificacaoService.caixaDo(3L)).willReturn(List.of(
                 new NotificacaoResponse(1L, "Rex: Reforço anual",
@@ -494,7 +494,7 @@ class PaginasRenderizamTest {
     /** Caixa vazia e o estado normal de quem esta em dia: explica, nao da erro. */
     @Test
     void caixaVaziaExplicaEmVezDeFicarEmBranco() throws Exception {
-        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(petDeExemplo())));
         given(notificacaoService.caixaDo(3L)).willReturn(List.of());
         given(notificacaoService.naoLidasDo(3L)).willReturn(0L);
@@ -530,7 +530,7 @@ class PaginasRenderizamTest {
     /** /tutor sem id escolhe o primeiro pet: e para onde o login manda o tutor. */
     @Test
     void tutorSemIdCaiNoPrimeiroPet() throws Exception {
-        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(petDeExemplo())));
         given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
         given(obrigacaoService.doPetComStatus(eq(9L), any(), any(Pageable.class)))
@@ -543,7 +543,7 @@ class PaginasRenderizamTest {
 
     @Test
     void tutorSemPetVeExplicacaoEmVezDeErro() throws Exception {
-        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
                 .willReturn(Page.empty(PageRequest.of(0, 50)));
 
         mockMvc.perform(get("/tutor").with(user(TUTOR)))
@@ -555,7 +555,7 @@ class PaginasRenderizamTest {
     /** Pet de outro tutor nao aparece na lista dele, entao nao existe para a tela. */
     @Test
     void tutorNaoAbrePetDeOutroDono() throws Exception {
-        given(petService.findByTutor(eq(3L), any(Pageable.class)))
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(petDeExemplo())));
 
         mockMvc.perform(get("/tutor/pets/4242").with(user(TUTOR)))

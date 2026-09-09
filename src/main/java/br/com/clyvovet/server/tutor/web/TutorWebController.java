@@ -71,7 +71,7 @@ public class TutorWebController {
                 .orElseThrow(() -> new UnauthorizedException("Sessão sem usuário autenticado"));
 
         List<PetResponse> pets = petService
-                .findByTutor(tutor.id(), PageRequest.of(0, 50, Sort.by("nome")))
+                .findAtivosDoTutor(tutor.id(), PageRequest.of(0, 50, Sort.by("nome")))
                 .getContent();
 
         model.addAttribute("tutor", tutor);

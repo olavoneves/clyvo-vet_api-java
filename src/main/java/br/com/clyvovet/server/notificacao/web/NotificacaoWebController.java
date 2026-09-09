@@ -36,7 +36,7 @@ public class NotificacaoWebController {
         model.addAttribute("tutor", tutor);
         // o cabecalho e o mesmo fragmento da tela do pet, e ele lista os pets
         model.addAttribute("pets", petService
-                .findByTutor(tutor.id(), PageRequest.of(0, 50, Sort.by("nome"))).getContent());
+                .findAtivosDoTutor(tutor.id(), PageRequest.of(0, 50, Sort.by("nome"))).getContent());
         model.addAttribute("notificacoes", service.caixaDo(tutor.id()));
         model.addAttribute("naoLidas", service.naoLidasDo(tutor.id()));
 
