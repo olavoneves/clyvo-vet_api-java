@@ -92,6 +92,19 @@ public class SecurityConfig {
     };
 
     /**
+     * A vitrine de clinicas que a tela de cadastro do aplicativo le antes de
+     * existir um token.
+     *
+     * <p>{@code POST /tutores} exige {@code clinicaId} e o aplicativo nao tinha
+     * como descobri-lo: {@code GET /clinicas} responde 401 para quem ainda nao
+     * tem conta. Esta e a unica leitura aberta da API, e devolve uma projecao
+     * reduzida — ver {@code ClinicaPublicaResponse}.
+     */
+    private static final String[] API_LEITURAS_PUBLICAS = {
+            "/clinicas/publicas"
+    };
+
+    /**
      * A API de gestao da clinica. So {@code VETERINARIO} e {@code COLABORADOR}.
      *
      * <p>{@code /pets/**} e {@code /agendamentos/**} entraram aqui porque estavam
@@ -125,7 +138,9 @@ public class SecurityConfig {
             "/tutores/**",
             "/veterinarios/**",
             // catalogo clinico. Especie, raca e protocolo sao a materia-prima
-            // do motor: quem os edita muda o cuidado de todos os pets.
+            // do motor: quem os edita muda o cuidado de todos os pets. O tutor
+            // le especie, raca e veterinario em /tutor/catalogo, que e somente
+            // leitura: escolher dentro do catalogo nao e o mesmo que edita-lo.
             "/especies/**",
             "/racas/**",
             "/protocolos/**",
@@ -237,6 +252,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(api(API_PUBLICA)).permitAll()
                         .requestMatchers(HttpMethod.POST, api(API_CADASTROS_PUBLICOS)).permitAll()
+                        // antes da regra de /clinicas/**, senao cai na API de gestao
+                        .requestMatchers(HttpMethod.GET, api(API_LEITURAS_PUBLICAS)).permitAll()
                         // contratar veterinario e ato administrativo da clinica
                         .requestMatchers(HttpMethod.POST, api("/veterinarios"))
                                 .hasRole(TipoUsuario.COLABORADOR.name())
