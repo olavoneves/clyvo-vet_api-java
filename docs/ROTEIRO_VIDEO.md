@@ -34,6 +34,13 @@ automática do YouTube antes de publicar.
 - [ ] `az login` feito e assinatura correta selecionada
 - [ ] Docker Desktop em execução
 - [ ] Resource Group **apagado** — a gravação começa do zero
+- [ ] **Key Vault purgado** — apagar o RG deixa o cofre em *soft delete* por 90
+      dias, e o `03_key-vault.sh` aborta se o nome ainda estiver preso:
+
+      ```bash
+      az keyvault list-deleted --query "[?name=='kv-petflow-rm561940'].name" -o tsv
+      az keyvault purge --name kv-petflow-rm561940      # se o comando acima retornar algo
+      ```
 - [ ] Terminal com fonte grande (14pt+), tema de alto contraste
 - [ ] Notificações do sistema desligadas
 - [ ] Microfone testado
