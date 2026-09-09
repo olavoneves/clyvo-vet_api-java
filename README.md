@@ -238,7 +238,9 @@ O `accessToken` expira em **15 minutos**. O `refreshToken` em **7 dias**.
 
 ### Rotas públicas (sem token)
 
-Esta lista é exaustiva. Qualquer rota fora dela exige autenticação.
+Esta lista é exaustiva, e agora é o `SecurityConfig` que a mantém exaustiva: a cadeia
+da API termina em `denyAll()`, então rota que ninguém declarou é negada — não há como
+uma rota nova virar pública por esquecimento.
 
 | Rota | Descrição |
 |---|---|
@@ -281,13 +283,22 @@ tutor fala com `/api/tutor/**`, logo abaixo.
 | `GET` | `/api/veterinarios` | Listar veterinários |
 | `GET` | `/api/tutores` | Listar tutores |
 | `GET` | `/api/clinicas` | Listar clínicas |
-| `GET` | `/api/vacinas/tipos` | Listar tipos de vacina |
-| `GET` | `/api/vacinas/aplicacoes` | Listar aplicações de vacina |
+| `GET` | `/api/tipos-vacina` | Listar tipos de vacina |
+| `GET` | `/api/vacinas` | Listar aplicações de vacina |
 | `GET` | `/api/exames` | Listar exames |
 | `GET` | `/api/prescricoes` | Listar prescrições |
 | `GET` | `/api/sensores-iot` | Listar sensores IoT |
 | `GET` | `/api/leituras-iot` | Listar leituras IoT |
 | `GET` | `/api/alertas-iot` | Listar alertas IoT |
+
+Cada família tem o CRUD completo (`GET`, `POST`, `PUT`, `DELETE`); a tabela mostra a
+leitura de cada uma. As famílias declaradas como rota de clínica são:
+
+`/pets`, `/agendamentos`, `/consultas`, `/anamneses`, `/prescricoes`, `/exames`,
+`/vacinas`, `/alergias-pet`, `/condicoes-pet`, `/obrigacoes`, `/painel`, `/clinicas`,
+`/tutores`, `/veterinarios`, `/especies`, `/racas`, `/protocolos`, `/medicamentos`,
+`/tipos-alergia`, `/tipos-condicao`, `/tipos-sensor`, `/tipos-vacina`, `/sensores-iot`,
+`/leituras-iot`, `/alertas-iot`, `/logs-erro`.
 
 ### API do tutor (`TUTOR`)
 
@@ -302,7 +313,7 @@ e não existe `/api/tutor/{id}` — a superfície não tem como endereçar outro
 | `GET` | `/api/tutor/pets/{id}` | `PetResponse` |
 | `POST` | `/api/tutor/pets` | `201` + `PetResponse`; o corpo (`PetDoTutorRequest`) não tem `tutorId` |
 | `PUT` | `/api/tutor/pets/{id}` | `PetResponse`, ainda vinculado ao tutor do token |
-| `DELETE` | `/api/tutor/pets/{id}` | `204` |
+| `DELETE` | `/api/tutor/pets/{id}` | `204` — **inativa**: some das listagens do tutor, o histórico permanece |
 | `GET` | `/api/tutor/pets/{id}/ficha-tecnica` | `PetFichaTecnicaResponse` |
 | `GET` | `/api/tutor/pets/{id}/consultas` | Página de `ConsultaResponse` |
 | `GET` | `/api/tutor/pets/{id}/vacinas` | Página de `AplicacaoVacinaResponse` |
@@ -722,7 +733,7 @@ de consulta, nunca de array literal (`FunilView`, `ComparacaoView`).
 
 ### 2. Flyway
 
-`src/main/resources/db/migration/`, **V0 a V13**. A tabela completa está em
+`src/main/resources/db/migration/`, **V0 a V14**. A tabela completa está em
 [Banco de Dados](#-banco-de-dados); em faixas:
 
 | Faixa | O que faz |
@@ -733,6 +744,7 @@ de consulta, nunca de array literal (`FunilView`, `ComparacaoView`).
 | `V8` | Gerador de dados de demonstração (`PR_CLV_SEED_*`) — nada aqui é chamado pela aplicação |
 | `V9` | Catálogo clínico: espécies, raças e 26 protocolos, com correções de regra do motor |
 | `V10` – `V13` | Senhas do seed em BCrypt válido, view da coorte, caixa do tutor e a antecedência do lembrete |
+| `V14` | `INATIVO` em `chk_pet_status`: o estado que o tutor grava ao remover o pet do aplicativo |
 
 A observação sobre **repair de objeto PL/SQL exigir regravação do objeto como segundo
 passo** está em [Banco de Dados](#-banco-de-dados), com o procedimento e a armadilha do
@@ -747,10 +759,25 @@ a da API, por token JWT, e a das telas, por sessão de formulário.
 
 | Perfil | Alcança nas telas | Alcança na API |
 |---|---|---|
-| `COLABORADOR` | `/`, `/painel/**`, `/pets/**`, `/agenda/**`, `/obrigacoes/**` | A API de gestão (`/api/pets/**`, `/api/agendamentos/**`, `/api/consultas/**`, `/api/anamneses/**`, `/api/prescricoes/**`, `/api/exames/**`, `/api/vacinas/**`, `/api/alergias-pet/**`, `/api/condicoes-pet/**`, `/api/obrigacoes/**`, `/api/painel/**`) e, **só ele**, `POST /api/veterinarios` |
+| `COLABORADOR` | `/`, `/painel/**`, `/pets/**`, `/agenda/**`, `/obrigacoes/**` | A API de gestão — as 26 famílias listadas em [Rotas da API](#-rotas-da-api), do prontuário ao catálogo, à telemetria e a `/api/logs-erro` — e, **só ele**, `POST /api/veterinarios` |
 | `VETERINARIO` | as mesmas telas de gestão | as mesmas rotas de gestão |
 | `TUTOR` | `/tutor`, `/tutor/**` — e **nada** das telas da clínica | `/api/tutor/**` (a superfície do aplicativo) e `/api/agente/**` (o agente de agendamento) |
 | anônimo | `/login`, `/error`, CSS, Swagger, `/actuator/health` | `/api/auth/**`, `POST /api/clinicas`, `POST /api/tutores` |
+
+**A cadeia da API é fechada por padrão.** A regra final é `anyRequest().denyAll()`, e
+cada rota está declarada explicitamente numa das quatro listas do `SecurityConfig`:
+pública, cadastro público por `POST`, rota de clínica e rota do tutor. **Rota não
+declarada é negada** — para todos os perfis, inclusive o colaborador.
+
+Antes a regra final era `anyRequest().authenticated()`, que se lê como "aberto para
+qualquer usuário autenticado, menos o que alguém lembrou de fechar". O que ninguém
+lembrava nascia alcançável por todo perfil, e foi assim que um token de tutor chegou a
+`GET /api/tutores` — nome, e-mail e telefone de todos os tutores da clínica —, aos
+catálogos, às três rotas de IoT e a `/api/logs-erro`. O preço da inversão é conhecido e
+aceito: controller novo cujo caminho não entre em nenhuma lista responde 403 mesmo para
+quem deveria alcançá-lo. É um 403 na primeira chamada, em desenvolvimento, no lugar de
+um vazamento em produção que ninguém vê. `AutorizacaoFechadaPorPadraoTest` afirma isso
+sobre uma rota que não existe, que é a única forma de testar a omissão futura.
 
 **A API de gestão é da clínica; o tutor tem superfície própria.** `/api/pets/**` e
 `/api/agendamentos/**` aceitam o dono como parâmetro — o `tutorId` na URL de
@@ -763,6 +790,20 @@ token e nunca recebida por parâmetro** — a mesma recusa que o `clyvo-insights
 o id de clínica. Quem confere é `tutor/app/PosseDoTutor`, e não uma anotação: não há
 `@PreAuthorize` nem SpEL de segurança no projeto.
 
+**Remover um pet no aplicativo inativa, não apaga.** `DELETE /api/tutor/pets/{id}`
+grava `PetStatus.INATIVO` (V14) e devolve 204: o pet sai das listagens do tutor — API e
+telas — e continua inteiro para a clínica, com as consultas, as vacinas e as obrigações
+que sustentam a coorte do painel. A rota de gestão `DELETE /api/pets/{id}` não mudou.
+
+O motivo não é o que parece. Remoção física nunca perdeu histórico: `Pet` não tem
+coleção mapeada e nenhuma das sete FKs que apontam para `TB_CLV_PET` tem
+`ON DELETE CASCADE`, então o Oracle recusava com ORA-02292 e a API devolvia 409. O
+problema era o oposto — o botão só funcionava em pet sem consulta, sem vacina e sem
+obrigação, ou seja, em nenhum pet real. `INATIVO` foi acrescentado ao domínio porque os
+quatro estados existentes (`ATIVO`, `EM_TRATAMENTO`, `OBITO`, `PERDIDO`) são afirmações
+clínicas sobre o animal: gravar `OBITO` porque alguém tocou em "remover" escreveria um
+fato falso no prontuário que a coorte lê.
+
 **Nela, recurso de outro tutor devolve `404` e não `403`,** porque um 403 confirmaria
 que o recurso existe e permitiria enumerar ids pela diferença entre as duas respostas.
 O 403 continua sendo a resposta de perfil — quem não é tutor não entra na rota — e essa
@@ -770,8 +811,8 @@ não depende de qual id foi pedido.
 
 Três coisas que a tabela não mostra e importam:
 
-- **`anyRequest().authenticated()`** fecha as duas cadeias: rota nova nasce protegida, e
-  não aberta por esquecimento.
+- **As duas cadeias fecham por omissão:** `denyAll()` na API e
+  `anyRequest().authenticated()` nas telas.
 - **Multi-tenancy é ortogonal ao perfil.** Ter o papel certo não basta: o
   `TenantContext`, alimentado pelo JWT ou pela sessão, entra num `@Filter` do Hibernate
   ligado por `autoEnabled` que recorta **toda** consulta pela clínica. Um colaborador da
@@ -780,9 +821,9 @@ Três coisas que a tabela não mostra e importam:
 - **Rate limit por IP** (`ratelimit/RateLimitFilter`, Bucket4j) com teto muito menor nas
   rotas de autenticação: 5 por minuto contra 100.
 
-Testes: `VeterinarioControllerSecurityTest`, `AgenteControllerSecurityTest` e
-`TutorApiRotasSecurityTest` afirmam que o perfil errado leva 403 e que o anônimo leva
-401. `PosseNaSuperficieDoTutorIntegracaoTest` cobre o outro eixo, que nenhum deles
+Testes: `VeterinarioControllerSecurityTest`, `AgenteControllerSecurityTest`,
+`TutorApiRotasSecurityTest` e `AutorizacaoFechadaPorPadraoTest` afirmam que o perfil
+errado leva 403 e que o anônimo leva 401. `PosseNaSuperficieDoTutorIntegracaoTest` cobre o outro eixo, que nenhum deles
 alcança: **dois tutores da mesma clínica**, contra o banco, com o pedido do tutor A
 sobre o recurso do tutor B terminando em 404 na leitura, na alteração, na remoção e no
 agendamento — e o mesmo pedido sobre o próprio recurso terminando em 200, para que um
