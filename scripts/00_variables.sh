@@ -53,8 +53,13 @@ export DNS_DB="${RM}-db-petflow"
 export DNS_APP="${RM}-app-petflow"
 
 # --- banco de dados ----------------------------------------------------
-# XEPDB1 e o PDB padrao da imagem gvenzl/oracle-xe.
-export ORACLE_DATABASE="XEPDB1"
+# ORACLE_DATABASE pede ao entrypoint da imagem que CRIE um PDB com este
+# nome. Nao pode ser "XEPDB1": esse PDB ja vem pronto na imagem, e pedir
+# a criacao dele aborta o boot com
+#   ORA-65012: Pluggable database XEPDB1 already exists.
+# Mesmo nome usado no docker-compose.yaml, para que local e nuvem
+# apontem para o mesmo PDB.
+export ORACLE_DATABASE="PETFLOWDB"
 export APP_USER="petflow"
 
 # --- nomes dos segredos no Key Vault -----------------------------------

@@ -1200,7 +1200,7 @@ az container exec \
 Dentro do container:
 
 ```sql
-sqlplus petflow/<senha>@localhost:1521/XEPDB1
+sqlplus petflow/<senha>@localhost:1521/PETFLOWDB
 
 SET LINESIZE 200
 SET PAGESIZE 50

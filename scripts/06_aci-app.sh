@@ -47,9 +47,9 @@ if [[ -z "${DB_FQDN}" ]]; then
 fi
 echo "  ${DB_FQDN}"
 
-# Formato thin com barra dupla e nome de SERVICO (nao SID): XEPDB1 e o PDB
-# padrao da imagem gvenzl/oracle-xe. Apontar para XE (o CDB) devolve
-# ORA-12514.
+# Formato thin com barra dupla e nome de SERVICO (nao SID). O PDB e o
+# criado pelo entrypoint a partir de ORACLE_DATABASE. Apontar para XE
+# (o CDB) devolve ORA-12514.
 JDBC_URL="jdbc:oracle:thin:@//${DB_FQDN}:1521/${ORACLE_DATABASE}"
 echo ""
 echo "URL JDBC:"
