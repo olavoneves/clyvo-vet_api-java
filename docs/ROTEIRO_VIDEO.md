@@ -326,8 +326,22 @@ SELECT id_tutor, nm_tutor, nr_telefone FROM TB_CLV_TUTOR WHERE id_tutor = <ID>;
 curl -H "Authorization: Bearer $TOKEN" $API/tutores/<ID>
 ```
 
-> O `PUT` reusa o DTO do `POST`: `senha` e `clinicaId` são obrigatórios no corpo.
-> Sem eles a resposta é **422**, não 200.
+> **Dois erros esperados, que não são bugs:**
+>
+> **422** no `PUT` — ele reusa o DTO do `POST`, então `senha` e `clinicaId` são
+> obrigatórios no corpo, além dos campos alterados.
+>
+> **401 com `"Token de acesso ausente ou invalido"`** — o JWT expira em **15
+> minutos**. Reautentique e siga; nada foi alterado no banco, o filtro barra
+> antes do controller:
+>
+> ```bash
+> TOKEN=$(curl -s -X POST $API/auth/login >   -H "Content-Type: application/json" >   -d '{"email":"master@clyvovet.com","senha":"master","tipo":"COLABORADOR"}' >   | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
+> echo ${#TOKEN}      # ~227, nunca 0
+> ```
+>
+> Se as cenas 12 a 15 forem longas, **reautentique antes de cada bloco** — custa
+> 3 segundos e evita o 401 no meio de uma sequência sem cortes.
 
 ### Cena 13 · CRUD de PET (~5 min) 🔵 a segunda tabela
 
