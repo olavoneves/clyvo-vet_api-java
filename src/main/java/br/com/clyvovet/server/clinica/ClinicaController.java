@@ -27,6 +27,17 @@ public class ClinicaController {
         return service.findAll(pageable);
     }
 
+    /**
+     * Aberta de proposito: e o unico jeito de a tela de cadastro do aplicativo
+     * descobrir o clinicaId que {@code POST /tutores} exige.
+     */
+    @GetMapping("/publicas")
+    @Operation(summary = "Listar clínicas para a tela de cadastro (sem autenticação)",
+            description = "Projeção reduzida: id, nome e cidade. Não expõe CNPJ nem contato.")
+    public Page<ClinicaPublicaResponse> findAllPublicas(Pageable pageable) {
+        return service.findAllPublicas(pageable);
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Buscar clínica por ID")
     @ApiResponse(responseCode = "404", description = "Não encontrado")

@@ -20,6 +20,17 @@ public class ClinicaService {
         return repository.findAll(pageable).map(ClinicaResponse::from);
     }
 
+    /**
+     * A lista que a tela de cadastro do aplicativo consome, sem token.
+     *
+     * <p>Mesma consulta do {@link #findAll}, projecao menor: ver
+     * {@link ClinicaPublicaResponse} para o que fica de fora e por que.
+     */
+    @Transactional(readOnly = true)
+    public Page<ClinicaPublicaResponse> findAllPublicas(Pageable pageable) {
+        return repository.findAll(pageable).map(ClinicaPublicaResponse::from);
+    }
+
     @Transactional(readOnly = true)
     public ClinicaResponse findById(Long id) {
         return repository.findById(id)
