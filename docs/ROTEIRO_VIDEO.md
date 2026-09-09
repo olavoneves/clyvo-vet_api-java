@@ -174,9 +174,21 @@ bash scripts/04_build-push.sh
 Este é o trecho mais longo: a imagem do Oracle tem ~755 MB. **Pode cortar aqui** —
 não é evidência de teste nem de persistência.
 
-Ao final, mostre:
-- `az acr repository list` com as **duas** imagens 🔵
-- A verificação de arquitetura imprimindo `amd64` para ambas
+Ao final o próprio script já imprime as duas imagens e a arquitetura. Se quiser
+repetir na tela:
+
+```bash
+az acr repository list --name acrpetflowrm561940 --output table
+```
+
+Deve listar **as duas** 🔵:
+
+```
+rm561940-app-petflow
+rm561940-db-petflow
+```
+
+E a verificação de arquitetura do script imprimindo `amd64` para ambas.
 
 ### Cena 7 · ACI do banco (~3 min)
 
@@ -385,8 +397,16 @@ SELECT COUNT(*) FROM TB_CLV_TUTOR WHERE id_tutor = <ID_TUTOR>;  -- 0
 Mostre no Portal do Azure, dentro do Resource Group:
 - ACR com as duas imagens
 - Os **dois** ACIs em `Running`
-- Key Vault com os três segredos (só os nomes)
-- `az container show` **sem senha em texto claro** 🔵
+- Key Vault com os três segredos (só os nomes, nunca os valores)
+
+E, de volta ao terminal, a prova de que os segredos não vazam 🔵:
+
+```bash
+az container show   --resource-group rg-petflow-rm561940   --name rm561940-aci-app   --query "containers[0].environmentVariables[].{nome:name, valor:value}"   --output table
+```
+
+`SPRING_DATASOURCE_PASSWORD` e `JWT_SECRET` aparecem com a coluna **valor
+vazia** — é o efeito do `--secure-environment-variables`.
 
 ### Cena 17 · Encerramento (~1 min)
 
