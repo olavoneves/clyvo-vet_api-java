@@ -6,6 +6,8 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 
 > Projeto acadêmico — FIAP 2TDSR · Challenge 2026
 
+Vídeo de demonstração: https://youtu.be/asLs3qNrzvs
+
 ---
 
 ## 📋 Índice
@@ -930,7 +932,8 @@ Três coisas que a tabela não mostra e importam:
   não enxerga o pet da B nem sabendo o id — `applyToLoadByKey` estende o filtro ao
   `findById`. Coberto por `IsolamentoMultiTenantIntegracaoTest`.
 - **Rate limit por IP** (`ratelimit/RateLimitFilter`, Bucket4j) com teto muito menor nas
-  rotas de autenticação: 5 por minuto contra 100.
+  tentativas de autenticação — o **POST** que envia a senha: 5 por minuto contra 100.
+  Abrir a tela de login é um GET e conta no balde comum.
 
 Testes: `VeterinarioControllerSecurityTest`, `AgenteControllerSecurityTest`,
 `TutorApiRotasSecurityTest`, `TutorCatalogoSecurityTest` e

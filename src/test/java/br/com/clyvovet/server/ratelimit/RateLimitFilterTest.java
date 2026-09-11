@@ -123,8 +123,50 @@ class RateLimitFilterTest {
                 org.mockito.ArgumentMatchers.any());
     }
 
+    /**
+     * Carregar a tela de login nao e tentar entrar.
+     *
+     * <p>{@code GET /login} e {@code POST /login} tem a mesma URI. Enquanto o
+     * filtro olhava so o caminho, abrir a pagina cinco vezes gastava o balde de
+     * autenticacao e a sexta visita recebia 429 em JSON cru no navegador — sem
+     * senha nenhuma envolvida. Alternar entre perfis numa demonstracao encosta
+     * nisso sozinho.
+     */
+    @Test
+    void abrirATelaDeLoginNaoGastaOTetoDeAutenticacao() throws Exception {
+        for (int i = 0; i < TETO_AUTENTICACAO * 2; i++) {
+            MockHttpServletResponse pagina = new MockHttpServletResponse();
+            filtro.doFilter(get("/login", "203.0.113.7"), pagina, cadeia);
+            assertThat(pagina.getStatus())
+                    .as("visita %d a tela de login", i + 1)
+                    .isEqualTo(HttpStatus.OK.value());
+        }
+
+        // e o teto apertado continua inteiro para quem de fato envia senha
+        for (int tentativa = 1; tentativa <= TETO_AUTENTICACAO; tentativa++) {
+            MockHttpServletResponse envio = new MockHttpServletResponse();
+            filtro.doFilter(requisicao("/login", "203.0.113.7"), envio, cadeia);
+            assertThat(envio.getStatus())
+                    .as("tentativa %d de senha", tentativa)
+                    .isEqualTo(HttpStatus.OK.value());
+        }
+
+        MockHttpServletResponse sexta = new MockHttpServletResponse();
+        filtro.doFilter(requisicao("/login", "203.0.113.7"), sexta, cadeia);
+
+        assertThat(sexta.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    }
+
     private MockHttpServletRequest requisicao(String uri, String ip) {
-        MockHttpServletRequest requisicao = new MockHttpServletRequest("POST", uri);
+        return requisicao("POST", uri, ip);
+    }
+
+    private MockHttpServletRequest get(String uri, String ip) {
+        return requisicao("GET", uri, ip);
+    }
+
+    private MockHttpServletRequest requisicao(String metodo, String uri, String ip) {
+        MockHttpServletRequest requisicao = new MockHttpServletRequest(metodo, uri);
         requisicao.setRequestURI(uri);
         requisicao.addHeader("X-Forwarded-For", ip);
         return requisicao;

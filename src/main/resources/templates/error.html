@@ -5,7 +5,8 @@
 
   So mostra status e um texto curto: o diagnostico fica no log do servidor.
 -->
-<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,8 +35,23 @@
         Se o problema continuar, avise a equipe técnica com o horário em que aconteceu.
     </p>
 
+    <!--
+      O destino e por perfil, e nao fixo no painel. O tutor nao alcanca
+      /painel/receita: mandar todo mundo para la fazia o erro do tutor virar beco
+      sem saida — 403 traz esta mesma pagina de volta, com o mesmo botao.
+      Anonimo vai para o login, que e de onde ele precisa recomecar.
+    -->
     <a class="botao-principal" style="display: block; text-align: center; text-decoration: none"
+       sec:authorize="hasRole('TUTOR')"
+       th:href="@{/tutor}">Voltar aos meus pets</a>
+
+    <a class="botao-principal" style="display: block; text-align: center; text-decoration: none"
+       sec:authorize="hasAnyRole('VETERINARIO', 'COLABORADOR')"
        th:href="@{/painel/receita}">Voltar ao painel</a>
+
+    <a class="botao-principal" style="display: block; text-align: center; text-decoration: none"
+       sec:authorize="!isAuthenticated()"
+       th:href="@{/login}">Ir para o login</a>
 </main>
 
 </body>

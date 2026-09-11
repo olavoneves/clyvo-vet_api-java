@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -70,7 +71,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        boolean autenticacao = ehRotaDeAutenticacao(request.getRequestURI());
+        boolean autenticacao = ehTentativaDeAutenticacao(request);
         int teto = autenticacao ? propriedades.autenticacaoPorMinuto() : propriedades.padraoPorMinuto();
         String chave = (autenticacao ? "auth|" : "geral|") + ipDeOrigem(request);
 
@@ -95,8 +96,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 .build();
     }
 
-    private boolean ehRotaDeAutenticacao(String uri) {
-        return propriedades.rotasDeAutenticacao().contains(uri);
+    /**
+     * O teto apertado e para quem <b>tenta</b> autenticar, e nao para quem abre a
+     * tela. {@code GET /login} tem a mesma URI do POST que envia a senha: sem
+     * olhar o metodo, recarregar a pagina de login cinco vezes ja gastava o balde
+     * e a sexta visita recebia 429 em JSON cru no navegador — sem senha nenhuma
+     * envolvida. Alternar entre perfis numa demonstracao encosta nisso sozinho.
+     *
+     * <p>O GET nao fica sem limite: cai no balde geral, que e o certo para uma
+     * pagina estatica. Forca bruta continua contida, porque adivinhar senha exige
+     * o POST.
+     */
+    private boolean ehTentativaDeAutenticacao(HttpServletRequest request) {
+        return HttpMethod.POST.matches(request.getMethod())
+                && propriedades.rotasDeAutenticacao().contains(request.getRequestURI());
     }
 
     /**
