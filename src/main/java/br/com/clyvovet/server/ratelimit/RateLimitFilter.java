@@ -124,10 +124,28 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(cabecalho)) {
             String encaminhado = request.getHeader(cabecalho);
             if (StringUtils.hasText(encaminhado)) {
-                return encaminhado.split(",")[0].trim();
+                return semPorta(encaminhado.split(",")[0].trim());
             }
         }
-        return request.getRemoteAddr();
+        return semPorta(request.getRemoteAddr());
+    }
+
+    /**
+     * O Azure App Service encaminha o cliente como "IP:porta". A porta de origem
+     * muda a cada conexao: mantida na chave, cada tentativa cairia num balde novo
+     * e o limite nunca seria atingido. Vale para os dois caminhos: no Azure o
+     * Spring Boot liga o RemoteIpValve do Tomcat, que consome o X-Forwarded-For e
+     * grava "IP:porta" no remoteAddr. IPv6 com porta vem entre colchetes
+     * ("[2001:db8::1]:443"); sem colchetes, os ":" sao do proprio endereco.
+     */
+    private String semPorta(String endereco) {
+        if (endereco.startsWith("[")) {
+            int fim = endereco.indexOf(']');
+            return fim > 0 ? endereco.substring(1, fim) : endereco;
+        }
+        int doisPontos = endereco.indexOf(':');
+        boolean ipv4ComPorta = doisPontos > 0 && doisPontos == endereco.lastIndexOf(':');
+        return ipv4ComPorta ? endereco.substring(0, doisPontos) : endereco;
     }
 
     private void responderExcedido(HttpServletResponse response, long segundos, int teto)
