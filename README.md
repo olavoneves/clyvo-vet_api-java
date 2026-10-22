@@ -28,7 +28,7 @@ Vídeo de demonstração: https://youtu.be/asLs3qNrzvs
 - [Uso de IA no Desenvolvimento](#-uso-de-ia-no-desenvolvimento)
 - [Deploy — Render](#-deploy--render)
 - [Git Flow](#-git-flow)
-- [DevOps Tools & Cloud Computing](#️-devops-tools--cloud-computing)
+- [DevOps Tools & Cloud Computing — Sprint 4](#️-devops-tools--cloud-computing--sprint-4)
 - [Arquitetura de Destino — Sprint 4](#-arquitetura-de-destino--o-desenho-da-sprint-4)
 - [Equipe](#-equipe)
 
@@ -1073,288 +1073,161 @@ develop   ← desenvolvimento
 ---
 ---
 
-# ☁️ DevOps Tools & Cloud Computing
+# ☁️ DevOps Tools & Cloud Computing — Sprint 4
+
+**Azure DevOps + CI/CD** da API do PetFlow, com o banco de dados em nuvem.
+
+- **Projeto no Azure DevOps:** https://dev.azure.com/RM561940/Sprint%204%20-%20Azure%20DevOps
+- **Aplicação publicada pelo CD:** https://rm561940-petflow-api-s4b.azurewebsites.net
+- **Vídeo da Sprint 4:** _(link do YouTube)_
 
 ---
 
-## 💼 Benefícios para o Negócio
+## 📝 Descrição da Solução
 
-**Para o tutor do pet:** acesso centralizado ao histórico de saúde, lembretes automáticos de vacinas e consultas, triagem inteligente de sintomas com IA, e maior previsibilidade no cuidado preventivo.
+O **PetFlow** é a plataforma da Clyvo Vet que acompanha a saúde do pet de forma contínua:
+clínicas cadastram tutores, pets, consultas e vacinas, e um **motor de protocolo em
+PL/SQL** transforma cada consulta nas obrigações futuras de cuidado (retornos, reforços de
+vacina), que viram lembretes para o tutor. A API expõe esse domínio em REST e o painel da
+clínica é renderizado no servidor.
 
-**Para o pet:** melhor cuidado preventivo, detecção precoce de problemas via IoT, maior adesão a tratamentos, e acompanhamento longitudinal da saúde.
+Nesta sprint, cada alteração de código na branch principal passa sozinha por **build,
+testes automáticos, geração do artefato e deploy** no Azure, por pipelines do Azure DevOps.
 
-**Para clínicas e hospitais:** aumento da recorrência e fidelização de clientes, redução do abandono de tratamentos, dashboard com KPIs em tempo real, e maior LTV por paciente.
+### Stack
 
-**Para a Clyvo Vet:** geração de moat competitivo através de dados, escalabilidade via conteinerização em nuvem, e base para monetização com planos de assinatura e marketplace de serviços.
+| Camada | Tecnologia |
+|---|---|
+| Aplicação | Java 21 · Spring Boot 4.0.6 · Spring Security (JWT) · Thymeleaf |
+| Build e testes | Maven · JUnit 5 |
+| Banco de dados | Oracle XE 21c · PL/SQL · Flyway (migrations `V0` a `V14`) |
+| Repositório | GitHub — `olavoneves/clyvo-vet_api-java` |
+| CI/CD | Azure DevOps — Azure Pipelines (YAML), variable group secreto, service connections |
+| Nuvem | Azure Web App (Java SE, Linux) · Azure Container Instances · Azure Container Registry · Azure Key Vault · Managed Identity |
+| Provisionamento | Azure CLI (scripts em `scripts/sprint4/`) |
 
 ---
 
-## 🏗️ Arquitetura da Solução
+## 🏗️ Arquitetura e Fluxo CI/CD
 
-![Arquitetura ACR + ACI](docs/arquitetura_sprint3.png)
+![Arquitetura e fluxo CI/CD da Sprint 4](docs/arquitetura/sprint4-cicd.png)
 
-A solução usa **containerização completa** — aplicação e banco, cada um em seu
-próprio Azure Container Instance — com as imagens vindas de um Azure Container
-Registry privado. Todos os recursos são criados por Azure CLI, nenhum pelo Portal.
-
-### Recursos
-
-| Recurso | Nome | Configuração |
+| # | Etapa | Onde atua |
 |---|---|---|
-| Resource Group | `rg-petflow-rm561940` | Brazil South |
-| Container Registry | `acrpetflowrm561940` | SKU Basic, admin habilitado |
-| Key Vault | `kv-petflow-rm561940` | 3 segredos gerados em runtime |
-| ACI — Banco | `rm561940-aci-db` | Oracle XE 21c · 2 vCPU / 4 GB · porta 1521 |
-| ACI — Aplicação | `rm561940-aci-app` | Spring Boot / Java 21 · 1 vCPU / 2 GB · porta 8080 |
+| 1 | O desenvolvedor altera o código na IDE e o envia para a branch `main` (commit/push ou merge de PR) | IDE, Git, GitHub |
+| 2 | O webhook do GitHub dispara a pipeline de CI | GitHub → Azure Pipelines |
+| 3 | O CI compila com Maven (Java 21) e executa os testes automáticos (JUnit), publicando o resultado | Azure Pipelines — `petflow-ci` |
+| 4 | O CI publica o artefato `petflow-jar` | Azure Pipelines |
+| 5 | O novo artefato dispara a pipeline de CD | Azure Pipelines — `petflow-cd` |
+| 6 | O CD recebe os segredos do variable group `petflow-secrets` (mascarados nos logs) | Azure DevOps — Library |
+| 7 | O CD publica o JAR no Web App e grava as app settings, autenticando pela service connection `sc-azure-petflow` | Azure Web App |
+| 8 | Na subida, a aplicação conecta no Oracle por JDBC (porta 1521) e o Flyway aplica as migrations | Web App → ACI |
+| 9 | O CD confere o `/actuator/health`, que só responde `UP` com o banco alcançável | Azure Pipelines → Web App |
+| 10 | O usuário final acessa a aplicação por HTTPS e faz o CRUD | Navegador → Web App |
+| 11 | Cada operação é persistida no Oracle | Web App → ACI |
 
-### Fluxos
+**Personas:** o **desenvolvedor**, que dispara o fluxo com uma alteração de código, e o
+**usuário final** (clínica veterinária), que usa a aplicação publicada.
 
-| # | Fluxo | O que acontece |
+---
+
+## 🗄️ Banco de Dados em Nuvem
+
+**Oracle XE 21c em container na nuvem**, no **Azure Container Instances**
+(`rm561940-aci-db`, 2 vCPU / 4 GB, porta 1521).
+
+- A imagem (`gvenzl/oracle-xe:21-slim`) é importada para o nosso **Azure Container
+  Registry** e o ACI a puxa de lá.
+- As senhas do banco são geradas pelos scripts e guardadas no **Azure Key Vault**; o ACI as
+  recebe como variáveis seguras, que não aparecem no Portal.
+- O schema é criado pela própria aplicação (**Flyway**) no primeiro deploy: tabelas,
+  procedures, gatilhos e a view do painel.
+- O container não tem volume: recriá-lo zera o banco, e o `08_bootstrap.sh` refaz a carga
+  inicial.
+
+---
+
+## ⚙️ Projeto no Azure DevOps
+
+| Configuração | Valor |
+|---|---|
+| Project Name | `Sprint 4 - Azure DevOps` |
+| Description | Projeto para entrega da Sprint 4 do professor Joao Carlos Menk + integrantes (RM - nome - turma) |
+| Visibility | Private |
+| Version control | Git |
+| Work item process | Scrum |
+| Professor | Convidado com acesso **Basic** |
+
+---
+
+## 🔁 Pipelines CI/CD (YAML)
+
+| Pipeline | Arquivo | Dispara quando | O que faz |
+|---|---|---|---|
+| `petflow-ci` | [`pipelines/ci.yml`](pipelines/ci.yml) | A cada alteração na branch `main` | Build Maven, testes automáticos com resultado publicado, artefato `petflow-jar` publicado |
+| `petflow-cd` | [`pipelines/cd.yml`](pipelines/cd.yml) | Quando o `petflow-ci` gera um novo artefato | Deploy do JAR no Azure Web App com as app settings e verificação de saúde |
+
+| Regra do enunciado | Como é atendida |
+|---|---|
+| I. Conectada ao repositório da aplicação | Service connection `sc-github-petflow` (OAuth) com o repositório no GitHub |
+| II. CI dispara a cada alteração na branch master | `trigger` na branch `main`, que cumpre o papel da `master` (uso autorizado pelo professor) |
+| III. CD dispara após novo artefato | `resources.pipelines` com gatilho na conclusão do `petflow-ci` |
+| IV. Variáveis sensíveis protegidas | `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` e `MASTER_PASSWORD` como **secretas** no variable group `petflow-secrets`, copiadas do Key Vault |
+| V. Artefato gerado e publicado | `PublishPipelineArtifact` do `petflow-jar` |
+| VI. Etapa de testes no CI | `mvn clean verify` com `publishJUnitResults` |
+| VII. Deploy em Azure Web App ou ACI | `AzureWebApp@1` no Web App `rm561940-petflow-api-s4b` |
+
+A service connection com o Azure (`sc-azure-petflow`) usa **workload identity
+federation** sobre uma managed identity com papel Contributor apenas no grupo de recursos:
+não existe senha ou chave guardada.
+
+---
+
+## ☁️ Recursos na Azure
+
+Grupo de recursos `rg-petflow-s4-rm561940`, região **Brazil South**.
+
+| Recurso | Nome | Função |
 |---|---|---|
-| 1 | Desenvolvedor → Azure | Os scripts `01` a `06` criam todos os recursos via Azure CLI |
-| 2 | Desenvolvedor → ACR | `docker build` e `docker push` das duas imagens |
-| 3 | Scripts → Key Vault | As três senhas são geradas com `openssl rand` e guardadas no cofre |
-| 4 | ACR → ACI Banco | O container puxa a imagem e recebe as senhas por variável de ambiente segura |
-| 5 | ACR → ACI Aplicação | Idem, com a senha do banco e o segredo do JWT |
-| 6 | Aplicação → Banco | Conexão JDBC pelo **FQDN público** na porta 1521 |
-| 7 | Aplicação → Banco | O Flyway aplica 15 migrations e cria as 37 tabelas no primeiro boot |
-| 8 | Usuário final → Aplicação | HTTP/REST pelo FQDN público na porta 8080 |
-
-### Três decisões que o diagrama registra
-
-**Dois container groups separados, não um multi-container.** Como não compartilham
-rede interna, a aplicação alcança o banco pelo **FQDN público** — é a seta 6, e por
-isso ela aparece destacada. Não há `localhost` em lugar nenhum da configuração.
-
-**O container da aplicação roda como `appuser` (uid 999), nunca root.** Requisito
-8.2 do enunciado. A imagem base é `eclipse-temurin:21-jre-jammy`, que tem shell —
-sem shell não haveria `az container exec` para provar o não-root na gravação.
-
-**O banco não tem volume.** O spike de 25–26/08 mostrou que o Oracle sobre Azure
-Files falha com `ORA-01990` no primeiro boot, e a validação local de 09/09 confirmou
-que sem mount o boot é limpo. O enunciado não exige persistência em disco — exige
-evidenciar o dado gravado via `SELECT`. **Consequência: recriar o ACI do banco zera
-os dados.**
+| Key Vault | `kv-petflow-s4b-rm561940` | Senhas do banco, segredo do JWT e senha do master |
+| Container Registry | `acrpetflows4brm561940` | Imagem do Oracle XE |
+| Container Instance | `rm561940-aci-db` | Banco Oracle XE 21c |
+| App Service Plan | `asp-petflow-rm561940` | Linux B1 |
+| Web App | `rm561940-petflow-api-s4b` | Aplicação (Java 21 SE), destino do CD |
+| Managed Identity | `id-petflow-ado-rm561940` | Identidade da service connection `sc-azure-petflow` |
 
 ---
 
-## 🚀 Deploy na Azure — ACR + ACI (How to)
+## 🖥️ Scripts (`scripts/sprint4/`)
 
-> Esta é a entrega da **Sprint 3**: containerização completa (App e Banco) com
-> Azure Container Registry e Azure Container Instance, todos os recursos criados
-> via Azure CLI. O roteiro abaixo é executável de ponta a ponta — o vídeo da
-> entrega segue exatamente estes passos.
+Todos os recursos são criados por **Azure CLI**. Nenhuma senha fica em arquivo: elas são
+geradas em tempo de execução e guardadas no Key Vault.
 
-### Pré-requisitos
-
-- Azure CLI autenticado (`az login`)
-- Docker em execução
-- Git Bash, WSL ou terminal Unix-like
-- `openssl` e `curl` no PATH
-
-### Passo 0 — Clonar o repositório
-
-```bash
-git clone https://github.com/olavoneves/clyvo-vet_api-java.git
-cd clyvo-vet_api-java
-```
-
-### Passo 1 — Conferir as variáveis
-
-Todos os nomes de recurso vivem em `scripts/00_variables.sh`. **Nenhuma senha
-está lá** — as três são geradas em runtime no passo 3 e guardadas no Key Vault.
-
-```bash
-cat scripts/00_variables.sh
-```
-
-### Passo 2 — Infraestrutura base
-
-```bash
-bash scripts/01_resource-group.sh    # Resource Group
-bash scripts/02_acr.sh               # Azure Container Registry (Basic)
-```
-
-### Passo 3 — Segredos
-
-```bash
-bash scripts/03_key-vault.sh
-```
-
-Gera com `openssl rand` e grava no cofre: senha do SYS do Oracle, senha do
-usuário `petflow` e o segredo de assinatura do JWT. Os valores nunca são
-impressos nem gravados em disco.
-
-### Passo 4 — Build e push das imagens 
-
-```bash
-bash scripts/04_build-push.sh
-```
-
-Os comandos que este script executa:
-
-```bash
-az acr login --name acrpetflowrm561940
-
-docker build --platform linux/amd64 \
-    -t acrpetflowrm561940.azurecr.io/rm561940-db-petflow:v1 ./db
-
-docker build --platform linux/amd64 \
-    -t acrpetflowrm561940.azurecr.io/rm561940-app-petflow:v1 .
-
-docker push acrpetflowrm561940.azurecr.io/rm561940-db-petflow:v1
-docker push acrpetflowrm561940.azurecr.io/rm561940-app-petflow:v1
-
-az acr repository list --name acrpetflowrm561940 --output table
-```
-
-> `--platform linux/amd64` é obrigatório: o ACI só executa amd64, e uma imagem
-> arm64 falha com `exec format error`.
-
-### Passo 5 — Banco de dados no ACI
-
-```bash
-bash scripts/05_aci-db.sh
-```
-
-Cria o container group do Oracle XE (2 vCPU / 4 GB) e espera o log chegar em
-`DATABASE IS READY TO USE!`. Leva cerca de 2 minutos.
-
-### Passo 6 — Aplicação no ACI
-
-```bash
-bash scripts/06_aci-app.sh
-```
-
-Descobre o FQDN público do banco, monta a URL JDBC e sobe a aplicação. No
-primeiro boot o Flyway aplica 15 migrations e cria as 37 tabelas.
-
-### Passo 7 — Bootstrap dos dados iniciais
-
-```bash
-bash scripts/07_bootstrap.sh
-```
-
-**Passo obrigatório.** O Flyway cria o schema, mas o banco nasce sem dados — e
-o usuário `master` só é criado se já existir uma clínica. O script cria a
-clínica pela rota pública, reinicia o app para o `DataInitializer` rodar e
-confirma o login.
-
-### Passo 8 — Smoke tests
-
-```bash
-bash scripts/08_smoke-tests.sh
-```
-
-Exercita o CRUD completo em `/api/tutores` e `/api/pets` contra o **FQDN
-público**, incluindo o 409 ao tentar apagar um tutor com pet vinculado.
-
-### Passo 9 — Evidência no banco
-
-O enunciado exige demonstrar cada operação do CRUD **por SELECT dentro do banco**.
-O banco fica exposto na porta 1521 com FQDN público, então qualquer cliente Oracle
-conecta nele de fora — o que também prova que não é um banco local.
-
-**SQL Developer** (ou DBeaver, SQLcl — qualquer cliente Oracle):
-
-| Campo | Valor |
+| Script | O que faz |
 |---|---|
-| Tipo de conexão | Básico |
-| Hostname | `rm561940-db-petflow.brazilsouth.azurecontainer.io` |
-| Porta | `1521` |
-| **Nome do serviço** | `PETFLOWDB` — serviço, **não** SID |
-| Usuário | `petflow` |
-| Senha | recupere do Key Vault: |
+| `00_variables.sh` | Nomes de todos os recursos e funções auxiliares (carregado pelos demais) |
+| `01_resource-group.sh` | Registra os providers usados e cria o grupo de recursos |
+| `02_key-vault.sh` | Cria o Key Vault e gera os segredos |
+| `03_acr.sh` | Cria o Container Registry e importa a imagem do Oracle |
+| `04_aci-db.sh` | Cria o ACI do Oracle e espera o banco ficar pronto |
+| `05_webapp.sh` | Cria o App Service Plan e o Web App |
+| `06_azure-devops.sh` | Projeto, acesso do professor e variable group com os segredos |
+| `06b_service-connection-azure.sh` | Service connection do Azure com managed identity e federação |
+| `07_pipelines.sh` | Registra as pipelines de CI e de CD |
+| `08_bootstrap.sh` | Carga inicial pela API depois do primeiro deploy |
+| `09_smoke-tests.sh` | CRUD completo pela URL pública |
+| `97_pausar.sh` / `98_retomar.sh` | Para e religa os recursos cobrados por hora |
+| `99_cleanup.sh` | Remove todos os recursos |
 
 ```bash
-az keyvault secret show --vault-name kv-petflow-rm561940   --name oracle-app-password --query value -o tsv
+cd scripts/sprint4
+./01_resource-group.sh && ./02_key-vault.sh && ./03_acr.sh && ./04_aci-db.sh && ./05_webapp.sh
+./06_azure-devops.sh          # depois, a service connection do GitHub pelo portal
+./06b_service-connection-azure.sh
+./07_pipelines.sh             # a partir daqui, todo push na main dispara CI e CD
+./08_bootstrap.sh && ./09_smoke-tests.sh
 ```
 
-Conectado, o arquivo [`docs/EVIDENCIAS_VIDEO.sql`](docs/EVIDENCIAS_VIDEO.sql) traz
-todas as consultas na ordem, pareadas com os `curl` que as antecedem.
-
-A primeira delas confirma que a conexão é com o container na Azure:
-
-```sql
-SELECT SYS_CONTEXT('USERENV','SERVER_HOST') AS servidor,
-       SYS_CONTEXT('USERENV','CON_NAME')    AS pdb,
-       USER                                  AS usuario
-  FROM dual;
-```
-
-**Alternativa por linha de comando**, se preferir não usar cliente gráfico:
-
-```bash
-az container exec   --resource-group rg-petflow-rm561940   --name rm561940-aci-db   --exec-command "/bin/bash"
-
-# dentro do container:
-sqlplus petflow/<senha>@localhost:1521/PETFLOWDB
-```
-
-> `az container exec` abre um websocket que **exige TTY real**: rode de um
-> terminal interativo, não de script.
-
-### Passo 10 — Encerramento
-
-Ao terminar a sessão, pare os ACIs para não consumir a quota:
-
-```bash
-az container stop -g rg-petflow-rm561940 -n rm561940-aci-app
-az container stop -g rg-petflow-rm561940 -n rm561940-aci-db
-```
-
-Para remover tudo, depois que o vídeo estiver publicado e o link no PDF:
-
-```bash
-bash scripts/99_cleanup.sh
-```
-
----
-
-## 🖥️ Scripts DevOps
-
-| Script | Finalidade |
-|---|---|
-| `scripts/00_variables.sh` | Nomes dos recursos e funções auxiliares. Carregado com `source` pelos demais. **Sem senhas** |
-| `scripts/01_resource-group.sh` | Cria o Resource Group com tags |
-| `scripts/02_acr.sh` | Cria o Azure Container Registry (Basic, admin habilitado) |
-| `scripts/03_key-vault.sh` | Cria o Key Vault e gera os três segredos com `openssl rand` |
-| `scripts/04_build-push.sh` | `docker build` + `docker push` das duas imagens para o ACR |
-| `scripts/05_aci-db.sh` | ACI do Oracle XE — 2 vCPU / 4 GB, sem volume |
-| `scripts/06_aci-app.sh` | ACI da API — 1 vCPU / 2 GB, conecta no banco pelo FQDN público |
-| `scripts/07_bootstrap.sh` | Cria a clínica, reinicia o app e confirma o login |
-| `scripts/08_smoke-tests.sh` | CRUD completo nas duas tabelas via FQDN público |
-| `scripts/99_cleanup.sh` | Remove o Resource Group (confirmação digitada) |
-
-### Documentação do banco
-
-| Arquivo | Conteúdo |
-|---|---|
-| `docs/script_bd.sql` | DDL do núcleo da solução — tabelas, colunas, chaves, constraints e comentários, mais a carga mínima de demonstração e as consultas de evidência |
-| `src/main/resources/db/migration/` | As 15 migrations Flyway (V0 → V13) que criam as 37 tabelas do schema completo |
-| `docs/VALIDACAO_LOCAL.md` | Evidências da validação em Docker local, antes do deploy |
-| `docs/EVIDENCIAS_VIDEO.sql` | Consultas da gravação, pareadas com os `curl` que as antecedem |
-
-Todos são idempotentes: verificam se o recurso existe antes de criar e podem
-ser reexecutados sem destruir o ambiente.
-
-### Dockerfiles
-
-| Arquivo | Imagem |
-|---|---|
-| `Dockerfile` | API Java — multi-stage (Maven → JRE), roda como `appuser` (uid 999), não root |
-| `db/Dockerfile` | Oracle XE 21c — sem senha em `ENV`, sem `init.sql` (o schema é do Flyway) |
-
-### Execução local (Docker Compose)
-
-```bash
-cp .env.example .env      # preencha as senhas
-docker compose up -d
-```
-
-
-
----
 ---
 
 # 🧭 Arquitetura de Destino — o desenho da Sprint 4
