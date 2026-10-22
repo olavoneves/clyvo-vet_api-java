@@ -28,6 +28,7 @@ source "$(dirname "$0")/00_variables.sh"
 
 exigir_comando az
 exigir_comando curl
+exigir_comando openssl
 
 titulo "08 - BOOTSTRAP DOS DADOS INICIAIS"
 
@@ -36,6 +37,10 @@ API="${WEBAPP_URL}/api"
 # A senha do master vem do Key Vault (02_key-vault.sh): o app a recebe por
 # MASTER_PASSWORD e nenhum literal no repositorio vira credencial.
 LOGIN_MASTER="{\"email\":\"master@clyvovet.com\",\"senha\":\"$(ler_segredo "${SECRET_MASTER}")\",\"tipo\":\"COLABORADOR\"}"
+
+# Os tutores criados aqui sao descartaveis: senha aleatoria por execucao, para
+# nenhuma senha fixa ficar no repositorio.
+SENHA_TUTOR="qa-$(openssl rand -hex 6)"
 
 echo "Endpoint base: ${API}"
 
@@ -124,7 +129,7 @@ criar_tutor() {
     status=$(curl -s -o "${CORPO}" -w "%{http_code}" \
         -X POST "${API}/tutores" \
         -H "Content-Type: application/json" \
-        -d "{\"nome\":\"${nome}\",\"email\":\"${email}\",\"telefone\":\"${fone}\",\"senha\":\"Clyvo@2026\",\"canalPreferencial\":\"${canal}\",\"clinicaId\":${ID_CLINICA}}")
+        -d "{\"nome\":\"${nome}\",\"email\":\"${email}\",\"telefone\":\"${fone}\",\"senha\":\"${SENHA_TUTOR}\",\"canalPreferencial\":\"${canal}\",\"clinicaId\":${ID_CLINICA}}")
 
     if [[ "${status}" == "201" ]]; then
         grep -o '"id":[0-9]*' "${CORPO}" | head -1 | cut -d: -f2

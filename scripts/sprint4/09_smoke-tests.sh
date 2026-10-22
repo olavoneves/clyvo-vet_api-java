@@ -18,6 +18,7 @@ set -euo pipefail
 source "$(dirname "$0")/00_variables.sh"
 
 exigir_comando curl
+exigir_comando openssl
 
 titulo "09 - SMOKE TESTS EM NUVEM"
 
@@ -26,6 +27,10 @@ API="${WEBAPP_URL}/api"
 # A senha do master vem do Key Vault (02_key-vault.sh): o app a recebe por
 # MASTER_PASSWORD e nenhum literal no repositorio vira credencial.
 LOGIN_MASTER="{\"email\":\"master@clyvovet.com\",\"senha\":\"$(ler_segredo "${SECRET_MASTER}")\",\"tipo\":\"COLABORADOR\"}"
+
+# Os tutores criados aqui sao descartaveis: senha aleatoria por execucao, para
+# nenhuma senha fixa ficar no repositorio.
+SENHA_TUTOR="qa-$(openssl rand -hex 6)"
 echo "Endpoint base: ${API}"
 
 CORPO="$(dirname "$0")/.smoke-resposta.tmp"
@@ -83,7 +88,7 @@ chamar 201 "POST   /tutores" \
     -X POST "${API}/tutores" \
     -H "Content-Type: application/json" \
     -d "{\"nome\":\"Maria Smoke Test\",\"email\":\"${EMAIL_TESTE}\",
-         \"telefone\":\"11988887777\",\"senha\":\"Clyvo@2026\",
+         \"telefone\":\"11988887777\",\"senha\":\"${SENHA_TUTOR}\",
          \"clinicaId\":${ID_CLINICA}}"
 
 ID_TUTOR=$(grep -o '"id":[0-9]*' "${CORPO}" | head -1 | cut -d: -f2)
@@ -98,7 +103,7 @@ chamar 200 "PUT    /tutores/${ID_TUTOR}" \
     -X PUT "${API}/tutores/${ID_TUTOR}" \
     -H "${AUTH}" -H "Content-Type: application/json" \
     -d "{\"nome\":\"Maria Smoke Test ALTERADO\",\"email\":\"${EMAIL_TESTE}\",
-         \"telefone\":\"11988886666\",\"senha\":\"Clyvo@2026\",
+         \"telefone\":\"11988886666\",\"senha\":\"${SENHA_TUTOR}\",
          \"clinicaId\":${ID_CLINICA}}"
 
 titulo "TABELA PET (lado N do relacionamento)"
