@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 #
-# 07 - Bootstrap dos dados iniciais.
+# 08 - Bootstrap dos dados iniciais, depois do PRIMEIRO deploy do CD.
 #
 # POR QUE ESTE SCRIPT EXISTE
 #
 # O Flyway cria as 37 tabelas, mas o banco nasce SEM DADOS. E ha uma
-# ordem obrigatoria, descoberta na validacao local de 09/09:
+# ordem obrigatoria, descoberta na validacao local da Sprint 3:
 #
 #   1. O DataInitializer so cria o usuario master se ja existir clinica.
 #      Sem clinica ele registra no log:
 #        "Nenhuma clinica cadastrada: usuario master nao criado."
 #
-#   2. As procedures PR_CLV_SEED_* da V8 tambem exigem clinica: elas fazem
-#      SELECT MIN(id_clinica) INTO v_clinica FROM TB_CLV_CLINICA, e num
-#      banco vazio isso devolve NULL, quebrando com
-#        ORA-01400: cannot insert NULL into ("TB_CLV_TUTOR"."ID_CLINICA")
+#   2. As procedures PR_CLV_SEED_* da V8 tambem exigem clinica, e num
+#      banco vazio quebram com ORA-01400.
 #
-# Entao: cria a clinica pela rota publica, reinicia o app para o
-# DataInitializer rodar de novo, e confirma o login.
+# Entao: cria a clinica pela rota publica, reinicia o Web App para o
+# DataInitializer rodar de novo, confirma o login e carrega dois tutores
+# com um pet cada, para o CRUD do video ter dado significativo na tela.
 #
-# Projeto Clyvo Vet - Sprint 3 - RM561940
+# Roda UMA vez por banco. Deploys seguintes do CD nao precisam dele: os
+# dados ficam no Oracle enquanto o ACI do banco nao for recriado.
+#
+# Projeto Clyvo Vet - Sprint 4 - RM561940
 #
 set -euo pipefail
 source "$(dirname "$0")/00_variables.sh"
@@ -27,24 +29,18 @@ source "$(dirname "$0")/00_variables.sh"
 exigir_comando az
 exigir_comando curl
 
-titulo "07 - BOOTSTRAP DOS DADOS INICIAIS"
+titulo "08 - BOOTSTRAP DOS DADOS INICIAIS"
 
-APP_FQDN=$(az container show \
-               --resource-group "${RESOURCE_GROUP}" \
-               --name "${ACI_APP}" \
-               --query ipAddress.fqdn --output tsv)
+API="${WEBAPP_URL}/api"
 
-if [[ -z "${APP_FQDN}" ]]; then
-    echo "ERRO: nao foi possivel obter o FQDN do ACI '${ACI_APP}'." >&2
-    echo "Execute 06_aci-app.sh antes deste script." >&2
-    exit 1
-fi
+# A senha do master vem do Key Vault (02_key-vault.sh): o app a recebe por
+# MASTER_PASSWORD e nenhum literal no repositorio vira credencial.
+LOGIN_MASTER="{\"email\":\"master@clyvovet.com\",\"senha\":\"$(ler_segredo "${SECRET_MASTER}")\",\"tipo\":\"COLABORADOR\"}"
 
-API="http://${APP_FQDN}:8080/api"
 echo "Endpoint base: ${API}"
 
 # Ao lado do script, e nao em /tmp: no Git Bash do Windows o curl.exe nao
-# enxerga o /tmp emulado e o corpo iria para um caminho ilegivel daqui.
+# enxerga o /tmp emulado.
 CORPO="$(dirname "$0")/.bootstrap-resposta.tmp"
 trap 'rm -f "${CORPO}"' EXIT
 
@@ -65,26 +61,31 @@ elif [[ "${STATUS}" == "409" ]]; then
     echo "  clinica ja existe (409) - seguindo"
 else
     echo "ERRO: POST /clinicas devolveu ${STATUS}." >&2
+    echo "A aplicacao ja foi publicada pelo CD? Confira ${WEBAPP_URL}/actuator/health" >&2
     cat "${CORPO}" >&2
     exit 1
 fi
 
-titulo "PASSO 2 - RESTART DO APP"
+titulo "PASSO 2 - RESTART DO WEB APP"
 echo "O DataInitializer roda no startup: sem restart, o master nao nasce."
 
-az container restart --resource-group "${RESOURCE_GROUP}" \
-                     --name "${ACI_APP}" \
-                     --output none
+az webapp restart --resource-group "${RESOURCE_GROUP}" \
+                  --name "${WEBAPP_NAME}" \
+                  --output none
 
-echo "Aguardando a aplicacao voltar. Timeout: 5 minutos."
+titulo "PASSO 3 - CONFIRMACAO DO LOGIN"
+echo "Aguardando a aplicacao voltar e o login do master responder 200."
+echo "Timeout: 5 minutos."
 
 PRONTO=0
 for tentativa in $(seq 1 30); do
-    if az container logs --resource-group "${RESOURCE_GROUP}" \
-                         --name "${ACI_APP}" 2>/dev/null \
-       | grep -q "Usuario master criado"; then
+    STATUS=$(curl -s -o "${CORPO}" -w "%{http_code}" --max-time 20 \
+        -X POST "${API}/auth/login" \
+        -H "Content-Type: application/json" \
+        -d "${LOGIN_MASTER}" || true)
+    if [[ "${STATUS}" == "200" ]]; then
         echo ""
-        echo "Master criado apos aproximadamente $((tentativa * 10)) segundos."
+        echo "  login OK apos aproximadamente $((tentativa * 10)) segundos - token emitido"
         PRONTO=1
         break
     fi
@@ -94,42 +95,19 @@ done
 
 if [[ "${PRONTO}" -eq 0 ]]; then
     echo ""
-    echo "AVISO: nao encontrei 'Usuario master criado' no log." >&2
-    echo "Se o master ja existia de uma execucao anterior, isso e esperado" >&2
-    echo "- o DataInitializer sai cedo quando o e-mail ja esta cadastrado." >&2
-    echo "O passo 3 confirma." >&2
-fi
-
-titulo "PASSO 3 - CONFIRMACAO DO LOGIN"
-
-STATUS=$(curl -s -o "${CORPO}" -w "%{http_code}" \
-    -X POST "${API}/auth/login" \
-    -H "Content-Type: application/json" \
-    -d '{"email":"master@clyvovet.com","senha":"master","tipo":"COLABORADOR"}')
-
-if [[ "${STATUS}" != "200" ]]; then
-    echo "ERRO: login devolveu ${STATUS}, esperado 200." >&2
-    cat "${CORPO}" >&2
+    echo "ERRO: o login do master nao respondeu 200 (ultimo status: ${STATUS})." >&2
+    echo "Veja o log com:" >&2
+    echo "    az webapp log tail -g ${RESOURCE_GROUP} -n ${WEBAPP_NAME}" >&2
     exit 1
 fi
 
-echo "  login OK - token emitido"
-
 titulo "PASSO 4 - CARGA DE DEMONSTRACAO"
 #
-# Item 5 do enunciado: inserir e manipular pelo menos 2 linhas com
-# conteudo significativo nas duas tabelas do CRUD (-20 se faltar).
-#
 # A carga vem pela API, nao por INSERT direto: assim o video evidencia a
-# integracao App <-> Banco, que e o que o item 9.3 cobra. As procedures
-# PR_CLV_SEED_* da V8 nao servem aqui - geram centenas de linhas e
-# poluem o SELECT na tela.
+# integracao App <-> Banco. As procedures PR_CLV_SEED_* da V8 nao servem
+# aqui - geram centenas de linhas e poluem o SELECT na tela.
 
-TOKEN=$(curl -s -X POST "${API}/auth/login" \
-    -H "Content-Type: application/json" \
-    -d '{"email":"master@clyvovet.com","senha":"master","tipo":"COLABORADOR"}' \
-    | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
-
+TOKEN=$(grep -o '"accessToken":"[^"]*' "${CORPO}" | cut -d'"' -f4)
 AUTH="Authorization: Bearer ${TOKEN}"
 
 ID_CLINICA=$(curl -s -H "${AUTH}" "${API}/clinicas" \
@@ -159,7 +137,7 @@ criar_pet() {
     curl -s -o "${CORPO}" -w "%{http_code}" \
         -X POST "${API}/pets" \
         -H "${AUTH}" -H "Content-Type: application/json" \
-        -d "{\"nome\":\"${nome}\",\"dtNascimento\":\"${nasc}\",\"sexo\":\"${sexo}\",\"porte\":\"${porte}\",\"castrado\":${castrado},\"statusPet\":\"ATIVO\",\"tutorId\":${tutor},\"racaId\":${ID_RACA}}"
+        -d "{\"nome\":\"${nome}\",\"dtNascimento\":\"${nasc}\",\"sexo\":\"${sexo}\",\"porte\":\"${porte}\",\"castrado\":${castrado},\"status\":\"ATIVO\",\"tutorId\":${tutor},\"racaId\":${ID_RACA}}"
 }
 
 ID_MARIA=$(criar_tutor "Maria Aparecida Silva" "maria.silva@exemplo.com" "11988887777" "APP")
@@ -182,10 +160,9 @@ fi
 unset TOKEN AUTH
 
 titulo "RESULTADO"
-echo "Ambiente pronto para os smoke tests (08_smoke-tests.sh)."
+echo "Ambiente pronto para os smoke tests (09_smoke-tests.sh)."
 echo ""
 echo "Credenciais de demonstracao:"
-echo "  master@clyvovet.com / master        (COLABORADOR, criado pelo app)"
-echo "  usuarios do seed    / Clyvo@2026    (se PR_CLV_SEED_* for executado)"
+echo "  master@clyvovet.com / segredo '${SECRET_MASTER}' do Key Vault (COLABORADOR)"
 echo ""
 echo "Nenhuma delas e credencial de producao."

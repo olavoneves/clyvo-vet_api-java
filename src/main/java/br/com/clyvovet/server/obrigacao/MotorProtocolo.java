@@ -34,6 +34,14 @@ public class MotorProtocolo {
     private static final int ORA_ERRO_APLICACAO_MIN = 20000;
     private static final int ORA_ERRO_APLICACAO_MAX = 20999;
 
+    /**
+     * O mesmo DEFAULT de P_HORIZONTE_DIAS em PR_CLV_GERAR_OBRIGACOES (V7).
+     * Repetido aqui porque um NULL explicito anula o DEFAULT do PL/SQL: com o
+     * limite nulo o laco de recorrencia da procedure nunca termina e soma datas
+     * ate estourar o ano 9999 (ORA-01841).
+     */
+    static final int HORIZONTE_PADRAO_DIAS = 400;
+
     private final EntityManager entityManager;
 
     /**
@@ -64,7 +72,8 @@ public class MotorProtocolo {
         procedure.setParameter("P_CORRELATION_ID", correlationId);
         procedure.setParameter("P_DATA_REFERENCIA", paraDate(dataReferencia));
         procedure.setParameter("P_CONTEXTO", contexto);
-        procedure.setParameter("P_HORIZONTE_DIAS", horizonteDias);
+        procedure.setParameter("P_HORIZONTE_DIAS",
+                horizonteDias != null ? horizonteDias : HORIZONTE_PADRAO_DIAS);
 
         executar(procedure);
 

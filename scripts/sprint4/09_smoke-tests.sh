@@ -1,41 +1,31 @@
 #!/usr/bin/env bash
 #
-# 08 - Exercita o CRUD completo contra o FQDN PUBLICO do ACI.
+# 09 - Exercita o CRUD completo contra o Web App publicado pelo CD.
 #
-# Todas as chamadas partem da maquina local e usam o endereco publico -
-# nao ha nenhuma chamada de loopback aqui. E este script que comprova que
-# a solucao esta acessivel pela internet, e nao apenas dentro do container.
+# Todas as chamadas usam a URL publica do Web App (https) - nenhuma
+# chamada de loopback. Entrega em localhost e zero de nota.
 #
-# Requisito 4 do enunciado: CRUD completo (inclusao, alteracao, exclusao,
-# consulta) sobre ao menos DUAS tabelas RELACIONADAS entre si (-20 se usar
-# so uma). O par aqui e TB_CLV_TUTOR 1:N TB_CLV_PET.
+# O par de tabelas e TB_CLV_TUTOR 1:N TB_CLV_PET. Cada operacao imprime o
+# status HTTP esperado ao lado do obtido; a evidencia no banco e feita por
+# SELECT, com docs/EVIDENCIAS_VIDEO.sql.
 #
 # As rotas vivem sob /api - o prefixo e aplicado pelo WebMvcConfig, nao
 # esta escrito nos controllers.
 #
-# Cada operacao imprime o status HTTP esperado ao lado do obtido.
-#
-# Projeto Clyvo Vet - Sprint 3 - RM561940
+# Projeto Clyvo Vet - Sprint 4 - RM561940
 #
 set -euo pipefail
 source "$(dirname "$0")/00_variables.sh"
 
-exigir_comando az
 exigir_comando curl
 
-titulo "08 - SMOKE TESTS EM NUVEM"
+titulo "09 - SMOKE TESTS EM NUVEM"
 
-APP_FQDN=$(az container show \
-               --resource-group "${RESOURCE_GROUP}" \
-               --name "${ACI_APP}" \
-               --query ipAddress.fqdn --output tsv)
+API="${WEBAPP_URL}/api"
 
-if [[ -z "${APP_FQDN}" ]]; then
-    echo "ERRO: nao foi possivel obter o FQDN do ACI '${ACI_APP}'." >&2
-    exit 1
-fi
-
-API="http://${APP_FQDN}:8080/api"
+# A senha do master vem do Key Vault (02_key-vault.sh): o app a recebe por
+# MASTER_PASSWORD e nenhum literal no repositorio vira credencial.
+LOGIN_MASTER="{\"email\":\"master@clyvovet.com\",\"senha\":\"$(ler_segredo "${SECRET_MASTER}")\",\"tipo\":\"COLABORADOR\"}"
 echo "Endpoint base: ${API}"
 
 CORPO="$(dirname "$0")/.smoke-resposta.tmp"
@@ -59,6 +49,9 @@ chamar() {
     fi
 }
 
+titulo "SAUDE DA APLICACAO"
+chamar 200 "GET    /actuator/health" "${WEBAPP_URL}/actuator/health"
+
 titulo "AUTENTICACAO"
 
 # O access token expira em 15 minutos. Se este script passar disso, um 401
@@ -66,11 +59,11 @@ titulo "AUTENTICACAO"
 chamar 200 "POST   /auth/login" \
     -X POST "${API}/auth/login" \
     -H "Content-Type: application/json" \
-    -d '{"email":"master@clyvovet.com","senha":"master","tipo":"COLABORADOR"}'
+    -d "${LOGIN_MASTER}"
 
 TOKEN=$(grep -o '"accessToken":"[^"]*' "${CORPO}" | cut -d'"' -f4)
 if [[ -z "${TOKEN}" ]]; then
-    echo "ERRO: nao foi possivel obter o token. Rode 07_bootstrap.sh antes." >&2
+    echo "ERRO: nao foi possivel obter o token. Rode 08_bootstrap.sh antes." >&2
     exit 1
 fi
 AUTH="Authorization: Bearer ${TOKEN}"
@@ -118,7 +111,7 @@ chamar 201 "POST   /pets" \
     -X POST "${API}/pets" \
     -H "${AUTH}" -H "Content-Type: application/json" \
     -d "{\"nome\":\"Luna\",\"dtNascimento\":\"2022-03-15\",\"sexo\":\"F\",
-         \"porte\":\"GRANDE\",\"castrado\":true,\"statusPet\":\"ATIVO\",
+         \"porte\":\"GRANDE\",\"castrado\":true,\"status\":\"ATIVO\",
          \"tutorId\":${ID_TUTOR},\"racaId\":${ID_RACA}}"
 
 ID_PET=$(grep -o '"id":[0-9]*' "${CORPO}" | head -1 | cut -d: -f2)
@@ -131,7 +124,7 @@ chamar 200 "PUT    /pets/${ID_PET}" \
     -X PUT "${API}/pets/${ID_PET}" \
     -H "${AUTH}" -H "Content-Type: application/json" \
     -d "{\"nome\":\"Luna Bela\",\"dtNascimento\":\"2022-03-15\",\"sexo\":\"F\",
-         \"porte\":\"GRANDE\",\"castrado\":true,\"statusPet\":\"ATIVO\",
+         \"porte\":\"GRANDE\",\"castrado\":true,\"status\":\"ATIVO\",
          \"tutorId\":${ID_TUTOR},\"racaId\":${ID_RACA}}"
 
 titulo "INTEGRIDADE REFERENCIAL"

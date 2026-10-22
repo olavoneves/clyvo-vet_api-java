@@ -78,6 +78,60 @@ class RateLimitFilterTest {
         assertThat(outroCliente.getStatus()).isEqualTo(HttpStatus.OK.value());
     }
 
+    /**
+     * O Azure App Service encaminha o cliente como "IP:porta" no X-Forwarded-For.
+     * A porta de origem muda a cada conexao: com ela na chave, cada tentativa
+     * caia num balde novo e o limite nunca era atingido - bastava abrir uma
+     * conexao por tentativa para forcar senha sem limite.
+     */
+    @Test
+    void portaDeOrigemNaoSeparaOBaldeDoMesmoIp() throws Exception {
+        for (int tentativa = 1; tentativa <= TETO_AUTENTICACAO; tentativa++) {
+            filtro.doFilter(requisicao("/api/auth/login", "203.0.113.7:5000" + tentativa),
+                    new MockHttpServletResponse(), cadeia);
+        }
+
+        MockHttpServletResponse sexta = new MockHttpServletResponse();
+        filtro.doFilter(requisicao("/api/auth/login", "203.0.113.7:61234"), sexta, cadeia);
+
+        assertThat(sexta.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    }
+
+    /**
+     * No Azure o Spring Boot liga o RemoteIpValve do Tomcat sozinho: ele consome o
+     * X-Forwarded-For, tira o cabecalho da requisicao e grava "IP:porta" no
+     * remoteAddr. O filtro cai no getRemoteAddr() e a porta precisa sair dali tambem.
+     */
+    @Test
+    void portaNoRemoteAddrNaoSeparaOBalde() throws Exception {
+        for (int tentativa = 1; tentativa <= TETO_AUTENTICACAO; tentativa++) {
+            filtro.doFilter(semCabecalho("/api/auth/login", "203.0.113.7:5000" + tentativa),
+                    new MockHttpServletResponse(), cadeia);
+        }
+
+        MockHttpServletResponse sexta = new MockHttpServletResponse();
+        filtro.doFilter(semCabecalho("/api/auth/login", "203.0.113.7:61234"), sexta, cadeia);
+
+        assertThat(sexta.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    }
+
+    /** IPv6 com porta vem entre colchetes; sem porta, os ":" sao do proprio endereco. */
+    @Test
+    void ipv6ComESemPortaCaemNoMesmoBalde() throws Exception {
+        for (int tentativa = 1; tentativa <= TETO_AUTENTICACAO; tentativa++) {
+            String ip = tentativa % 2 == 0 ? "[2001:db8::7]:5000" + tentativa : "2001:db8::7";
+            filtro.doFilter(requisicao("/api/auth/login", ip), new MockHttpServletResponse(), cadeia);
+        }
+
+        MockHttpServletResponse sexta = new MockHttpServletResponse();
+        filtro.doFilter(requisicao("/api/auth/login", "[2001:db8::7]:443"), sexta, cadeia);
+        MockHttpServletResponse outroIpv6 = new MockHttpServletResponse();
+        filtro.doFilter(requisicao("/api/auth/login", "2001:db8::8"), outroIpv6, cadeia);
+
+        assertThat(sexta.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+        assertThat(outroIpv6.getStatus()).isEqualTo(HttpStatus.OK.value());
+    }
+
     /** Login e trafego comum contam em baldes distintos, com tetos distintos. */
     @Test
     void rotaComumNaoGastaOTetoDeAutenticacao() throws Exception {
@@ -163,6 +217,14 @@ class RateLimitFilterTest {
 
     private MockHttpServletRequest get(String uri, String ip) {
         return requisicao("GET", uri, ip);
+    }
+
+    /** Requisicao como o RemoteIpValve a deixa: sem o cabecalho, com o cliente no remoteAddr. */
+    private MockHttpServletRequest semCabecalho(String uri, String remoteAddr) {
+        MockHttpServletRequest requisicao = new MockHttpServletRequest("POST", uri);
+        requisicao.setRequestURI(uri);
+        requisicao.setRemoteAddr(remoteAddr);
+        return requisicao;
     }
 
     private MockHttpServletRequest requisicao(String metodo, String uri, String ip) {
