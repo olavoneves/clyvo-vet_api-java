@@ -29,10 +29,27 @@ echo "Religando Always On..."
 az webapp config set --resource-group "${RESOURCE_GROUP}" \
     --name "${WEBAPP_NAME}" --always-on true --output none
 
-echo ""
-echo "Aguarde o Oracle ficar pronto antes de iniciar o Web App:"
-echo "    az container logs -g ${RESOURCE_GROUP} -n ${ACI_DB} | grep 'DATABASE IS READY'"
-read -r -p "Enter quando aparecer 'DATABASE IS READY TO USE'... "
+titulo "AGUARDANDO O ORACLE FICAR PRONTO"
+# Mesmo poll do 04_aci-db.sh. Timeout: 8 minutos.
+PRONTO=0
+for tentativa in $(seq 1 48); do
+    if az container logs --resource-group "${RESOURCE_GROUP}" --name "${ACI_DB}" 2>/dev/null \
+            | grep -q "DATABASE IS READY TO USE"; then
+        echo ""
+        echo "Oracle pronto apos aproximadamente $((tentativa * 10)) segundos."
+        PRONTO=1
+        break
+    fi
+    printf "."
+    sleep 10
+done
+
+if [[ "${PRONTO}" -eq 0 ]]; then
+    echo ""
+    echo "ERRO: o Oracle nao ficou pronto em 8 minutos." >&2
+    az container logs --resource-group "${RESOURCE_GROUP}" --name "${ACI_DB}" 2>&1 | tail -30 >&2
+    exit 1
+fi
 
 echo "Iniciando o Web App ${WEBAPP_NAME}..."
 az webapp start --resource-group "${RESOURCE_GROUP}" --name "${WEBAPP_NAME}"

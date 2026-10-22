@@ -63,14 +63,16 @@ colecao = {
     "event": [{
         "listen": "prerequest",
         "script": {"type": "text/javascript", "exec": [
-            "// E-mail unico por execucao: o e-mail do tutor e UNIQUE no banco.",
+            "// E-mail e senha unicos por execucao: o e-mail do tutor e UNIQUE no banco,",
+            "// e o tutor e criado e apagado pela propria colecao - nenhuma senha fixa.",
             "if (!pm.collectionVariables.get('emailTutor')) {",
             "    pm.collectionVariables.set('emailTutor', `qa.auto.${Date.now()}@exemplo.com`);",
+            "    pm.collectionVariables.set('senhaTutor', `qa-${Math.random().toString(36).slice(2, 12)}`);",
             "}",
         ]},
     }],
     "variable": [
-        {"key": "senhaTutor", "value": "Clyvo@2026"},
+        {"key": "senhaTutor", "value": ""},
         {"key": "emailTutor", "value": ""},
         {"key": "token", "value": ""},
         {"key": "tokenTutor", "value": ""},
@@ -173,8 +175,9 @@ colecao = {
                 ]),
                 requisicao("Tutor excluido nao e mais encontrado", "GET", "/api/tutores/{{tutorId}}", testes=[
                     "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
-                    "// limpa o e-mail para a proxima execucao gerar outro",
+                    "// limpa e-mail e senha para a proxima execucao gerar outros",
                     "pm.collectionVariables.set('emailTutor', '');",
+                    "pm.collectionVariables.set('senhaTutor', '');",
                 ]),
             ],
         },
