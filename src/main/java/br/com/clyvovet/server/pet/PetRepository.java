@@ -22,6 +22,26 @@ public interface PetRepository extends JpaRepository<Pet, Long> {
     @EntityGraph(attributePaths = {"tutor", "raca", "clinica"})
     Page<Pet> findByTutorId(Long tutorId, Pageable pageable);
 
+    /**
+     * Os pets que o tutor ainda quer ver no aplicativo.
+     *
+     * <p>Status nulo entra: linha antiga sem status e um pet ativo, e escondê-la
+     * do dono seria perder o animal por causa de um campo que ninguem preencheu.
+     * Um {@code status <> INATIVO} puro deixaria essas linhas de fora, porque em
+     * SQL a comparacao com NULL nao e verdadeira.
+     *
+     * <p>O recorte e so do tutor: {@link #findByTutorId} continua devolvendo tudo
+     * para a clinica, que precisa enxergar o pet inativado.
+     */
+    @Query("""
+            select p from Pet p
+             where p.tutor.id = :idTutor
+               and (p.status is null
+                    or p.status <> br.com.clyvovet.server.enums.PetStatus.INATIVO)
+            """)
+    @EntityGraph(attributePaths = {"tutor", "raca", "clinica"})
+    Page<Pet> ativosDoTutor(@Param("idTutor") Long idTutor, Pageable pageable);
+
     @EntityGraph(attributePaths = {"tutor", "raca", "clinica"})
     Page<Pet> findByStatus(PetStatus status, Pageable pageable);
 

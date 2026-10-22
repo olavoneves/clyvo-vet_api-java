@@ -30,6 +30,17 @@ public class AgendamentoService {
                 .orElseThrow(() -> new EntityNotFoundException("Agendamento", id));
     }
 
+    /**
+     * A agenda de um tutor: os compromissos dos pets dele, e nada mais.
+     *
+     * <p>Recebe o id ja resolvido, e quem resolve e o {@code PosseDoTutor} a
+     * partir do token — nenhum cliente informa de qual tutor quer a agenda.
+     */
+    @Transactional(readOnly = true)
+    public Page<AgendamentoResponse> findByTutor(Long idTutor, Pageable pageable) {
+        return repository.findByPet_Tutor_Id(idTutor, pageable).map(AgendamentoResponse::from);
+    }
+
     @Transactional(readOnly = true)
     public Page<AgendamentoResponse> findByStatus(AgendamentoStatus status, Pageable pageable) {
         return repository.findByStatus(status, pageable).map(AgendamentoResponse::from);

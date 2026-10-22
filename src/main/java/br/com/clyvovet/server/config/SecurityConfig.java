@@ -55,6 +55,19 @@ import java.util.List;
  *
  * <p>Nas duas cadeias o {@code TenantFilter} entra logo depois de quem
  * autentica: o isolamento por clinica vale igual na tela e na API.
+ *
+ * <p><b>A cadeia da API termina em {@code denyAll}.</b> Terminava em
+ * {@code anyRequest().authenticated()}, que se le como "aberto para qualquer
+ * usuario autenticado, menos o que alguem lembrou de fechar" — e o que alguem
+ * esquecia de fechar nascia alcancavel por todo perfil. Foi assim que um token
+ * de tutor chegou a {@code /api/tutores}, que devolve o cadastro de todos os
+ * tutores da clinica. Com {@code denyAll} a omissao passa a errar para o lado
+ * seguro: rota nova nasce negada e so abre quando alguem a declara aqui.
+ *
+ * <p>O preco e conhecido e aceito: controller novo cujo caminho nao entre em
+ * nenhuma das listas responde 403 mesmo para quem deveria alcanca-lo. E um 403
+ * na primeira chamada, em desenvolvimento, no lugar de um vazamento em
+ * producao que ninguem ve.
  */
 @Slf4j
 @Configuration
@@ -78,8 +91,36 @@ public class SecurityConfig {
             "/tutores"
     };
 
-    /** Prontuario, consulta e anamnese: tutor le pelo /pets/**, mas nao escreve aqui. */
+    /**
+     * A vitrine de clinicas que a tela de cadastro do aplicativo le antes de
+     * existir um token.
+     *
+     * <p>{@code POST /tutores} exige {@code clinicaId} e o aplicativo nao tinha
+     * como descobri-lo: {@code GET /clinicas} responde 401 para quem ainda nao
+     * tem conta. Esta e a unica leitura aberta da API, e devolve uma projecao
+     * reduzida — ver {@code ClinicaPublicaResponse}.
+     */
+    private static final String[] API_LEITURAS_PUBLICAS = {
+            "/clinicas/publicas"
+    };
+
+    /**
+     * A API de gestao da clinica. So {@code VETERINARIO} e {@code COLABORADOR}.
+     *
+     * <p>{@code /pets/**} e {@code /agendamentos/**} entraram aqui porque estavam
+     * caindo no {@code anyRequest().authenticated()}, e isso bastava para um token
+     * de tutor alcanca-las. Nenhuma delas verifica dono: o id do tutor vinha da
+     * URL em {@code /pets/tutor/{id}} e do corpo no cadastro, entao trocar o
+     * numero era ler e escrever no nome de outro tutor da mesma clinica. O
+     * isolamento entre clinicas nunca esteve em jogo — o que faltava era o
+     * isolamento dentro de uma.
+     *
+     * <p>O tutor nao fica sem superficie: o aplicativo dele passa a falar com
+     * {@code /api/tutor/**}, onde o dono sai do token e nao do parametro.
+     */
     private static final String[] API_ROTAS_CLINICAS = {
+            "/pets/**",
+            "/agendamentos/**",
             "/consultas/**",
             "/anamneses/**",
             "/prescricoes/**",
@@ -89,18 +130,49 @@ public class SecurityConfig {
             "/condicoes-pet/**",
             // motor de protocolo: obrigacao e receita sao gestao da clinica
             "/obrigacoes/**",
-            "/painel/**"
+            "/painel/**",
+            // ciclo de vida dos cadastros. So o POST de clinica e o de tutor
+            // sao publicos, e os dois ja passaram na regra acima: ler, alterar
+            // e remover cadastro e ato administrativo da equipe.
+            "/clinicas/**",
+            "/tutores/**",
+            "/veterinarios/**",
+            // catalogo clinico. Especie, raca e protocolo sao a materia-prima
+            // do motor: quem os edita muda o cuidado de todos os pets. O tutor
+            // le especie, raca e veterinario em /tutor/catalogo, que e somente
+            // leitura: escolher dentro do catalogo nao e o mesmo que edita-lo.
+            "/especies/**",
+            "/racas/**",
+            "/protocolos/**",
+            "/medicamentos/**",
+            "/tipos-alergia/**",
+            "/tipos-condicao/**",
+            "/tipos-sensor/**",
+            "/tipos-vacina/**",
+            // telemetria: sensor, leitura e alerta sao instrumentacao da clinica
+            "/sensores-iot/**",
+            "/leituras-iot/**",
+            "/alertas-iot/**",
+            // diagnostico: a trilha de erro do motor conta como o sistema falhou
+            "/logs-erro/**"
     };
 
     /**
      * Rotas do aplicativo do tutor.
      *
-     * <p>O agente de agendamento e a unica superficie que so o tutor alcanca:
-     * veterinario e colaborador tem a agenda inteira nas telas de gestao, e nao
-     * precisam conversar com um assistente para marcar o que ja podem marcar.
+     * <p>Duas superficies que so o tutor alcanca. O agente de agendamento, porque
+     * veterinario e colaborador tem a agenda inteira nas telas de gestao e nao
+     * precisam conversar com um assistente para marcar o que ja podem marcar. E
+     * {@code /tutor/**}, o CRUD do aplicativo, onde o dono do pet e derivado do
+     * usuario autenticado e nunca aceito como parametro.
+     *
+     * <p>Nao confundir com {@code /tutores}, que e o cadastro de tutor da API de
+     * gestao e continua sendo outra coisa: {@code /api/tutor/**} nao tem como
+     * endereçar um tutor que nao seja o do token.
      */
     private static final String[] API_ROTAS_DO_TUTOR = {
-            "/agente/**"
+            "/agente/**",
+            "/tutor/**"
     };
 
     /** Documentacao da API. Fora de /api: quem a serve e o springdoc. */
@@ -180,13 +252,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(api(API_PUBLICA)).permitAll()
                         .requestMatchers(HttpMethod.POST, api(API_CADASTROS_PUBLICOS)).permitAll()
+                        // antes da regra de /clinicas/**, senao cai na API de gestao
+                        .requestMatchers(HttpMethod.GET, api(API_LEITURAS_PUBLICAS)).permitAll()
                         // contratar veterinario e ato administrativo da clinica
                         .requestMatchers(HttpMethod.POST, api("/veterinarios"))
                                 .hasRole(TipoUsuario.COLABORADOR.name())
                         .requestMatchers(api(API_ROTAS_CLINICAS)).hasAnyRole(
                                 TipoUsuario.VETERINARIO.name(), TipoUsuario.COLABORADOR.name())
                         .requestMatchers(api(API_ROTAS_DO_TUTOR)).hasRole(TipoUsuario.TUTOR.name())
-                        .anyRequest().authenticated())
+                        // fechado por padrao: ver a nota da classe
+                        .anyRequest().denyAll())
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, ex) -> escreverProblema(
                                 response, HttpStatus.UNAUTHORIZED, "Unauthorized",

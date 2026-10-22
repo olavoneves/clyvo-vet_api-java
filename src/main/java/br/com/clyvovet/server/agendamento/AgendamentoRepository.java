@@ -3,6 +3,7 @@ package br.com.clyvovet.server.agendamento;
 import br.com.clyvovet.server.enums.AgendamentoStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +15,27 @@ import java.util.Optional;
 public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> {
 
     Page<Agendamento> findByPetId(Long petId, Pageable pageable);
+
+    /**
+     * Os compromissos dos pets de um tutor.
+     *
+     * <p>O grafo carrega pet e veterinario porque {@code AgendamentoResponse} le
+     * o nome dos dois em toda linha, e as duas associacoes sao LAZY sem
+     * open-in-view: sem ele uma pagina de 20 compromissos custa 41 selects.
+     */
+    @EntityGraph(attributePaths = {"pet", "veterinario"})
+    Page<Agendamento> findByPet_Tutor_Id(Long idTutor, Pageable pageable);
+
+    /**
+     * De quem e o pet deste compromisso, em uma consulta e sem carregar a
+     * entidade — a contrapartida de {@code PetRepository.idDoTutor}.
+     *
+     * <p>Vazio significa tanto "nao existe" quanto "e de outra clinica": o filtro
+     * de tenant do Agendamento ja recorta por pet da clinica, e quem pergunta
+     * tambem nao deve distinguir os dois casos.
+     */
+    @Query("select a.pet.tutor.id from Agendamento a where a.id = :id")
+    Optional<Long> idDoTutor(@Param("id") Long id);
 
     Page<Agendamento> findByStatus(AgendamentoStatus status, Pageable pageable);
 

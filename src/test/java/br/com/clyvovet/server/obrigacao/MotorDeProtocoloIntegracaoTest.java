@@ -3,10 +3,10 @@ package br.com.clyvovet.server.obrigacao;
 import br.com.clyvovet.server.enums.EventoGatilho;
 import br.com.clyvovet.server.enums.ObrigacaoStatus;
 import br.com.clyvovet.server.exception.ConflitoDeEstadoException;
+import br.com.clyvovet.server.support.CenarioClinico;
 import br.com.clyvovet.server.tenant.TenantContext;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -32,6 +32,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>Tudo roda dentro da transacao do teste e e desfeito no fim. As procedures
  * nao dao COMMIT proprio nem usam transacao autonoma, entao o rollback alcanca
  * as linhas que elas escreveram.
+ *
+ * <p><b>A clinica e o pet sao fabricados aqui.</b> A classe pegava a primeira
+ * clinica que existisse e, nos testes de transicao, a primeira obrigacao PREVISTA
+ * que achasse — desistindo por {@code assumeTrue} quando nao achava. Com a
+ * varredura de lembretes rodando todo dia, "a primeira PREVISTA" e um alvo que se
+ * move sozinho: obrigacoes saem desse estado sem ninguem tocar no teste. Fabricar
+ * remove a dependencia e, de quebra, torna as contagens deterministicas.
  */
 @SpringBootTest
 @Transactional
@@ -51,19 +58,18 @@ class MotorDeProtocoloIntegracaoTest {
     @Autowired
     private EntityManager entityManager;
 
-    /** Ate quantas consultas tentar antes de desistir de achar uma que gere. */
+    /** Horizonte pedido ao motor: um ano cobre a serie vacinal inteira. */
     private static final int HORIZONTE_DE_UM_ANO = 365;
 
+    private CenarioClinico fixture;
+    private CenarioClinico.Cenario cenario;
     private Long clinica;
 
     @BeforeEach
-    void escolherClinica() {
-        List<Long> clinicas = entityManager
-                .createNativeQuery("select id_clinica from TB_CLV_CLINICA order by id_clinica", Long.class)
-                .getResultList();
-        Assumptions.assumeFalse(clinicas.isEmpty(), "nenhuma clinica cadastrada");
-
-        clinica = clinicas.get(0);
+    void montarClinica() {
+        fixture = new CenarioClinico(entityManager);
+        cenario = fixture.clinicaCompleta("Clinica do motor");
+        clinica = cenario.clinica();
         TenantContext.set(clinica);
     }
 
@@ -86,7 +92,9 @@ class MotorDeProtocoloIntegracaoTest {
      * <p>Um filhote recem-cadastrado nao tem cobertura nenhuma, e casa com a
      * regra de {@code CAN_V10_SERIE} — canina, entre 1,5 e 4 meses. O gatilho
      * entao tem obrigatoriamente o que gerar, em qualquer base com o catalogo
-     * clinico da V9 aplicado.
+     * clinico da V9 aplicado. Hoje a clinica que o abriga tambem e do teste,
+     * entao a contagem de obrigacoes da clinica comeca em zero e o delta medido
+     * abaixo e exatamente o que este gatilho produziu.
      *
      * <p>A assercao que importa nao e o numero em si, e sim que o contador
      * devolvido pelo parametro de saida bate com as linhas realmente gravadas.
@@ -119,51 +127,16 @@ class MotorDeProtocoloIntegracaoTest {
     }
 
     /**
-     * Um filhote canino novo, com consulta de hoje, criado aqui e nao no seed.
+     * Um filhote canino de dois meses, com consulta de hoje, criado aqui.
      *
-     * <p>Reaproveita tutor, raca e veterinario que ja existem — o que precisa ser
-     * novo e o <b>pet</b>, porque e nele que mora a cobertura do motor. Roda
-     * dentro da transacao do teste, entao nada disso sobra na base.
+     * <p>Dois meses porque e a faixa que {@code CAN_V10_SERIE} exige — o que
+     * precisa ser novo e o <b>pet</b>, porque e nele que mora a cobertura do
+     * motor. Raca vem do catalogo global; tutor e veterinario, da clinica que
+     * este teste montou.
      */
     private Long consultaDeFilhoteNovo() {
-        Long racaCanina = idNativo("""
-                select min(r.id_raca) from TB_CLV_RACA r
-                 join TB_CLV_ESPECIE e on e.id_especie = r.id_especie
-                where upper(e.nm_especie) = 'CANINA'
-                """);
-        Long tutor = idNativo(
-                "select min(id_tutor) from TB_CLV_TUTOR where id_clinica = %d".formatted(clinica));
-        Long veterinario = idNativo(
-                "select min(id_veterinario) from TB_CLV_VETERINARIO where id_clinica = %d"
-                        .formatted(clinica));
-
-        Assumptions.assumeTrue(racaCanina != null && tutor != null && veterinario != null,
-                "a clinica precisa de raca canina, tutor e veterinario cadastrados");
-
-        entityManager.createNativeQuery("""
-                insert into TB_CLV_PET (nm_pet, dt_nascimento, ds_sexo, ds_porte,
-                                        ds_status_pet, id_tutor, id_raca, id_clinica)
-                values ('Filhote do teste', ADD_MONTHS(TRUNC(SYSDATE), -2), 'M', 'MEDIO',
-                        'ATIVO', %d, %d, %d)
-                """.formatted(tutor, racaCanina, clinica)).executeUpdate();
-
-        Long pet = idNativo("""
-                select max(id_pet) from TB_CLV_PET
-                 where nm_pet = 'Filhote do teste' and id_clinica = %d
-                """.formatted(clinica));
-
-        entityManager.createNativeQuery("""
-                insert into TB_CLV_CONSULTA (dt_consulta, ds_motivo, ds_status, nr_valor,
-                                             id_pet, id_veterinario)
-                values (TRUNC(SYSDATE), 'Primeira consulta do filhote', 'REALIZADA', 180,
-                        %d, %d)
-                """.formatted(pet, veterinario)).executeUpdate();
-
-        entityManager.flush();
-
-        return idNativo("""
-                select max(id_consulta) from TB_CLV_CONSULTA where id_pet = %d
-                """.formatted(pet));
+        Long filhote = fixture.novoPet(clinica, cenario.tutor(), 2);
+        return fixture.novaConsulta(filhote, cenario.veterinario());
     }
 
     /**
@@ -172,11 +145,7 @@ class MotorDeProtocoloIntegracaoTest {
      */
     @Test
     void transicaoInvalidaERejeitadaSemAlterarNada() {
-        Long obrigacaoId = idNativo("""
-                select min(id_obrigacao) from TB_CLV_OBRIGACAO
-                 where id_clinica = %d and ds_status = 'PREVISTA'
-                """.formatted(clinica));
-        Assumptions.assumeTrue(obrigacaoId != null, "nenhuma obrigacao PREVISTA para testar");
+        Long obrigacaoId = umaObrigacaoPrevista();
 
         long transicoesAntes = transicaoRepository.findByObrigacaoIdOrderByDtOcorrenciaAsc(obrigacaoId).size();
 
@@ -204,11 +173,7 @@ class MotorDeProtocoloIntegracaoTest {
      */
     @Test
     void transicaoValidaAvancaOEstadoERegistraALinhaDoTempo() {
-        Long obrigacaoId = idNativo("""
-                select min(id_obrigacao) from TB_CLV_OBRIGACAO
-                 where id_clinica = %d and ds_status = 'PREVISTA'
-                """.formatted(clinica));
-        Assumptions.assumeTrue(obrigacaoId != null, "nenhuma obrigacao PREVISTA para testar");
+        Long obrigacaoId = umaObrigacaoPrevista();
 
         int transicoesAntes = transicaoRepository
                 .findByObrigacaoIdOrderByDtOcorrenciaAsc(obrigacaoId).size();
@@ -229,6 +194,18 @@ class MotorDeProtocoloIntegracaoTest {
                    and ds_event_type = 'ObrigacaoNotificada'
                 """.formatted(obrigacaoId)))
                 .isPositive();
+    }
+
+    /**
+     * Uma obrigacao PREVISTA deste teste, vencendo daqui a 30 dias.
+     *
+     * <p>Fabricada, e nao a {@code min(id_obrigacao)} PREVISTA da base: com a
+     * varredura de lembretes levando obrigacoes a NOTIFICADA todo dia, aquela
+     * consulta devolvia uma linha diferente a cada execucao e podia nao devolver
+     * nenhuma — e ai os dois testes de transicao desistiam em silencio.
+     */
+    private Long umaObrigacaoPrevista() {
+        return fixture.novaObrigacao(clinica, cenario.pet(), "PREVISTA", 30, false);
     }
 
     private long contarObrigacoes() {

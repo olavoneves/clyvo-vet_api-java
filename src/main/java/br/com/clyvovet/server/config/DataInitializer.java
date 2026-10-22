@@ -6,9 +6,9 @@ import br.com.clyvovet.server.colaborador.Colaborador;
 import br.com.clyvovet.server.colaborador.ColaboradorRepository;
 import br.com.clyvovet.server.tenant.TenantFilters;
 import jakarta.persistence.EntityManager;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Session;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.data.domain.PageRequest;
@@ -20,7 +20,6 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DataInitializer implements ApplicationRunner {
 
     private static final String EMAIL_MASTER = "master@clyvovet.com";
@@ -29,6 +28,19 @@ public class DataInitializer implements ApplicationRunner {
     private final ClinicaRepository clinicaRepository;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
+    private final String senhaMaster;
+
+    public DataInitializer(ColaboradorRepository colaboradorRepository,
+                           ClinicaRepository clinicaRepository,
+                           PasswordEncoder passwordEncoder,
+                           EntityManager entityManager,
+                           @Value("${app.master.senha:}") String senhaMaster) {
+        this.colaboradorRepository = colaboradorRepository;
+        this.clinicaRepository = clinicaRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.entityManager = entityManager;
+        this.senhaMaster = senhaMaster;
+    }
 
     @Override
     @Transactional
@@ -38,6 +50,12 @@ public class DataInitializer implements ApplicationRunner {
         entityManager.unwrap(Session.class).disableFilter(TenantFilters.TENANT);
 
         if (colaboradorRepository.findByEmail(EMAIL_MASTER).isPresent()) return;
+
+        // sem senha configurada nao ha master: nenhum literal vira credencial
+        if (senhaMaster.isBlank()) {
+            log.warn("MASTER_PASSWORD nao definida: usuario master nao criado.");
+            return;
+        }
 
         Optional<Clinica> clinica = clinicaRepository.findAll(PageRequest.of(0, 1)).stream().findFirst();
         if (clinica.isEmpty()) {
@@ -49,7 +67,7 @@ public class DataInitializer implements ApplicationRunner {
         Colaborador master = new Colaborador();
         master.setNome("master");
         master.setEmail(EMAIL_MASTER);
-        master.setSenhaHash(passwordEncoder.encode("master"));
+        master.setSenhaHash(passwordEncoder.encode(senhaMaster));
         master.setCargo("master");
         master.setClinica(clinica.get());
         colaboradorRepository.save(master);
