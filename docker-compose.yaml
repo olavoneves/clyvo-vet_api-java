@@ -45,6 +45,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${APP_USER_PASSWORD:?defina no .env}
       - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.OracleDialect
       - JWT_SECRET=${JWT_SECRET:?defina no .env}
+      - MASTER_PASSWORD=${MASTER_PASSWORD:?defina no .env}
       # Vem do .env da raiz, que o compose carrega sozinho. Sem ela a
       # aplicacao sobe igual e so /api/agente/** responde 503.
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
