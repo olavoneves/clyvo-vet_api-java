@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
 #
-# 03 - Cria o Azure Key Vault e gera os segredos da aplicacao.
+# 02 - Cria o Azure Key Vault e gera os segredos da solucao.
 #
-# Sao TRES segredos:
-#   - senha do SYS do Oracle          (usada pelo ACI do banco)
-#   - senha do usuario petflow        (usada pelos DOIS ACIs)
-#   - segredo de assinatura do JWT    (usado pelo ACI do app)
+# Sao QUATRO segredos:
+#   - senha do SYS do Oracle          (usada so pelo ACI do banco)
+#   - senha do usuario petflow        (banco e aplicacao)
+#   - segredo de assinatura do JWT    (aplicacao)
+#   - senha do colaborador master     (aplicacao, bootstrap e testes)
 #
 # As senhas sao geradas AQUI, em tempo de execucao, com `openssl rand`.
-# Nenhum valor literal existe em arquivo: os scripts 05 e 06 leem os
-# segredos do cofre e os injetam nos ACIs por
-# --secure-environment-variables. Isso endereca a penalidade de -20 por
-# dado sensivel exposto no codigo-fonte.
+# Nenhum valor literal existe em arquivo. O Key Vault e a fonte da verdade:
+# o 04 le os segredos do banco e o 06 copia os da aplicacao para o variable
+# group secreto do Azure DevOps, de onde o CD os grava no Web App.
 #
 # ATENCAO - soft delete: o Key Vault permanece "excluido reversivelmente"
 # por 90 dias apos um `az group delete`. Recriar um cofre com o mesmo nome
-# falha ate que ele seja purgado com:
-#     az keyvault purge --name kv-petflow-rm561940
-# Avise o responsavel antes de purgar.
+# falha ate que ele seja purgado (az keyvault purge), o que e irreversivel.
 #
-# Projeto Clyvo Vet - Sprint 3 - RM561940
+# Projeto Clyvo Vet - Sprint 4 - RM561940
 #
 set -euo pipefail
 source "$(dirname "$0")/00_variables.sh"
@@ -27,11 +25,11 @@ source "$(dirname "$0")/00_variables.sh"
 exigir_comando az
 exigir_comando openssl
 
-titulo "03 - AZURE KEY VAULT"
+titulo "02 - AZURE KEY VAULT"
 echo "Cofre : ${KEYVAULT_NAME}"
 
 # Alfanumerico puro: '/', '+' e '=' quebram a URL JDBC e o sqlplus na
-# linha de comando. Ver LISTA NEGRA do roteiro.
+# linha de comando.
 gerar_senha() {
     openssl rand -base64 32 | tr -d '/+=\n' | head -c 28
 }
@@ -62,9 +60,7 @@ else
         --name "${KEYVAULT_NAME}" \
         --location "${LOCATION}" \
         --enable-rbac-authorization false \
-        --tags disciplina="${TAG_DISCIPLINA}" \
-               sprint="${TAG_SPRINT}" \
-               projeto="${TAG_PROJETO}" \
+        --tags "${TAGS[@]}" \
         --output table
 fi
 
@@ -91,6 +87,7 @@ criar_segredo_se_ausente() {
 criar_segredo_se_ausente "${SECRET_ORACLE_PASSWORD}" gerar_senha
 criar_segredo_se_ausente "${SECRET_APP_PASSWORD}"    gerar_senha
 criar_segredo_se_ausente "${SECRET_JWT}"             gerar_jwt_secret
+criar_segredo_se_ausente "${SECRET_MASTER}"          gerar_senha
 
 titulo "RESULTADO"
 az keyvault secret list \
@@ -100,4 +97,3 @@ az keyvault secret list \
 
 echo ""
 echo "Os VALORES dos segredos nunca sao impressos nem gravados em disco."
-echo "Os scripts 05 e 06 os leem do cofre no momento do deploy."

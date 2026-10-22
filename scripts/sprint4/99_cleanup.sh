@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
 #
-# 99 - Remove todos os recursos do projeto.
+# 99 - Remove todos os recursos Azure da Sprint 4.
 #
-# QUANDO EXECUTAR: depois que o video estiver publicado e o link no PDF.
+# QUANDO EXECUTAR: depois que o video estiver publicado, a nota saiu e
+# ninguem mais precisa da solucao no ar. Antes disso, mantenha de pe: e a
+# rede de seguranca para regravar.
 #
-# Diferente do CP1, a Sprint 3 nao exige evidencia de remocao - e tambem
-# nao exige que a solucao continue no ar. A correcao e feita assistindo
-# ao video; o acesso que o enunciado cobra e ao repositorio e ao video.
-#
-# Antes disso, mantenha de pe: e a rede de seguranca para regravar. Dois
-# ACIs ligados custam cerca de R$ 21 por dia, entao nao deixe correndo
-# depois que a entrega saiu.
+# O que NAO e removido aqui: o projeto no Azure DevOps. O professor corrige
+# olhando as pipelines e o historico de execucoes - apagar o projeto antes
+# da nota e zero.
 #
 # Exige confirmacao digitada: `az group delete` e irreversivel.
 #
 # ATENCAO - Key Vault: o cofre fica em soft delete por 90 dias depois
-# disso. Recriar um cofre com o mesmo nome falha ate ser purgado:
-#     az keyvault purge --name kv-petflow-rm561940
+# disso. Recriar um cofre com o mesmo nome falha ate ser purgado.
 #
-# Projeto Clyvo Vet - Sprint 3 - RM561940
+# Projeto Clyvo Vet - Sprint 4 - RM561940
 #
 set -euo pipefail
 source "$(dirname "$0")/00_variables.sh"
@@ -41,6 +38,7 @@ az resource list --resource-group "${RESOURCE_GROUP}" \
 
 echo ""
 echo "Isto e IRREVERSIVEL. O banco nao tem volume: os dados vao junto."
+echo "Depois disto, o CD falha ate os scripts 01 a 05 serem rodados de novo."
 echo ""
 read -r -p "Digite o nome do grupo para confirmar: " CONFIRMACAO
 
@@ -56,6 +54,5 @@ echo "Remocao iniciada em background (--no-wait)."
 titulo "VERIFICACAO"
 echo "Acompanhe com:"
 echo "    az group list --output table"
-echo "    az container list --output table"
 echo ""
 echo "Lembrete: o cofre '${KEYVAULT_NAME}' ficara em soft delete por 90 dias."

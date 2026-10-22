@@ -1,0 +1,90 @@
+# =====================================================================
+#  PetFlow / Clyvo Vet - Pipeline de CD
+#  FIAP - DevOps Tools & Cloud Computing - Sprint 4
+#
+#  Dispara sozinha quando a pipeline de CI (petflow-ci) termina com
+#  sucesso na branch principal, isto e, sempre que um novo artefato e
+#  gerado. Nao tem gatilho de push proprio.
+#
+#    1. baixa o artefato petflow-jar gerado pelo CI
+#    2. publica o JAR no Azure Web App (Java 21 SE) e grava as app
+#       settings com a conexao do banco e o segredo do JWT
+#    3. confere se a aplicacao subiu e alcanca o Oracle (/actuator/health)
+#
+#  Os valores sensiveis (DB_USER, DB_PASSWORD, JWT_SECRET,
+#  MASTER_PASSWORD) vem do variable
+#  group "petflow-secrets", onde estao marcados como secretos: o Azure
+#  DevOps os mascara (***) em todo log desta pipeline.
+# =====================================================================
+
+name: cd-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger: none
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: ci            # apelido usado no download do artefato
+      source: petflow-ci      # nome da pipeline de CI no Azure DevOps
+      trigger:
+        branches:
+          include:
+            - main
+
+variables:
+  - group: petflow-secrets
+  - name: webAppName
+    value: rm561940-petflow-api-s4b
+
+stages:
+  - stage: CD
+    displayName: CD - deploy no Azure Web App
+    jobs:
+      - deployment: deploy_webapp
+        displayName: Deploy do JAR no Web App
+        pool:
+          vmImage: ubuntu-latest
+        # O environment guarda o historico de deploys: qual run do CI
+        # (e qual commit) esta em producao agora.
+        environment: petflow-producao
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: ci
+                  artifact: petflow-jar
+                  displayName: Baixa o artefato gerado pelo CI
+
+                - task: AzureWebApp@1
+                  displayName: Publica o JAR e aplica as app settings
+                  inputs:
+                    azureSubscription: sc-azure-petflow
+                    appType: webAppLinux
+                    appName: $(webAppName)
+                    package: $(Pipeline.Workspace)/ci/petflow-jar/*.jar
+                    runtimeStack: JAVA|21-java21
+                    appSettings: >-
+                      -SPRING_DATASOURCE_URL $(DB_JDBC_URL)
+                      -SPRING_DATASOURCE_USERNAME $(DB_USER)
+                      -SPRING_DATASOURCE_PASSWORD $(DB_PASSWORD)
+                      -JWT_SECRET $(JWT_SECRET)
+                      -MASTER_PASSWORD $(MASTER_PASSWORD)
+
+                # O health do Spring inclui o datasource: 200 com "UP" prova
+                # a cadeia inteira, Web App -> Oracle no ACI. No primeiro
+                # deploy o Flyway cria o schema, por isso a espera e longa.
+                - bash: |
+                    URL="https://$(webAppName).azurewebsites.net/actuator/health"
+                    echo "Verificando ${URL}"
+                    for tentativa in $(seq 1 40); do
+                      CODIGO=$(curl -s -o health.json -w '%{http_code}' --max-time 20 "${URL}" || true)
+                      if [ "${CODIGO}" = "200" ] && grep -q '"UP"' health.json; then
+                        echo "Aplicacao no ar apos ~$((tentativa * 15)) s: $(cat health.json)"
+                        exit 0
+                      fi
+                      echo "tentativa ${tentativa}: HTTP ${CODIGO}"
+                      sleep 15
+                    done
+                    echo "##vso[task.logissue type=error]A aplicacao nao respondeu UP em 10 minutos."
+                    exit 1
+                  displayName: Verifica a saude da aplicacao (smoke test)

@@ -1,0 +1,86 @@
+# =====================================================================
+#  PetFlow / Clyvo Vet - Pipeline de CI
+#  FIAP - DevOps Tools & Cloud Computing - Sprint 4
+#
+#  Dispara a cada push na branch principal e:
+#    1. compila a aplicacao (Java 21, Maven)
+#    2. executa os testes automaticos e publica o resultado
+#    3. gera o JAR e o publica como artefato no Azure DevOps
+#
+#  O artefato publicado aqui ("petflow-jar") e o gatilho do CD:
+#  pipelines/cd.yml dispara quando esta pipeline termina com sucesso.
+#
+#  Branch: o repositorio segue o padrao atual do Git/GitHub, em que a
+#  branch principal se chama "main". Ela cumpre o papel da "master" citada
+#  no enunciado (uso autorizado pelo professor): e a branch de producao, e
+#  todo push nela dispara o CI.
+# =====================================================================
+
+name: ci-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+
+# Pull requests nao disparam: o CI e o gatilho do deploy em producao.
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  # Repositorio Maven local dentro do workspace, para o Cache@2 guardar
+  # entre execucoes e o build nao baixar as dependencias toda vez.
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+
+stages:
+  - stage: CI
+    displayName: CI - build, testes e artefato
+    jobs:
+      - job: build
+        displayName: Build, testes e publicacao do artefato
+        steps:
+          - task: Cache@2
+            displayName: Restaura o cache do Maven
+            inputs:
+              key: 'maven | "$(Agent.OS)" | pom.xml'
+              restoreKeys: |
+                maven | "$(Agent.OS)"
+              path: $(MAVEN_CACHE_FOLDER)
+
+          # "verify" passa por compile -> test -> package: se um teste
+          # falhar, nao ha JAR, nao ha artefato e o CD nao dispara.
+          #
+          # Os testes de integracao exigem o Oracle com o motor de
+          # protocolo e so rodam quando SPRING_DATASOURCE_URL esta definida
+          # (@EnabledIfEnvironmentVariable). Aqui ela nao esta: eles
+          # aparecem como "skipped" no relatorio, e os testes de unidade,
+          # seguranca e renderizacao das telas rodam todos.
+          - task: Maven@4
+            displayName: Build e testes automaticos (mvn clean verify)
+            inputs:
+              mavenPomFile: pom.xml
+              goals: clean verify
+              options: -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)
+              javaHomeOption: Path
+              jdkDirectory: $(JAVA_HOME_21_X64)
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              testRunTitle: PetFlow - testes automaticos
+
+          # So o JAR executavel: o *.jar.original (sem dependencias) que o
+          # spring-boot-maven-plugin deixa ao lado nao casa com o padrao.
+          - task: CopyFiles@2
+            displayName: Separa o JAR executavel
+            inputs:
+              SourceFolder: $(System.DefaultWorkingDirectory)/target
+              Contents: '*.jar'
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publica o artefato petflow-jar
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: petflow-jar
+              publishLocation: pipeline
