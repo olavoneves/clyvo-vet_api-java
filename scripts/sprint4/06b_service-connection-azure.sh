@@ -130,6 +130,8 @@ echo "  liberada para todas as pipelines"
 
 # --- 4. credencial federada --------------------------------------------
 titulo "PASSO 4 - CREDENCIAL FEDERADA"
+# Uma credencial por organizacao: o subject identifica a service connection, e
+# a mesma identidade pode atender conexoes de mais de uma organizacao.
 # O issuer e o subject sao definidos pelo Azure DevOps para cada service
 # connection: lidos dela em vez de montados a mao.
 ISSUER=$(az devops service-endpoint show --id "${ID_SC}" \
@@ -146,13 +148,13 @@ if [[ -z "${ISSUER}" || -z "${SUBJECT}" ]]; then
     exit 1
 fi
 
-if az identity federated-credential show --name "ado-${SC_AZURE}" \
+if az identity federated-credential show --name "ado-${ADO_ORG}-${SC_AZURE}" \
         --identity-name "${MANAGED_IDENTITY}" \
         --resource-group "${RESOURCE_GROUP}" >/dev/null 2>&1; then
     echo "AVISO: a credencial federada ja existe."
 else
     az identity federated-credential create \
-        --name "ado-${SC_AZURE}" \
+        --name "ado-${ADO_ORG}-${SC_AZURE}" \
         --identity-name "${MANAGED_IDENTITY}" \
         --resource-group "${RESOURCE_GROUP}" \
         --issuer "${ISSUER}" \

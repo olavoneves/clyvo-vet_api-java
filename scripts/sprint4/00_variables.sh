@@ -90,7 +90,12 @@ export SECRET_MASTER="master-password"
 # --- Azure DevOps ------------------------------------------------------
 # A organizacao e criada pelo portal (dev.azure.com): nao ha comando de CLI
 # para isso. Ajuste ADO_ORG para o nome da organizacao criada.
-export ADO_ORG="${ADO_ORG:-RM561940}"
+#
+# Organizacao do Olavo (RM563558), com o RM561940 como Project Collection
+# Administrator. O agente hospedado gratuito (1 job, 1800 min/mes) so vale
+# com a organizacao vinculada a uma assinatura ativa: a RM561940 ficou presa
+# a assinatura desabilitada e passou a ter 0 jobs hospedados.
+export ADO_ORG="${ADO_ORG:-RM563558}"
 export ADO_ORG_URL="https://dev.azure.com/${ADO_ORG}"
 export ADO_PROJECT="Sprint 4 - Azure DevOps"
 
