@@ -1077,7 +1077,7 @@ develop   ← desenvolvimento
 
 **Azure DevOps + CI/CD** da API do PetFlow, com o banco de dados em nuvem.
 
-- **Projeto no Azure DevOps:** https://dev.azure.com/RM561940/Sprint%204%20-%20Azure%20DevOps
+- **Projeto no Azure DevOps:** https://dev.azure.com/RM563558/Sprint%204%20-%20Azure%20DevOps
 - **Aplicação publicada pelo CD:** https://rm561940-petflow-api-s4b.azurewebsites.net
 - **Vídeo da Sprint 4:** _(link do YouTube)_
 
