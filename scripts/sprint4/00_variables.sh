@@ -122,6 +122,8 @@ export GITHUB_REPO_URL="https://github.com/olavoneves/clyvo-vet_api-java"
 export GITHUB_BRANCH="main"
 export PIPELINE_CI="petflow-ci"
 export PIPELINE_CD="petflow-cd"
+# Environment do job de deploy (cd.yml): guarda o historico de deploys.
+export ADO_ENVIRONMENT="petflow-producao"
 export YAML_CI="pipelines/ci.yml"
 export YAML_CD="pipelines/cd.yml"
 

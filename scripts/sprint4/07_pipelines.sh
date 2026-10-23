@@ -81,6 +81,36 @@ titulo "REGISTRO DAS PIPELINES"
 criar_pipeline "${PIPELINE_CI}" "${YAML_CI}" "CI: build, testes automaticos e publicacao do artefato"
 criar_pipeline "${PIPELINE_CD}" "${YAML_CD}" "CD: deploy do artefato no Azure Web App"
 
+titulo "ENVIRONMENT ${ADO_ENVIRONMENT}"
+# O job de deploy do CD usa este environment. Criado pela propria pipeline, ele
+# nasce sem autorizar ninguem e o primeiro run do CD para em
+# "Checkpoint.Authorization" esperando um clique em "Permit" - o que quebraria o
+# disparo automatico. Criado e autorizado aqui, o CD roda sozinho desde o inicio.
+API_PROJETO="${ADO_ORG_URL}/$(printf '%s' "${ADO_PROJECT}" | sed 's/ /%20/g')/_apis"
+RECURSO_ADO="499b84ac-1321-427f-aa17-267ca6975798"
+
+ID_ENV=$(az rest --method get --resource "${RECURSO_ADO}" \
+             --url "${API_PROJETO}/distributedtask/environments?name=${ADO_ENVIRONMENT}&api-version=7.1" \
+             --query "value[0].id" --output tsv | tr -d '\r')
+if [[ -z "${ID_ENV}" ]]; then
+    ID_ENV=$(az rest --method post --resource "${RECURSO_ADO}" \
+                 --headers "Content-Type=application/json" \
+                 --url "${API_PROJETO}/distributedtask/environments?api-version=7.1" \
+                 --body "{\"name\":\"${ADO_ENVIRONMENT}\",\"description\":\"Deploy do PetFlow no Azure Web App\"}" \
+                 --query id --output tsv | tr -d '\r')
+    echo "  environment .................. criado (id ${ID_ENV})"
+else
+    echo "  environment .................. ja existe (id ${ID_ENV})"
+fi
+
+ID_CD=$(az pipelines show --name "${PIPELINE_CD}" --query id --output tsv | tr -d '\r')
+az rest --method patch --resource "${RECURSO_ADO}" \
+    --headers "Content-Type=application/json" \
+    --url "${API_PROJETO}/pipelines/pipelinePermissions/environment/${ID_ENV}?api-version=7.1-preview.1" \
+    --body "{\"pipelines\":[{\"id\":${ID_CD},\"authorized\":true}]}" \
+    --output none
+echo "  ${PIPELINE_CD} autorizada no environment"
+
 titulo "RESULTADO"
 az pipelines list --query "[].{pipeline:name, id:id, pasta:path}" --output table
 
