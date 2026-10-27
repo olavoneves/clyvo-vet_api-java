@@ -40,3 +40,6 @@ __pycache__/
 
 ### Resultados do Newman (gerados a cada execucao) ###
 tests/postman/resultados/
+
+### Snapshots da V15 (scripts/sql/v15_snapshot.sql; o .sql e versionado, a saida nao) ###
+docs/v15-snapshot-*.txt

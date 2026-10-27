@@ -14,7 +14,8 @@ import java.math.BigDecimal;
  *
  * <p>Quando flPorPorte e verdadeiro, os limites nao vem de nrValorMin/Max e sim
  * de {@link ParamPorte}: "filhote" nao significa a mesma idade para um chihuahua
- * e para um dogue alemao. Avaliada por FN_CLV_AVALIA_CONDICAO.
+ * e para um dogue alemao. Avaliada por AVALIA_CONDICAO, funcao privada de
+ * PKG_CLV_MOTOR.
  */
 @Entity
 @Table(name = "TB_CLV_CONDICAO_PROT")

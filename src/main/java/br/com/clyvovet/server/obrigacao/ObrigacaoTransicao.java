@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 
 /**
  * Registro de cada mudanca de status de uma obrigacao. Escrito por
- * PR_CLV_TRANSITAR_OBRIGACAO; somente leitura pela aplicacao.
+ * PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO; somente leitura pela aplicacao.
  *
  * <p>dsStatusDe nulo marca a transicao de criacao.
  */
