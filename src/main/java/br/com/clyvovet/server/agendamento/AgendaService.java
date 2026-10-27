@@ -142,7 +142,7 @@ public class AgendaService {
     /**
      * Marca o compromisso e fecha o elo com a obrigacao que o pediu.
      *
-     * <p>A transicao vai pela {@code PR_CLV_TRANSITAR_OBRIGACAO}, nunca por
+     * <p>A transicao vai pela {@code PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO}, nunca por
      * UPDATE: e a procedure que valida o salto de estado, escreve a trilha de
      * auditoria e publica no outbox, tudo na mesma transacao deste metodo.
      *

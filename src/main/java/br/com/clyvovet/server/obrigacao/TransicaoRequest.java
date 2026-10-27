@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 
 /**
  * Pedido de transicao. Quem valida se o salto e legal e
- * PR_CLV_TRANSITAR_OBRIGACAO, nao esta classe.
+ * PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO, nao esta classe.
  */
 public record TransicaoRequest(
         @NotNull ObrigacaoStatus novoStatus,

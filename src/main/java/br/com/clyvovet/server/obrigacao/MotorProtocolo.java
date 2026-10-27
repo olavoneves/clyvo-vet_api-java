@@ -35,7 +35,7 @@ public class MotorProtocolo {
     private static final int ORA_ERRO_APLICACAO_MAX = 20999;
 
     /**
-     * O mesmo DEFAULT de P_HORIZONTE_DIAS em PR_CLV_GERAR_OBRIGACOES (V7).
+     * O mesmo DEFAULT de P_HORIZONTE_DIAS em PKG_CLV_MOTOR.GERAR_OBRIGACOES (V15).
      * Repetido aqui porque um NULL explicito anula o DEFAULT do PL/SQL: com o
      * limite nulo o laco de recorrencia da procedure nunca termina e soma datas
      * ate estourar o ano 9999 (ORA-01841).
@@ -53,7 +53,7 @@ public class MotorProtocolo {
                                String correlationId, LocalDate dataReferencia,
                                String contexto, Integer horizonteDias) {
         StoredProcedureQuery procedure = entityManager
-                .createStoredProcedureQuery("PR_CLV_GERAR_OBRIGACOES");
+                .createStoredProcedureQuery("PKG_CLV_MOTOR.GERAR_OBRIGACOES");
 
         registrarEntrada(procedure, "P_ID_CLINICA", Long.class);
         registrarEntrada(procedure, "P_ID_PET", Long.class);
@@ -85,7 +85,7 @@ public class MotorProtocolo {
     public void transitar(Long idObrigacao, ObrigacaoStatus novoStatus, String motivo,
                           String causationId, Long idAgendamento, Long idConsulta, BigDecimal valor) {
         StoredProcedureQuery procedure = entityManager
-                .createStoredProcedureQuery("PR_CLV_TRANSITAR_OBRIGACAO");
+                .createStoredProcedureQuery("PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO");
 
         registrarEntrada(procedure, "P_ID_OBRIGACAO", Long.class);
         registrarEntrada(procedure, "P_NOVO_STATUS", String.class);

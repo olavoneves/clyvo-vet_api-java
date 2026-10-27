@@ -14,7 +14,8 @@ import java.math.BigDecimal;
  *
  * <p>A data prevista sai de dsTipoIntervalo: APOS_REFERENCIA conta do evento
  * gatilho, APOS_ETAPA encadeia em etapaReferencia, RECORRENTE repete a cada
- * nrRecorrenciaDias. O calculo vive em FN_CLV_CALCULAR_DATA, no banco.
+ * nrRecorrenciaDias. O calculo vive no banco, em CALCULAR_DATA, funcao privada
+ * de PKG_CLV_MOTOR.
  */
 @Entity
 @Table(name = "TB_CLV_ETAPA_PROTOCOLO")
