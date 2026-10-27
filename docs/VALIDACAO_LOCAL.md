@@ -76,14 +76,15 @@ PL/SQL. As migrations seguiram e as 15 foram aplicadas. Não bloqueia o boot.
 
 ## Bootstrap: a ordem importa
 
-Num banco vazio o schema nasce completo, mas **sem dados**. As procedures
-`PR_CLV_SEED_*` da V8 não são chamadas pela aplicação e **falham se não houver clínica**:
+Num banco vazio o schema nasce completo, mas **sem dados**. As rotinas de seed
+(`PKG_CLV_SEED`, nascidas na V8 e empacotadas na V15) não são chamadas pela aplicação e
+**falham se não houver clínica**:
 
 ```
 ORA-01400: cannot insert NULL into ("PETFLOW"."TB_CLV_TUTOR"."ID_CLINICA")
 ```
 
-A causa está na própria procedure: `SELECT MIN(id_clinica) INTO v_clinica FROM TB_CLV_CLINICA`
+A causa está no próprio seed: `SELECT MIN(id_clinica) INTO v_clinica FROM TB_CLV_CLINICA`
 devolve `NULL` quando a tabela está vazia.
 
 O `DataInitializer` também depende de clínica — sem ela, registra:
