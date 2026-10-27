@@ -218,14 +218,24 @@ class AgendaServiceIntegracaoTest {
                 .allSatisfy(c -> assertThat(c.diasDeAtraso()).isPositive());
     }
 
+    /**
+     * As recusas de calendario, cada uma pela regra que o nome promete.
+     *
+     * <p>O dia das duas ultimas checagens e o proximo dia util a partir de
+     * amanha, e nao o da primeira vaga. A primeira vaga cai hoje sempre que ainda
+     * sobra horario no expediente, e ai 10h17 de hoje ja passou depois das 10h17,
+     * e 21h ja passou depois das 21h: a recusa vinha por "horario ja passado",
+     * que e checado antes, e o teste falhava conforme a hora em que rodava. Num
+     * dia util futuro o unico motivo de recusa e o que se quer exercitar.
+     */
     @Test
     @DisplayName("fim de semana e horario fora do expediente sao recusados")
     void horarioForaDoExpedienteERecusado() {
         Long obrigacao = umaObrigacaoPendente();
-        AgendaService.HorarioLivre vaga = primeiraVaga();
-        Long veterinario = vaga.idVeterinario();
+        Long veterinario = primeiraVaga().idVeterinario();
 
         LocalDate sabado = proximoSabado();
+        LocalDate diaUtil = proximoDiaUtil();
 
         assertThatThrownBy(() -> agendaService.agendar(
                 obrigacao, sabado.atTime(10, 0), veterinario))
@@ -233,12 +243,12 @@ class AgendaServiceIntegracaoTest {
                 .hasMessageContaining("fins de semana");
 
         assertThatThrownBy(() -> agendaService.agendar(
-                obrigacao, vaga.data().atTime(21, 0), veterinario))
+                obrigacao, diaUtil.atTime(21, 0), veterinario))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expediente");
 
         assertThatThrownBy(() -> agendaService.agendar(
-                obrigacao, vaga.data().atTime(10, 17), veterinario))
+                obrigacao, diaUtil.atTime(10, 17), veterinario))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("30 minutos");
     }
@@ -291,6 +301,16 @@ class AgendaServiceIntegracaoTest {
     private static LocalDate proximoSabado() {
         LocalDate dia = LocalDate.now().plusDays(1);
         while (dia.getDayOfWeek() != java.time.DayOfWeek.SATURDAY) {
+            dia = dia.plusDays(1);
+        }
+        return dia;
+    }
+
+    /** O primeiro dia de semana a partir de amanha: sempre no futuro, nunca no fim de semana. */
+    private static LocalDate proximoDiaUtil() {
+        LocalDate dia = LocalDate.now().plusDays(1);
+        while (dia.getDayOfWeek() == java.time.DayOfWeek.SATURDAY
+                || dia.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
             dia = dia.plusDays(1);
         }
         return dia;
