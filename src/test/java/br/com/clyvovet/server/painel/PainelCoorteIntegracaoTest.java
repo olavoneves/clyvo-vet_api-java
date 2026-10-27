@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * escrever um teste que quebra no proximo seed sem dizer nada sobre a view.
  *
  * <p>O que e estavel, e portanto o que se afirma: as <b>taxas</b>, que saem do
- * sorteio de {@code PR_CLV_SEED_DESFECHOS}; a <b>aritmetica</b> da view,
+ * sorteio de {@code DESFECHOS}, em {@code PKG_CLV_SEED}; a <b>aritmetica</b> da view,
  * conferida contra a tabela que ela resume; e a <b>forma</b> — um grupo de cada
  * por clinica, e o tratado acima do controle.
  *
@@ -44,11 +44,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * valor em reais desistia por {@code assumeTrue} sempre que a amostra daquela
  * clinica nao passava do piso, que e justamente a condicao que ele existe para
  * exercitar. E a proporcao do sorteio passou a ser medida chamando
- * {@code FN_CLV_GRUPO_CONTROLE} direto, sobre milhares de ids sinteticos, em vez
+ * {@code PKG_CLV_MOTOR.GRUPO_CONTROLE} direto, sobre milhares de ids sinteticos, em vez
  * de contar pets semeados.
  *
  * <p>O unico caso que continua exigindo a base semeada e o da calibragem do
- * seed — nao ha como verificar que {@code PR_CLV_SEED_DESFECHOS} produz as taxas
+ * seed — nao ha como verificar que o {@code DESFECHOS} do seed produz as taxas
  * que declara sem os dados que ele produziu. Esse caso <b>falha</b>, com
  * mensagem dizendo o que rodar, em vez de se pular em silencio.
  */
@@ -65,7 +65,7 @@ class PainelCoorteIntegracaoTest {
      * A taxa que o seed sorteia, lida do proprio seed.
      *
      * <p>Antes eram duas constantes aqui, 58,0 e 36,0, copiadas de
-     * {@code PR_CLV_SEED_DESFECHOS}. Copia de numero e copia de verdade: quem
+     * {@code DESFECHOS}, em {@code PKG_CLV_SEED}. Copia de numero e copia de verdade: quem
      * recalibrasse o sorteio no banco veria este teste falhar sem nada estar
      * quebrado, e a leitura obvia da falha seria mexer no teste ate ele calar.
      *
@@ -73,6 +73,12 @@ class PainelCoorteIntegracaoTest {
      * {@code DEFAULT_VALUE} vem vazia para este caso —, entao a leitura e do
      * texto da procedure, que e onde o valor de fato esta. Feio de olhar e
      * honesto: existe uma fonte so, e e a mesma que o seed executa.
+     *
+     * <p>Desde a V15 {@code DESFECHOS} e privada de {@code PKG_CLV_SEED}: a spec
+     * so expoe {@code EXECUTAR} e {@code LIMPAR}, e o {@code DEFAULT} mora no
+     * {@code PACKAGE BODY}. Por isso o filtro de tipo — e por isso o body nao tem
+     * declaracao antecipada de {@code DESFECHOS}, que repetiria a linha e faria
+     * {@code optional()} receber duas.
      *
      * <p>Devolve o literal como texto, e a conversao acontece em Java. Com
      * {@code TO_NUMBER} no SQL a consulta quebrava com ORA-01722 na sessao da
@@ -83,7 +89,8 @@ class PainelCoorteIntegracaoTest {
     private static final String SQL_TAXA_DO_SEED = """
             select regexp_substr(text, 'DEFAULT\\s+([0-9]+\\.?[0-9]*)', 1, 1, NULL, 1)
               from user_source
-             where name = 'PR_CLV_SEED_DESFECHOS'
+             where name = 'PKG_CLV_SEED'
+               and type = 'PACKAGE BODY'
                and upper(text) like '%' || :parametro || '%'
                and upper(text) like '%DEFAULT%'
             """;
@@ -120,7 +127,7 @@ class PainelCoorteIntegracaoTest {
      * A calibragem do seed, sobre a base semeada.
      *
      * <p>Este e o unico caso da classe que precisa dos dados de demonstracao: nao
-     * ha como conferir que {@code PR_CLV_SEED_DESFECHOS} produz as taxas que
+     * ha como conferir que o {@code DESFECHOS} do seed produz as taxas que
      * declara sem olhar o que ele produziu. Antes ele se pulava quando a base
      * estava vazia; agora falha dizendo o que rodar, porque um banco de
      * demonstracao sem demonstracao e um defeito de ambiente, e nao um motivo
@@ -200,7 +207,7 @@ class PainelCoorteIntegracaoTest {
      * poucas centenas de pets a proporcao oscila tanto que a faixa aceita tinha
      * que ir de 3% a 20%, o que so barrava o caso degenerado.
      *
-     * <p>Chamando {@code FN_CLV_GRUPO_CONTROLE} direto sobre dez mil ids, a lei
+     * <p>Chamando {@code PKG_CLV_MOTOR.GRUPO_CONTROLE} direto sobre dez mil ids, a lei
      * dos grandes numeros aperta a faixa para um ponto percentual e o teste passa
      * a afirmar o que diz no nome. Nao depende de dado nenhum na base, e ainda
      * confere que o parametro de percentual e respeitado — o que impede alguem de
@@ -237,7 +244,7 @@ class PainelCoorteIntegracaoTest {
                       v_qtd  NUMBER := 0;
                     BEGIN
                       FOR i IN 1 .. ? LOOP
-                        IF FN_CLV_GRUPO_CONTROLE(1, i, 1, ?, v_seed, v_hash) = 'S' THEN
+                        IF PKG_CLV_MOTOR.GRUPO_CONTROLE(1, i, 1, ?, v_seed, v_hash) = 'S' THEN
                           v_qtd := v_qtd + 1;
                         END IF;
                       END LOOP;
@@ -435,7 +442,7 @@ class PainelCoorteIntegracaoTest {
 
         assertThat(clinicas)
                 .as("este caso confere a calibragem do seed e precisa da base de "
-                        + "demonstracao: rode PR_CLV_SEED_EXECUTAR antes")
+                        + "demonstracao: rode PKG_CLV_SEED.EXECUTAR antes")
                 .isNotEmpty();
         return clinicas.getFirst();
     }
@@ -471,13 +478,13 @@ class PainelCoorteIntegracaoTest {
     }
 
     /**
-     * A taxa alvo de um dos parametros de {@code PR_CLV_SEED_DESFECHOS}, em
-     * pontos percentuais.
+     * A taxa alvo de um dos parametros de {@code DESFECHOS}, em
+     * {@code PKG_CLV_SEED}, em pontos percentuais.
      *
-     * <p>Falha se a procedure nao estiver no schema. Antes pulava — mas a
-     * procedure nasce na V8 e existe em qualquer schema migrado, entao a ausencia
-     * dela significa migration faltando, que e um defeito para mostrar e nao para
-     * contornar.
+     * <p>Falha se o pacote nao estiver no schema. Antes pulava — mas a rotina
+     * nasce na V8, vai para o pacote na V15 e existe em qualquer schema migrado,
+     * entao a ausencia dela significa migration faltando, que e um defeito para
+     * mostrar e nao para contornar.
      */
     private double taxaDoSeed(String parametro) {
         java.util.Optional<String> literal = jdbcClient.sql(SQL_TAXA_DO_SEED)
@@ -486,7 +493,7 @@ class PainelCoorteIntegracaoTest {
                 .optional();
 
         assertThat(literal)
-                .as("PR_CLV_SEED_DESFECHOS nasce na V8: sem ela, o schema esta incompleto")
+                .as("o body de PKG_CLV_SEED nasce na V15: sem ele, o schema esta incompleto")
                 .isPresent();
 
         // a procedure guarda a fracao (0,58); a view devolve pontos percentuais

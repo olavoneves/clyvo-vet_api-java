@@ -84,7 +84,7 @@ class MotorDeProtocoloIntegracaoTest {
      * <p><b>O teste cria o proprio pet, e essa e a correcao que importa.</b> Antes
      * ele varria consultas ja existentes de pets que ja tinham obrigacoes — ou
      * seja, exatamente os pets que o motor se recusa a reprocessar. A guarda de
-     * cobertura de {@code PR_CLV_GERAR_OBRIGACOES} nao regera protocolo que ja
+     * cobertura de {@code PKG_CLV_MOTOR.GERAR_OBRIGACOES} nao regera protocolo que ja
      * tem obrigacao viva e futura, entao numa base ja exercitada as vinte
      * candidatas devolviam zero e o teste falhava sem que nada estivesse
      * quebrado. Passava ou nao conforme o quanto a base tinha sido usada.
