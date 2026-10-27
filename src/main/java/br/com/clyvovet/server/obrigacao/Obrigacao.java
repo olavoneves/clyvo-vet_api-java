@@ -22,8 +22,8 @@ import java.time.LocalDateTime;
  * O compromisso de cuidado que o protocolo gerou para um pet: o que era para
  * acontecer, quando, e o que de fato aconteceu.
  *
- * <p>Escrita exclusivamente pelas procedures PR_CLV_GERAR_OBRIGACOES e
- * PR_CLV_TRANSITAR_OBRIGACAO. A aplicacao le esta tabela, mas nao muda status
+ * <p>Escrita exclusivamente pelas procedures GERAR_OBRIGACOES e
+ * TRANSITAR_OBRIGACAO, de PKG_CLV_MOTOR. A aplicacao le esta tabela, mas nao muda status
  * por UPDATE: a transicao valida, registra em TB_CLV_OBRIGACAO_TRANSICAO e
  * publica no outbox, tudo em uma transacao no banco.
  *

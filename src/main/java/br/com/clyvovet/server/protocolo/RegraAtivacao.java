@@ -9,7 +9,8 @@ import lombok.Setter;
 /**
  * Decide se uma versao de protocolo se aplica ao pet quando o gatilho ocorre.
  * As condicoes sao combinadas por dsOperadorLogico; nrPrioridade desempata
- * quando mais de uma regra casa. Avaliada por FN_CLV_AVALIA_REGRA.
+ * quando mais de uma regra casa. Avaliada por AVALIA_REGRA, funcao privada de
+ * PKG_CLV_MOTOR.
  */
 @Entity
 @Table(name = "TB_CLV_REGRA_ATIVACAO")

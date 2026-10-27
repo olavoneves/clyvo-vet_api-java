@@ -195,7 +195,7 @@ class PaginasRenderizamTest {
      * O rodapé de método mostra a fatia MEDIDA, e não os 10% que o sorteio mira.
      *
      * <p>A tela dizia "10% dos pets" em texto fixo. Os 10% moram no banco, em
-     * {@code FN_CLV_GRUPO_CONTROLE.p_percentual} — repeti-los no HTML era uma
+     * {@code p_percentual} de {@code PKG_CLV_MOTOR.GRUPO_CONTROLE} — repeti-los no HTML era uma
      * segunda cópia que não acompanharia uma recalibragem do sorteio. E o alvo
      * nem era o número honesto: o sorteio é por hash do pet, então a fatia real
      * oscila em torno dele. Aqui, 27 de 245 pets dão 11,0%.

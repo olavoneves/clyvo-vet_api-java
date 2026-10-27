@@ -78,7 +78,7 @@ public record CoorteResponse(
     /**
      * Que fatia dos pets desta clinica caiu no controle, de fato.
      *
-     * <p>O sorteio de {@code FN_CLV_GRUPO_CONTROLE} <i>mira</i> 10%, e a tela
+     * <p>O sorteio de {@code PKG_CLV_MOTOR.GRUPO_CONTROLE} <i>mira</i> 10%, e a tela
      * afirmava esse 10% em texto fixo. Duas coisas erradas nisso: o percentual
      * alvo mora no banco, no parametro da funcao, e o HTML era uma segunda copia
      * dele; e o valor exibido nem era o que a clinica tem — o sorteio e por hash

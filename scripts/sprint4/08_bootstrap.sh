@@ -11,7 +11,7 @@
 #      Sem clinica ele registra no log:
 #        "Nenhuma clinica cadastrada: usuario master nao criado."
 #
-#   2. As procedures PR_CLV_SEED_* da V8 tambem exigem clinica, e num
+#   2. O seed PL/SQL (PKG_CLV_SEED, V8/V15) tambem exige clinica, e num
 #      banco vazio quebram com ORA-01400.
 #
 # Entao: cria a clinica pela rota publica, reinicia o Web App para o
@@ -109,7 +109,7 @@ fi
 titulo "PASSO 4 - CARGA DE DEMONSTRACAO"
 #
 # A carga vem pela API, nao por INSERT direto: assim o video evidencia a
-# integracao App <-> Banco. As procedures PR_CLV_SEED_* da V8 nao servem
+# integracao App <-> Banco. O PKG_CLV_SEED (V8/V15) nao serve
 # aqui - geram centenas de linhas e poluem o SELECT na tela.
 
 TOKEN=$(grep -o '"accessToken":"[^"]*' "${CORPO}" | cut -d'"' -f4)

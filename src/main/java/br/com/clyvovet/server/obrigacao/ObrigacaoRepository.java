@@ -36,7 +36,7 @@ public interface ObrigacaoRepository
      *   controle existe para medir o produto contra a inercia; notificar um pet
      *   de controle destroi o experimento de forma irreversivel, porque nao ha
      *   como "desnotificar". A leitura e da flag <i>persistida</i>, sorteada uma
-     *   vez por FN_CLV_GRUPO_CONTROLE na geracao: recalcular o hash em Java
+     *   vez por PKG_CLV_MOTOR.GRUPO_CONTROLE na geracao: recalcular o hash em Java
      *   criaria uma segunda fonte da mesma verdade, e bastaria uma diferenca de
      *   arredondamento para os dois discordarem sobre quem e controle.
      *   <li><b>{@code ds_status = 'PREVISTA'}</b> — e tambem a idempotencia: a

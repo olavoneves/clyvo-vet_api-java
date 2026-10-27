@@ -133,7 +133,7 @@ divergir do banco.
 
 | Banco | O que acontece no primeiro boot |
 |---|---|
-| **Vazio** (container do compose) | A cadeia `V0 → V0.1 → V1 … → V14` roda inteira: tabelas, foreign keys, índices, o motor de protocolo em PL/SQL e as views do painel |
+| **Vazio** (container do compose) | A cadeia `V0 → V0.1 → V1 … → V15` roda inteira: tabelas, foreign keys, índices, o motor de protocolo em PL/SQL (empacotado na V15) e as views do painel |
 | **FIAP** | O schema até a V8 já existia, aplicado pelo DBA. Com `baseline-version=8` o Flyway registra o baseline e aplica a partir da **V9** |
 
 ### 5. Subir a aplicação
@@ -160,12 +160,13 @@ O banco sobe com o schema criado e **sem dados**. Para semear clínicas, pets, c
 os 18 meses de histórico que o painel lê, conecte-se ao Oracle e rode:
 
 ```sql
-BEGIN PR_CLV_SEED_EXECUTAR(p_qtd_pets => 400); END;
+BEGIN PKG_CLV_SEED.EXECUTAR(p_qtd => 400); END;
 /
 ```
 
-A procedure vem da migration `V8` e não é chamada por nenhum ponto da aplicação — semear é
-ato deliberado.
+O seed nasceu na migration `V8` e mora no pacote `PKG_CLV_SEED` desde a `V15`. Nenhum ponto
+da aplicação o chama — semear é ato deliberado. **Só em banco descartável:** `EXECUTAR` e
+`LIMPAR` apagam e reescrevem a base, e nunca rodam no Oracle da FIAP.
 
 ### 7. Rodar os testes
 
@@ -500,13 +501,37 @@ rodam em cada banco.
 | `V5__consulta_valor.sql` | Valor da consulta |
 | `V6__raca_perfil.sql` | Perfil da raça |
 | `V7__correcoes_motor.sql` | **Motor de protocolo**: catálogo, obrigações, outbox, auditoria, funções, procedures e `VW_CLV_PAINEL_RECEITA` |
-| `V8__melhorias_banco.sql` | Gerador de dados de demonstração (`PR_CLV_SEED_*`) — nada aqui é chamado pela aplicação |
+| `V8__melhorias_banco.sql` | Gerador de dados de demonstração (hoje em `PKG_CLV_SEED`) — nada aqui é chamado pela aplicação |
 | `V9__catalogo_clinico_e_correcoes.sql` | Catálogo clínico (espécies, raças, 26 protocolos) e correções de regra do motor |
 | `V10__senha_dos_usuarios_de_demonstracao.sql` | Regrava as senhas do seed em BCrypt válido |
 | `V11__vw_clv_painel_coorte.sql` | `VW_CLV_PAINEL_COORTE` — comparação controle × tratado |
 | `V12__notificacao_do_tutor.sql` | `TB_CLV_NOTIFICACAO` — a caixa de entrada do tutor |
 | `V13__antecedencia_do_lembrete.sql` | `nr_antecedencia_lembrete_dias` no protocolo: quantos dias antes o lembrete sai |
 | `V14__pet_status_inativo.sql` | `INATIVO` em `chk_pet_status`: o estado que o tutor grava ao remover o pet |
+| `V15__empacotamento_plsql.sql` | Empacota as 19 rotinas soltas da V7 e da V8 em quatro pacotes e apaga as soltas — os corpos são cópia, a regra não muda |
+
+### Pacotes PL/SQL
+
+Desde a V15 todo o PL/SQL mora em quatro pacotes. A **spec** é o que fica visível fora do
+pacote; o **body** guarda o resto, que nenhum outro objeto consegue chamar.
+
+| Pacote | Responsabilidade | Spec (pública) | Só no body (privada) |
+|---|---|---|---|
+| `PKG_CLV_LOG` | Grava erro em `TB_CLV_LOG_ERRO` numa transação autônoma, que sobrevive ao rollback de quem falhou | `REGISTRAR_ERRO` | — |
+| `PKG_CLV_MOTOR` | Motor de protocolo: quando um evento gera obrigação, qual transição é legal, quem cai no grupo de controle | `GERAR_OBRIGACOES`, `TRANSITAR_OBRIGACAO` (as duas que `MotorProtocolo` chama), `GRUPO_CONTROLE`, `FASE_VIDA` | `IDADE_MESES`, `PESO_ATUAL`, `CALCULAR_DATA`, `AVALIA_CONDICAO`, `AVALIA_REGRA` |
+| `PKG_CLV_AUDITORIA` | Trilha encadeada por hash SHA-256 de cada mudança em `TB_CLV_OBRIGACAO`, e a verificação da cadeia | `REGISTRAR_TRANSICAO`, `VERIFICA_CADEIA` | — |
+| `PKG_CLV_SEED` | Gerador da base de demonstração. **Nunca roda no Oracle da FIAP** | `EXECUTAR`, `LIMPAR` | `BASE`, `GERAR`, `SEED_CONSULTA`, `POPULACAO`, `HEROIS`, `DESFECHOS` |
+
+**O trigger fica fora de pacote porque o Oracle não deixa trigger morar em pacote.**
+`TR_CLV_AUDIT_OBRIGACAO` continua sendo um objeto próprio sobre `TB_CLV_OBRIGACAO`, mas só
+monta o JSON do antes e do depois e delega a `PKG_CLV_AUDITORIA.REGISTRAR_TRANSICAO`, onde
+estão o encadeamento e o hash.
+
+Toda rotina pública termina em `WHEN OTHERS` → `PKG_CLV_LOG.REGISTRAR_ERRO` → `RAISE`: o
+erro fica registrado e continua subindo com o mesmo código, então o `ORA-20010` de transição
+inválida ainda chega a `MotorProtocolo` e vira `409`. A exceção é o próprio
+`REGISTRAR_ERRO`, que não relança — uma falha ao registrar um erro não pode esconder o erro
+original.
 
 ### Repair de objeto PL/SQL exige um segundo passo
 
@@ -527,7 +552,8 @@ repositório.
    `USER_SOURCE` guarda o texto já sem o `CREATE OR REPLACE [EDITIONABLE]`, então tire
    esse prefixo do lado da migration.
 2. **Regravar** cada objeto divergente rodando o trecho `CREATE OR REPLACE` da migration
-   atual direto no schema.
+   atual direto no schema. Num pacote, isso vale para a spec **e** o body: o `USER_SOURCE`
+   guarda os dois separados, com `type` `PACKAGE` e `PACKAGE BODY`.
 3. Conferir de novo. Só aí o repair está terminado.
 
 ### Diagrama de dependências (simplificado)
@@ -553,7 +579,7 @@ COLABORADOR (sem FKs — usuário interno)
 O painel responde a pergunta que justifica o produto: **quanto da receita aconteceu
 porque o Clyvo cobrou, e quanto teria acontecido de qualquer jeito.**
 
-Para poder responder isso, `FN_CLV_GRUPO_CONTROLE` sorteia ~10% dos pets para um **grupo
+Para poder responder isso, `PKG_CLV_MOTOR.GRUPO_CONTROLE` sorteia ~10% dos pets para um **grupo
 de controle** que nunca recebe lembrete e nunca entra no agente. A diferença entre a taxa
 de cumprimento dos dois grupos é o efeito do produto; sem o controle, o número do painel
 seria só a taxa de comparecimento da clínica, que existiria com ou sem software.
@@ -570,10 +596,10 @@ distinção importa, e é melhor deixá-la escrita do que deixá-la subentendida
 
 | | Situação |
 |---|---|
-| Sorteio do grupo de controle | **Real.** `FN_CLV_GRUPO_CONTROLE` usa `SHA256` sobre um seed determinístico por pet, persiste flag e hash, e é auditável depois do fato |
+| Sorteio do grupo de controle | **Real.** `PKG_CLV_MOTOR.GRUPO_CONTROLE` usa `SHA256` sobre um seed determinístico por pet, persiste flag e hash, e é auditável depois do fato |
 | Separação de caminho no motor | **Real.** A varredura de lembretes exclui o controle no `WHERE`, o botão da ficha não aparece para ele e a rota recusa o POST. Um pet de controle não recebe lembrete nem entra no agente |
 | Agregação e aritmética do painel | **Reais.** `VW_CLV_PAINEL_COORTE` conta as linhas que existem, e o delta, as consultas atribuíveis e o valor saem dessa contagem |
-| **Os desfechos dos 18 meses** | **Simulados.** `PR_CLV_SEED_DESFECHOS` sorteia quem cumpriu e quem perdeu com taxas **declaradas nos parâmetros da própria procedure** — hoje `p_taxa_tratado => 0.58` e `p_taxa_controle => 0.36` |
+| **Os desfechos dos 18 meses** | **Simulados.** `DESFECHOS`, rotina privada de `PKG_CLV_SEED`, sorteia quem cumpriu e quem perdeu com taxas **declaradas nos parâmetros da própria procedure** — hoje `p_taxa_tratado => 0.58` e `p_taxa_controle => 0.36` |
 
 Ou seja: **o mecanismo é real, o histórico é sintético.** Os +25 p.p. que o painel mostra
 não são uma descoberta — são, aproximadamente, a diferença que o seed foi instruído a
@@ -643,7 +669,7 @@ Medição de 06/09/2026 no banco da FIAP, que é o que a demonstração usa:
 | PetCare Zona Sul | Tratado | 1.767 | 1.042 | **58,97%** | 146 |
 
 Delta de **+25,5 pontos** na Vida Animal e **+27,5** na PetCare. As taxas do grupo tratado
-batem com os 0,58 que `PR_CLV_SEED_DESFECHOS` sorteia, o que é a confirmação de que o
+batem com os 0,58 que o `DESFECHOS` do `PKG_CLV_SEED` sorteia, o que é a confirmação de que o
 denominador mede o que diz medir.
 
 > **Números lidos em bancos diferentes não se comparam.** O seed usa `SYS_GUID` e datas
@@ -661,7 +687,7 @@ era o colaborador, não o motor**. O que o sistema oferecia era a lista do que a
 deveria ter feito.
 
 `VarreduraDeLembretes` é um `@Scheduled` que varre as obrigações `PREVISTA` cuja janela
-de antecedência já abriu e chama `PR_CLV_TRANSITAR_OBRIGACAO` para levá-las a
+de antecedência já abriu e chama `PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO` para levá-las a
 `NOTIFICADA`. A notificação já pendia da transição, então a caixa de entrada do tutor
 funciona sem alteração nenhuma.
 
@@ -761,7 +787,7 @@ métodos Java sobre serviços que já existiam.
 |---|---|
 | `listar_obrigacoes_pendentes` | Obrigações em `PREVISTA`, `NOTIFICADA` ou `RESPONDIDA` |
 | `consultar_disponibilidade` | Horários livres, derivados de `TB_CLV_AGENDAMENTO` |
-| `criar_agendamento` | Cria com `ds_canal_origem = 'APP'` e chama `PR_CLV_TRANSITAR_OBRIGACAO` |
+| `criar_agendamento` | Cria com `ds_canal_origem = 'APP'` e chama `PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO` |
 | `reagendar` | Move um compromisso já marcado |
 | `escalar_para_veterinario` | Passa a conversa para uma pessoa |
 
@@ -855,7 +881,7 @@ de consulta, nunca de array literal (`FunilView`, `ComparacaoView`).
 
 ### 2. Flyway
 
-`src/main/resources/db/migration/`, **V0 a V14**. A tabela completa está em
+`src/main/resources/db/migration/`, **V0 a V15**. A tabela completa está em
 [Banco de Dados](#-banco-de-dados); em faixas:
 
 | Faixa | O que faz |
@@ -863,10 +889,11 @@ de consulta, nunca de array literal (`FunilView`, `ComparacaoView`).
 | `V0` – `V0.1` | Schema base: 23 tabelas e, em passo separado, as foreign keys |
 | `V1` – `V6` | Autenticação, colaborador, multi-tenancy (`id_clinica`) e campos de negócio |
 | `V7` | **Motor de protocolo**: catálogo, obrigações, outbox, auditoria encadeada, funções, procedures e a view de receita |
-| `V8` | Gerador de dados de demonstração (`PR_CLV_SEED_*`) — nada aqui é chamado pela aplicação |
+| `V8` | Gerador de dados de demonstração (hoje em `PKG_CLV_SEED`) — nada aqui é chamado pela aplicação |
 | `V9` | Catálogo clínico: espécies, raças e 26 protocolos, com correções de regra do motor |
 | `V10` – `V13` | Senhas do seed em BCrypt válido, view da coorte, caixa do tutor e a antecedência do lembrete |
 | `V14` | `INATIVO` em `chk_pet_status`: o estado que o tutor grava ao remover o pet do aplicativo |
+| `V15` | Empacota o PL/SQL em `PKG_CLV_LOG`, `PKG_CLV_MOTOR`, `PKG_CLV_AUDITORIA` e `PKG_CLV_SEED`; o trigger de auditoria delega ao pacote |
 
 ### 3. Spring Security — dois perfis, três superfícies
 
@@ -976,7 +1003,7 @@ recuperada mede o efeito dos dois.
 | Formulário / corpo da requisição | Bean Validation nos `*Request` (`@NotBlank`, `@NotNull`, `@Email`, `@Size`, `@Positive`), acionada por `@Valid` nos controllers |
 | Resposta de erro | `exception/GlobalExceptionHandler` traduz violação em `400` com os campos, sem vazar stack trace |
 | Regra de negócio na aplicação | `AgendaService` recusa fim de semana, fora do expediente e horário não múltiplo de 30 min |
-| Regra clínica | No banco: `PR_CLV_TRANSITAR_OBRIGACAO` recusa salto ilegal de estado com `ORA-20010`, traduzido em `409` por `MotorProtocolo` |
+| Regra clínica | No banco: `PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO` recusa salto ilegal de estado com `ORA-20010`, traduzido em `409` por `MotorProtocolo` |
 | Guardrail do agente | `agente/GuardrailClinico` barra dosagem, diagnóstico e prescrição na saída do modelo |
 | Integridade | Constraints no schema: `CHECK` de estado, `UNIQUE` de CNPJ, e-mail, CRMV e microchip |
 
@@ -992,7 +1019,7 @@ o pacote de cima enxergar.
 **PL/SQL é o motor; Java não reimplementa regra clínica.** Quando gerar obrigação, qual
 transição de estado é legal, como calcular a data prevista e quem cai no grupo de controle
 vivem no banco, junto com a auditoria encadeada e o outbox, na mesma transação.
-`MotorProtocolo` é o único ponto da aplicação que fala com as procedures, e só traduz
+`MotorProtocolo` é o único ponto da aplicação que fala com o `PKG_CLV_MOTOR`, e só traduz
 `ORA-20010` em erro de domínio. Reimplementar a regra em Java criaria duas fontes de
 verdade que divergiriam na primeira regra nova.
 
@@ -1100,7 +1127,7 @@ testes automáticos, geração do artefato e deploy** no Azure, por pipelines do
 |---|---|
 | Aplicação | Java 21 · Spring Boot 4.0.6 · Spring Security (JWT) · Thymeleaf |
 | Build e testes | Maven · JUnit 5 |
-| Banco de dados | Oracle XE 21c · PL/SQL · Flyway (migrations `V0` a `V14`) |
+| Banco de dados | Oracle XE 21c · PL/SQL · Flyway (migrations `V0` a `V15`) |
 | Repositório | GitHub — `olavoneves/clyvo-vet_api-java` |
 | CI/CD | Azure DevOps — Azure Pipelines (YAML), variable group secreto, service connections |
 | Nuvem | Azure Web App (Java SE, Linux) · Azure Container Instances · Azure Container Registry · Azure Key Vault · Managed Identity |
@@ -1141,7 +1168,7 @@ testes automáticos, geração do artefato e deploy** no Azure, por pipelines do
 - As senhas do banco são geradas pelos scripts e guardadas no **Azure Key Vault**; o ACI as
   recebe como variáveis seguras, que não aparecem no Portal.
 - O schema é criado pela própria aplicação (**Flyway**) no primeiro deploy: tabelas,
-  procedures, gatilhos e a view do painel.
+  pacotes PL/SQL, gatilhos e as views do painel.
 - O container não tem volume: recriá-lo zera o banco, e o `08_bootstrap.sh` refaz a carga
   inicial.
 
@@ -1296,7 +1323,7 @@ telas Thymeleaf.
 | Caixa do diagrama | Estado | Evidência |
 |---|---|---|
 | `clyvo-core` — Spring Boot, Java 21, escrita e domínio clínico | **Construído** | Este repositório |
-| Oracle — sistema de registro, PL/SQL | **Construído** | Migrations `V7` e `V9`: procedures, máquina de estados, auditoria encadeada |
+| Oracle — sistema de registro, PL/SQL | **Construído** | Migrations `V7`, `V9` e `V15`: pacotes PL/SQL, máquina de estados, auditoria encadeada |
 | Painel da clínica no navegador (Thymeleaf) | **Construído** | `*/web/`, telas de painel, agenda e ficha |
 | `clyvo-insights` — ASP.NET Core, leitura e projeções | **Construído**, fora deste repo | Repositório separado |
 | MongoDB — projeções e logs | **Construído**, fora deste repo | Usado pelo `insights` |
