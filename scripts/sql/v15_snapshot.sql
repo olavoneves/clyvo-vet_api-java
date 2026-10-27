@@ -8,9 +8,15 @@
 -- saída não diz qual das duas rodou: o diff entre as duas fotos tem que ser
 -- vazio.
 --
--- Nada aqui escreve no banco. Só leitura e DBMS_OUTPUT.
+-- Nada aqui escreve no banco: só SELECT, ALTER SESSION de formato e uma
+-- função de verificação que só lê. Sem DML, sem DDL, sem COMMIT.
 --
--- Uso, no XE do docker-compose (NUNCA no Oracle da FIAP):
+-- No SQL Developer: abrir este arquivo, escolher a conexão e rodar com F5
+-- (Run Script); a saída sai na aba Script Output. Comandos SET que o SQL
+-- Developer não reconhece são pulados com aviso, igual nas duas fotos. Não
+-- termina com EXIT de propósito: no F5 ele encerraria a sessão da planilha.
+--
+-- No SQL*Plus, no XE do docker-compose:
 --   docker exec -i -e NLS_LANG=.AL32UTF8 oracle-clyvovet \
 --     sqlplus -s -L petflow/<senha>@localhost:1521/PETFLOWDB \
 --     < scripts/sql/v15_snapshot.sql > docs/v15-snapshot-antes.txt
@@ -123,5 +129,3 @@ SELECT name, referenced_type, referenced_name
  WHERE name IN ('VW_CLV_PAINEL_COORTE', 'VW_CLV_PAINEL_RECEITA')
    AND referenced_owner = USER
  ORDER BY name, referenced_type, referenced_name;
-
-EXIT
