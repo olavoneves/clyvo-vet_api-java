@@ -234,9 +234,37 @@ git push
 
 **Passo 3. Pull request e merge.** No GitHub, na página do repositório:
 1. Clique em **Compare & pull request** (ou *Pull requests → New pull request*)
-2. Base: **`main`** ← compare: **`develop`**. Confira que o `login.html` aparece na lista
-   de arquivos
-3. **Create pull request** → **Merge pull request** → **Confirm merge**
+2. Base: **`main`** ← compare: **`develop`**
+3. Preencha o **título** e a **descrição** abaixo (deixe copiados antes de gravar)
+4. Na aba **Files changed**, aponte o `login.html`. Se aparecerem outros arquivos em `docs/`,
+   diga que são documentação (os roteiros)
+5. **Create pull request** → **Merge pull request** → **Confirm merge**
+
+**Título:**
+
+```
+feat: destaca a Sprint 4 na tela de login
+```
+
+**Descrição:**
+
+```markdown
+## Alteração
+
+Subtítulo da tela de login (`src/main/resources/templates/login.html`):
+
+- **Antes:** "Entre com seu e-mail e senha"
+- **Depois:** "Entre com seu e-mail e senha · Sprint 4 CI/CD"
+
+## O que acontece no merge
+
+O merge na `main` dispara automaticamente:
+
+1. **CI (`petflow-ci`):** build com Maven, testes automáticos e publicação do artefato `petflow-jar`
+2. **CD (`petflow-cd`):** deploy do artefato no Azure Web App e verificação de saúde da aplicação
+
+Também leva para a `main` os roteiros dos vídeos da Sprint 4 (DevOps e Compliance), já revisados na `develop`.
+```
 
 > "O merge é a alteração de código na `main`. A partir daqui, nada mais é manual."
 
