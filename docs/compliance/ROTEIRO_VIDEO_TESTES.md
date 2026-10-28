@@ -28,32 +28,51 @@ Cada execução cria um tutor com **e-mail e senha únicos** e apaga tudo o que 
 ser repetida sem preparar dados.
 
 ---
+## Ferramenta: Newman
+
+Os testes rodam no **Newman**, o executor oficial de coleções do Postman por linha de comando.
+É o mesmo motor do Postman e roda a mesma coleção, sem instalar o Postman: basta o Node.js e o
+`npx`. O enunciado aceita *"POSTMAN, JMETER ou software equivalente"*.
+
+O vídeo cobre só as três coisas que o enunciado pede: **configuração**, **execução** e
+**resultados**.
+
+---
 
 ## Antes de gravar
 
-- [ ] **Infra ligada e carga inicial feita**, como no "Antes de gravar" do roteiro de DevOps:
-      `98_retomar.sh`, health `UP` e `08_bootstrap.sh`. A coleção faz login com o master,
-      que o bootstrap cria.
-- [ ] **Postman** aberto, com a coleção
-      `tests/postman/petflow-testes-automatizados.postman_collection.json` e o ambiente
-      `tests/postman/petflow-azure.postman_environment.json` importados
-- [ ] Ambiente **PetFlow - Azure Web App** selecionado, com a senha do master no
-      **Current value** de `senhaColaborador`. Não exporte o ambiente de volta para o
-      repositório:
+Tudo isso fica **fora** do vídeo.
+
+- [ ] **Infra ligada, CD rodado e carga inicial feita**, como no "Antes de gravar" do roteiro
+      de DevOps: `98_retomar.sh`, reativar o CD, rodar o CD manualmente, health `UP` e
+      `08_bootstrap.sh`. A coleção faz login com o master, que o bootstrap cria.
+- [ ] Newman já baixado (a primeira execução baixa o pacote):
 
       ```bash
-      az keyvault secret show --vault-name kv-petflow-s4b-rm561940 --name master-password --query value -o tsv
+      npx --yes newman --version      # 6.2.3 ou superior
       ```
-- [ ] Se for usar o Newman: `npx newman --version` já executado uma vez, porque a primeira
-      execução baixa o pacote
-- [ ] Fonte grande, notificações desligadas, microfone testado
+- [ ] Terminal Git Bash **na raiz do repositório**, com a senha do master numa variável e a
+      tela limpa:
+
+      ```bash
+      SENHA_MASTER=$(az keyvault secret show --vault-name kv-petflow-s4b-rm561940 \
+        --name master-password --query value -o tsv | tr -d '\r')
+      echo ${#SENHA_MASTER}     # deve imprimir 28, nao 0
+      clear
+      ```
+- [ ] IDE com os três arquivos abertos em abas:
+      `tests/postman/gerar_colecao.py`,
+      `tests/postman/petflow-testes-automatizados.postman_collection.json` e
+      `tests/postman/petflow-azure.postman_environment.json`
+- [ ] Fonte grande no terminal e na IDE, notificações desligadas, microfone testado
 
 ### ⚠️ Dois cuidados durante a gravação
 
-**Nenhuma senha na tela.** Preencha `senhaColaborador` antes de gravar. No Postman, o
-campo é do tipo *secret* e aparece mascarado.
+**Nenhuma senha na tela.** O `SENHA_MASTER` é preenchido no preparo, antes de gravar. No
+comando do vídeo aparece só o nome da variável, nunca o valor. O arquivo de ambiente não tem
+senha: `senhaColaborador` está vazio de propósito.
 
-**Limite de login:** no máximo 5 por minuto por IP. Cada execução da coleção faz 2 logins.
+**Limite de login:** no máximo 5 por minuto por IP, e cada execução da coleção faz 2 logins.
 Não rode mais de duas vezes no mesmo minuto, e espere 1 minuto antes de começar o vídeo de
 DevOps.
 
@@ -61,36 +80,28 @@ DevOps.
 
 ## Roteiro
 
-### Cena 1 · Abertura (~1 min)
+### Cena 1 · Configuração dos testes (~3 min) 🔵 "configuração"
 
-Diga em voz:
-- Que o vídeo é da **Parte B** de Compliance: automação dos testes de integração da API
-- Por que **Postman**: o sistema é uma API REST, e o enunciado indica Postman, JMeter ou
-  equivalente para sistemas compostos por APIs
-- Que os testes rodam contra a aplicação **publicada no Azure**, e não em localhost
+Na IDE, em três passos:
 
-### Cena 2 · Configuração da coleção (~3 min)
+1. **`gerar_colecao.py`: os testes escritos como código.** A coleção é gerada por este script,
+   para as asserções poderem ser revisadas como código. Mostre:
+   - os **5 casos**, CA01 a CA05, e diga o que cada um verifica (tabela acima);
+   - as asserções de **duas** requisições, lidas em voz alta:
+     - **CA01 → "Login do colaborador"**: HTTP 200, emite `accessToken`, colaborador não
+       recebe `refreshToken`, perfil COLABORADOR;
+     - **CA03 → "Recusar exclusão de tutor com pet vinculado"**: HTTP **409, nunca 500**, e
+       a mensagem de conflito de integridade.
+2. **`petflow-testes-automatizados.postman_collection.json`: a coleção gerada.** Mostre o
+   **pre-request** no topo: cada execução gera um e-mail e uma senha únicos para o tutor de
+   teste. Por isso a coleção pode rodar várias vezes sem preparar dados.
+3. **`petflow-azure.postman_environment.json`: o ambiente.** O `baseUrl` aponta para o Web App
+   publicado no Azure, e o `senhaColaborador` está **vazio**: a senha do master não fica no
+   repositório e entra na hora da execução, vinda do Key Vault.
 
-No Postman:
-1. A **coleção** e as 5 pastas, CA01 a CA05. Use a tabela acima para dizer o que cada uma
-   verifica.
-2. As **variáveis da coleção** e o **pre-request** da coleção: cada execução gera um e-mail
-   e uma senha únicos para o tutor de teste.
-3. O **ambiente** *PetFlow - Azure Web App*: `baseUrl` aponta para o Web App, e a senha do
-   master está mascarada.
-4. A aba **Tests** de duas requisições, lendo as asserções em voz alta:
-   - **CA01 → Login do colaborador**: HTTP 200, emite `accessToken`, colaborador não recebe
-     `refreshToken`, perfil COLABORADOR
-   - **CA03 → Recusar exclusão de tutor com pet vinculado**: HTTP 409, nunca 500, e a
-     mensagem de conflito de integridade
-5. Uma requisição que **guarda dado para a próxima**: o `POST /api/tutores` grava o
-   `tutorId` usado nos passos seguintes.
+### Cena 2 · Execução (~2 min) 🔵 "execução"
 
-### Cena 3 · Execução (~2 min)
-
-**Opção A, no Postman:** clique na coleção → **Run collection** → mantenha a ordem → **Run**.
-
-**Opção B, na linha de comando** (gera o relatório JUnit):
+No terminal, na raiz do repositório:
 
 ```bash
 npx newman run tests/postman/petflow-testes-automatizados.postman_collection.json \
@@ -99,30 +110,25 @@ npx newman run tests/postman/petflow-testes-automatizados.postman_collection.jso
   -r cli,junit --reporter-junit-export tests/postman/resultados/newman-junit.xml
 ```
 
-Na opção B, defina `SENHA_MASTER` **antes de gravar** (comando do
-[`ENTREGA.md`](ENTREGA.md)) e limpe a tela.
+Explique o comando em uma frase por parte: a **coleção** (`run`), o **ambiente** (`-e`), a
+**senha** vinda da variável (`--env-var`) e os **relatórios** (`-r`: no terminal e em JUnit).
 
-### Cena 4 · Resultados (~2 min)
+Enquanto roda, acompanhe a saída: cada requisição aparece com o método, a rota, o status HTTP
+e, embaixo, cada asserção com ✓.
 
-- O resumo final: **13 requisições e 28 asserções aprovadas, 0 falhas**
-- Abra uma requisição no resultado e mostre a resposta e as asserções verdes
-- Na opção B: a tabela final do Newman e o arquivo `newman-junit.xml` em
-  `tests/postman/resultados/`
+### Cena 3 · Resultados (~2 min) 🔵 "resultados"
 
-Se quiser mostrar que os testes **detectam** falha de verdade: troque o `baseUrl` do
-ambiente por uma URL errada, rode só o CA01 e mostre as asserções vermelhas. Depois
-desfaça a troca.
-
-### Cena 5 · Encerramento (~30 s)
-
-Recapitule: 5 casos e 28 asserções cobrindo saúde, autenticação, cadastro, validação,
-integridade, controle de acesso e exclusão, contra a aplicação publicada no Azure.
+1. **Tabela final do Newman:** 13 requisições e **28 asserções, 0 falhas**. Aponte as linhas
+   `requests`, `test-scripts` e `assertions`.
+2. **Relatório JUnit:** abra na IDE o `tests/postman/resultados/newman-junit.xml`. Cada requisição
+   aparece como `testsuite`, com as suas asserções como `testcase` e nenhum `failure`. É o mesmo
+   formato que ferramentas de CI usam para publicar resultados de testes.
 
 ---
 
 ## Depois de gravar
 
-1. Siga para o vídeo de DevOps, esperando 1 minuto por causa do limite de login.
+1. Espere 1 minuto (limite de login) e siga para o vídeo de DevOps.
 2. Com o link do YouTube: atualize o [`ENTREGA.md`](ENTREGA.md) na branch **`develop`**.
 
 ---
@@ -131,11 +137,11 @@ integridade, controle de acesso e exclusão, contra a aplicação publicada no A
 
 | Bloco | Tempo |
 |---|---|
-| Cenas 1–2 (abertura e configuração) | ~4 min |
-| Cenas 3–4 (execução e resultados) | ~4 min |
-| Cena 5 (fecho) | ~30 s |
+| Cena 1 (configuração) | ~3 min |
+| Cena 2 (execução) | ~2 min |
+| Cena 3 (resultados) | ~2 min |
 
-Total: **8 a 10 minutos**.
+Total: **cerca de 7 minutos**.
 
 ---
 
@@ -144,6 +150,14 @@ Total: **8 a 10 minutos**.
 - [ ] Aparecem a **configuração**, a **execução** e os **resultados**, as três coisas que o
       enunciado pede
 - [ ] Os 5 casos aparecem, acima do mínimo de 4
+- [ ] A tabela final mostra **0 falhas**
 - [ ] Nenhuma senha visível em nenhum frame
 - [ ] Áudio audível do início ao fim
 - [ ] Publicado como **não listado** e o link testado numa janela anônima
+
+---
+
+> **Alternativa sem Newman:** o Postman no navegador (`web.postman.co`, com conta gratuita)
+> importa a mesma coleção e o mesmo ambiente e roda pelo *Run collection*. Nesse caso,
+> preencha `senhaColaborador` no **Current value** do ambiente antes de gravar, sem exportar
+> o ambiente de volta para o repositório.
