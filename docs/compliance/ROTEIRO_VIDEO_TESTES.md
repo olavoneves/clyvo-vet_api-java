@@ -102,6 +102,15 @@ repetido à vontade, porque cada execução cria e apaga os próprios dados. Dep
 > (`.json`), que já está pronta no repositório. No vídeo, ele só é **mostrado**, porque nele os
 > testes estão escritos de forma legível.
 
+### Introdução (~20 s)
+
+Com a IDE na tela, já com a aba do `gerar_colecao.py` aberta, diga:
+
+> "Este vídeo é da **Parte B de Compliance, Quality Assurance & Tests**: a automação dos testes
+> do **PetFlow**, a API da Clyvo Vet. São **5 casos de teste automatizados**, rodados com o
+> **Newman**, o executor de coleções do Postman, contra a aplicação **publicada no Azure**.
+> Vou mostrar a configuração, a execução e os resultados."
+
 ### Cena 1 · Configuração dos testes (~3 min) 🔵 "configuração"
 
 **Passo 1. Os 5 casos de teste.**
@@ -221,6 +230,7 @@ publicar resultados".
 
 | Bloco | Tempo |
 |---|---|
+| Introdução | ~20 s |
 | Cena 1 (configuração) | ~3 min |
 | Cena 2 (execução) | ~2 min |
 | Cena 3 (resultados) | ~2 min |
