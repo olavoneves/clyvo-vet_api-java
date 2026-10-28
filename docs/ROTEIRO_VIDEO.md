@@ -46,13 +46,17 @@ Na ordem. Tudo isso fica **fora** do vídeo.
 - [ ] **CD reativado.** Ele fica desativado entre as sessões, para um merge na `main` com
       a infra desligada não deixar run vermelho no histórico:
       Azure DevOps → *Pipelines* → `petflow-cd` → **⋮** → *Settings* → **Enabled** → *Save*
-- [ ] **App no ar.** O banco voltou zerado, e o Flyway recria o schema na subida (~4 min
-      no B1):
+- [ ] **CD rodado uma vez manualmente:** *Pipelines* → `petflow-cd` → **Run pipeline** → *Run*.
+      Ele publica a versão atual da `main` no Web App. Assim as migrations novas (como a V15)
+      rodam e são validadas **antes** do vídeo, e o deploy do vídeo só leva a alteração do
+      `login.html`. Espere o run terminar **verde** (~6 min) e confira:
 
       ```bash
       curl -s https://rm561940-petflow-api-s4b.azurewebsites.net/actuator/health
       # {"status":"UP",...}
       ```
+
+      Se o CD falhar aqui, **não grave**: o problema está na versão da `main`, e não no vídeo.
 - [ ] **Carga inicial:** `./08_bootstrap.sh` (clínica, master, 2 tutores com pet)
 - [ ] **Vídeo de Compliance gravado** (ele precisa da carga inicial)
 - [ ] IDE com o projeto na branch **`develop`** atualizada (`git pull`) e **push testado**
@@ -216,7 +220,7 @@ O CI leva ~2 min.
 > **Enunciado:** *"Mostre o artefato criado e os resultados dos testes"*.
 
 No resumo do run do CI:
-- Aba **Tests**: **128 aprovados e 40 pulados**. Explique os pulados: "são testes de
+- Aba **Tests**: **130 aprovados e 40 pulados** (números do CI de 27/10; confira os do dia). Explique os pulados: "são testes de
   integração que precisam do Oracle e não rodam no agente do CI".
 - **Artefato publicado**: *1 published* → `petflow-jar` → o `.jar`.
 
