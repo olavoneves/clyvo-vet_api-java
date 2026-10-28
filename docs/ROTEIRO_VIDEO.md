@@ -46,13 +46,17 @@ Na ordem. Tudo isso fica **fora** do vídeo.
 - [ ] **CD reativado.** Ele fica desativado entre as sessões, para um merge na `main` com
       a infra desligada não deixar run vermelho no histórico:
       Azure DevOps → *Pipelines* → `petflow-cd` → **⋮** → *Settings* → **Enabled** → *Save*
-- [ ] **App no ar.** O banco voltou zerado, e o Flyway recria o schema na subida (~4 min
-      no B1):
+- [ ] **CD rodado uma vez manualmente:** *Pipelines* → `petflow-cd` → **Run pipeline** → *Run*.
+      Ele publica a versão atual da `main` no Web App. Assim as migrations novas (como a V15)
+      rodam e são validadas **antes** do vídeo, e o deploy do vídeo só leva a alteração do
+      `login.html`. Espere o run terminar **verde** (~6 min) e confira:
 
       ```bash
       curl -s https://rm561940-petflow-api-s4b.azurewebsites.net/actuator/health
       # {"status":"UP",...}
       ```
+
+      Se o CD falhar aqui, **não grave**: o problema está na versão da `main`, e não no vídeo.
 - [ ] **Carga inicial:** `./08_bootstrap.sh` (clínica, master, 2 tutores com pet)
 - [ ] **Vídeo de Compliance gravado** (ele precisa da carga inicial)
 - [ ] IDE com o projeto na branch **`develop`** atualizada (`git pull`) e **push testado**
@@ -61,8 +65,10 @@ Na ordem. Tudo isso fica **fora** do vídeo.
       em `/login`
 - [ ] **SQL Developer conectado** (tabela abaixo), com o
       [`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) aberto
-- [ ] Terminal Git Bash com o **preparo** do `EVIDENCIAS_VIDEO.sql` já executado (`API`,
-      `EMAIL`, `SENHA_TUTOR`, `TOKEN`) e a tela limpa (`clear`)
+- [ ] Terminal Git Bash **na raiz do repositório**, na branch `develop`, com o **preparo** do
+      `EVIDENCIAS_VIDEO.sql` (linhas 31 a 36, copiadas **sem** o `--` do início) já executado: `MSYS_NO_PATHCONV`, `API`, `EMAIL` e
+      `SENHA_TUTOR`. O `TOKEN` **não**: ele expira em 15 minutos e é gerado na pausa antes da
+      Cena 11. Tela limpa (`clear`)
 - [ ] Fonte grande no terminal e na IDE, notificações desligadas, microfone testado
 - [ ] Este roteiro aberto numa segunda tela
 
@@ -89,193 +95,350 @@ mostra.
 
 **Não reinicie o ACI do banco.** Não há volume: reiniciar zera os dados.
 
-**Limite de login:** no máximo 5 por minuto por IP. A coleção do Postman (Compliance) já
-fez 2. Se o `TOKEN` precisar ser refeito, espere 1 minuto depois do vídeo de Compliance.
+**Limite de login:** no máximo 5 por minuto por IP. A coleção do Newman (Compliance) faz 2
+logins por execução. Até a pausa do `TOKEN` já terão passado vários minutos, então não há
+conflito; só não refaça o `TOKEN` várias vezes seguidas.
 
 ---
 
 ## Roteiro
 
-A ordem segue o "Fluxo do vídeo" do enunciado.
+### O que o enunciado pede e onde está
 
-### Cena 1 · Abertura e arquitetura (~2 min)
+O "Fluxo do vídeo" do enunciado tem 9 itens. **Cada um precisa aparecer**; esta tabela diz em
+qual cena, e cada cena abaixo começa citando o item que cumpre. O roteiro tem **só** o que os
+itens pedem, mais uma introdução de 20 segundos.
 
-Diga em voz:
-- O que a aplicação faz, em duas frases: o PetFlow acompanha a saúde do pet de forma
-  contínua; o motor de protocolo em PL/SQL transforma cada consulta nas obrigações futuras
-  de cuidado.
-- A stack: Java 21 e Spring Boot, Oracle XE em container no Azure, Azure DevOps para CI/CD.
+| # | Item do enunciado (texto literal) | Cena |
+|---|---|---|
+| 1 | *"Mostre as ferramentas usadas (IDE, Azure DevOps, Banco de Dados, Portal do Azure etc.)"* | 1 |
+| 2 | *"Apresente a configuração da pipeline (cada jobs/tasks)"* | 2 e 3 |
+| 3 | *"Altere algo no código no projeto, algo fácil de visualizar na tela o que foi alterado (Exemplo: label, título etc)"* | 4 e 5 |
+| 4 | *"Mostre o início automático da pipeline após o commit"* | 6 |
+| 5 | *"Explique cada etapa do CI/CD durante a execução - Abra os detalhes do fluxo de execução da sua pipeline e comente no vídeo"* | 6 e 8 |
+| 6 | *"Mostre o artefato criado e os resultados dos testes"* | 7 |
+| 7 | *"Demonstre no Portal do Azure os recursos atualizados pelo deploy (Web App ou Azure Container Instance)"* | 9 |
+| 8 | *"Acesse a aplicação no Web App ou ACI e execute o CRUD completo, mostrando no banco cada operação (inserir, consultar, atualizar, deletar)"* | 10 e 11 |
+| 9 | *"O CRUD pode ser feito via interface da aplicação ou via chamadas REST [...], porém as evidências de persistência devem ser efetuadas através de SELECT dentro do Banco"* | 11 |
 
-Mostre o diagrama do README (`docs/arquitetura/sprint4-cicd.png`) e percorra os números de
-1 a 11:
+### Introdução (~20 s)
 
-1. O desenvolvedor envia a alteração para a `main`
-2. O webhook do GitHub dispara o CI
-3. Build com Maven e testes automáticos
-4. Publicação do artefato
-5. O novo artefato dispara o CD
-6. O CD recebe os segredos protegidos do variable group
-7. Deploy do JAR no Web App, pela service connection
-8. A aplicação conecta no Oracle e o Flyway aplica as migrations
-9. O CD confere a saúde da aplicação
-10. O usuário final usa a aplicação
-11. Os dados são persistidos no Oracle
+Com o Azure DevOps na tela, no projeto *Sprint 4 - Azure DevOps*, diga:
 
-As personas são o **desenvolvedor** e o **usuário final** (clínica veterinária).
+> "Este vídeo é da **Sprint 4 de DevOps Tools & Cloud Computing**: o CI/CD do **PetFlow**, a API
+> Java da Clyvo Vet, no **Azure DevOps**. Toda alteração de código na branch principal passa
+> sozinha por build, testes, geração do artefato e deploy num **Azure Web App**, com o banco
+> **Oracle em container no Azure**. Vou mostrar as ferramentas, a configuração das pipelines,
+> uma alteração no código disparando o CI/CD, os recursos no portal e o CRUD com evidência no
+> banco."
 
-### Cena 2 · Ferramentas (~1 min)
+### Cena 1 · Ferramentas (~1 min) 🔵 item 1
 
-Passe por cada janela: IDE com o código, GitHub, Azure DevOps, Portal do Azure, SQL
-Developer e o app no navegador.
+> **Enunciado:** *"Mostre as ferramentas usadas (IDE, Azure DevOps, Banco de Dados, Portal do
+> Azure etc.)"*
 
-### Cena 3 · Projeto no Azure DevOps (~1 min)
+Passe por cada janela, na ordem, com uma frase em cada:
 
-- *Project settings → Overview*: nome **Sprint 4 - Azure DevOps**, descrição com o
-  professor e os integrantes, **Private**, **Git**, **Scrum**.
-- *Organization settings → Users*: o professor com acesso **Basic**.
+| Janela | O que mostrar | O que falar |
+|---|---|---|
+| **IDE** | O projeto aberto, com as pastas `src/` e `pipelines/` | "O código da aplicação, em Java 21 com Spring Boot, e as pipelines em YAML" |
+| **GitHub** | A página do repositório `olavoneves/clyvo-vet_api-java` | "O repositório, ligado ao Azure DevOps" |
+| **Azure DevOps** | *Pipelines*, com o `petflow-ci` e o `petflow-cd` | "As duas pipelines: integração contínua e entrega contínua" |
+| **Portal do Azure** | O grupo `rg-petflow-s4-rm561940` com a lista de recursos | "Os recursos na nuvem: o Web App e o banco no Container Instance" |
+| **SQL Developer** | A conexão aberta no banco | "O banco Oracle em container no Azure" |
+| **Navegador** | O app em `/login` | "A aplicação publicada" |
 
-### Cena 4 · Pipeline de CI, task por task (~2 min)
+### Cena 2 · Pipeline de CI, task por task (~2 min) 🔵 item 2
 
-Abra o `petflow-ci` → *Edit* (ou `pipelines/ci.yml` na IDE) e explique:
+> **Enunciado:** *"Apresente a configuração da pipeline (cada jobs/tasks)"*. Vale para as
+> **duas** pipelines: o CI aqui, o CD na cena seguinte.
 
-| Trecho | O que dizer |
-|---|---|
-| `trigger: branches: main` | Dispara a cada alteração na `main`, que faz o papel da `master` (uso autorizado pelo professor) |
-| `pool: vmImage: ubuntu-latest` | Agente hospedado pela Microsoft |
-| `Cache@2` | Guarda as dependências do Maven entre execuções |
-| `Maven@4` com `clean verify` | Compila e **executa os testes automáticos**. `publishJUnitResults` publica o resultado. Se um teste falha, não há artefato e o CD não dispara |
-| `CopyFiles@2` | Separa só o JAR executável |
-| `PublishPipelineArtifact@1` | **Publica o artefato** `petflow-jar`, que é o gatilho do CD |
+No Azure DevOps: **Pipelines → `petflow-ci` → Edit** (canto superior direito). Abre o
+`pipelines/ci.yml` com os números de linha. Percorra de cima para baixo:
 
-### Cena 5 · Pipeline de CD, task por task (~2 min)
+| Linhas | O que apontar | O que falar |
+|---|---|---|
+| 21–24 | `trigger: branches: include: main` | "O CI dispara a cada alteração na branch `main`, que faz o papel da `master` do enunciado, com uso autorizado pelo professor" |
+| 27 | `pr: none` | "Pull requests abertos não disparam; o que dispara é o código entrar na `main`" |
+| 29–30 | `pool: vmImage: ubuntu-latest` | "Roda num agente Linux hospedado pela Microsoft" |
+| 44–45 | `Cache@2` | "Guarda as dependências do Maven entre execuções, para o build ser mais rápido" |
+| 60–70 | `Maven@4` com `goals: clean verify` | "Compila e **executa os testes automáticos**. A linha 68, `publishJUnitResults`, publica o resultado dos testes no Azure DevOps. Se um teste falha, não há artefato e o CD não dispara" |
+| 74–75 | `CopyFiles@2` | "Separa só o JAR executável da aplicação" |
+| 81–85 | `PublishPipelineArtifact@1`, `artifact: petflow-jar` | "**Publica o artefato** `petflow-jar`. É ele que dispara o CD" |
 
-Abra o `petflow-cd` → *Edit* (ou `pipelines/cd.yml`) e explique:
+Clique em **Cancel** ou volte, sem salvar nada.
 
-| Trecho | O que dizer |
-|---|---|
-| `trigger: none` + `resources.pipelines` | Não dispara por push: dispara **quando o CI gera um novo artefato** |
-| `variables: group: petflow-secrets` | Os segredos vêm do variable group |
-| `deployment` + `environment: petflow-producao` | Guarda o histórico de deploys |
-| `download: ci` | Baixa o mesmo JAR que o CI gerou |
-| `AzureWebApp@1` | Publica o JAR no Web App e grava as app settings (banco, usuário, senha, JWT) |
-| Health check | Espera o `/actuator/health` responder `UP`, o que só acontece com o banco alcançável |
+### Cena 3 · Pipeline de CD, task por task (~2 min) 🔵 item 2
 
-Em seguida:
-- *Pipelines → Library → petflow-secrets*: `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` e
-  `MASTER_PASSWORD` com **cadeado**. "Usuários, senhas e tokens ficam protegidos e
-  mascarados nos logs."
-- *Project settings → Service connections*: `sc-github-petflow` (OAuth com o GitHub) e
-  `sc-azure-petflow` (federação de identidade com o Azure, sem senha guardada).
+> **Enunciado:** *"Apresente a configuração da pipeline (cada jobs/tasks)"*.
 
-### Cena 6 · O app antes da alteração (~30 s)
+**Pipelines → `petflow-cd` → Edit** (`pipelines/cd.yml`):
 
-No navegador, abra `https://rm561940-petflow-api-s4b.azurewebsites.net/login` e mostre o
-subtítulo **"Entre com seu e-mail e senha"**.
+| Linhas | O que apontar | O que falar |
+|---|---|---|
+| 22–23 | `trigger: none`, `pr: none` | "O CD não dispara por push" |
+| 25–32 | `resources: pipelines: source: petflow-ci`, `branches: main` | "Ele dispara **quando o CI termina com sucesso na `main`**, ou seja, a cada novo artefato" |
+| 35 | `group: petflow-secrets` | "Os segredos vêm de um variable group" |
+| 49 | `environment: petflow-producao` | "O deploy fica registrado num ambiente, com o histórico de versões publicadas" |
+| 54–56 | `download: ci`, `artifact: petflow-jar` | "Baixa **o mesmo JAR** que o CI gerou" |
+| 58–71 | `AzureWebApp@1` e o `appSettings` | "Publica o JAR no Web App e grava as configurações: a URL do banco, o usuário, a senha, o segredo do JWT e a senha do usuário master, todas vindas do variable group" |
+| 73–90 | o script do health check | "No fim, confere o `/actuator/health`; ele só responde `UP` se a aplicação subiu e alcança o banco" |
 
-### Cena 7 · Alteração no código (~2 min) 🔵 código, nunca o README
+Clique em **Cancel**. Depois: **Pipelines → Library → `petflow-secrets`**. Aponte os
+**cadeados** em `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` e `MASTER_PASSWORD`:
 
-Na IDE, em `src/main/resources/templates/login.html`:
+> "Usuários, senhas e tokens estão marcados como secretos: não aparecem aqui e saem como `***`
+> nos logs."
+
+### Cena 4 · O app antes da alteração (~30 s) 🔵 item 3
+
+> **Enunciado:** *"Altere algo no código no projeto, algo fácil de visualizar na tela o que foi
+> alterado"*. Mostrar o **antes** é o que torna a alteração visível na Cena 10.
+
+No navegador, abra `https://rm561940-petflow-api-s4b.azurewebsites.net/login`. Aponte o
+subtítulo embaixo do logo: **"Entre com seu e-mail e senha"**.
+
+> "Esta é a tela de login publicada agora. Vou alterar este subtítulo no código."
+
+### Cena 5 · Alteração no código (~2 min) 🔵 item 3
+
+> **Enunciado:** *"Altere algo no código no projeto, algo fácil de visualizar na tela o que foi
+> alterado (Exemplo: label, título etc)"*. É **código**, nunca o README (-20).
+
+**Passo 1. A alteração.** Na IDE, abra `src/main/resources/templates/login.html` e vá até a
+**linha 20**:
 
 ```html
 <p class="login-sub">Entre com seu e-mail e senha</p>
 ```
 
-vira:
+Troque por:
 
 ```html
 <p class="login-sub">Entre com seu e-mail e senha · Sprint 4 CI/CD</p>
 ```
 
-Seguindo o Git Flow do repositório (a `main` não recebe commit direto):
+Salve (**Ctrl+S**).
+
+**Passo 2. Commit e push na `develop`.** No terminal, na raiz do repositório:
 
 ```bash
+git status                       # mostra o login.html modificado
 git add src/main/resources/templates/login.html
 git commit -m "feat: destaca a Sprint 4 na tela de login"
 git push
 ```
 
-No GitHub, abra o PR **`develop → main`** e faça o **merge**. Diga em voz: "o merge é a
-alteração de código na `main` que deve disparar o CI sozinho".
+> "O repositório segue Git Flow: a `main` não recebe commit direto. A alteração vai para a
+> `develop` e chega à `main` por pull request."
 
-### Cena 8 · O CI dispara sozinho (~3 min) 🔵 explicar cada etapa
+**Passo 3. Pull request e merge.** No GitHub, na página do repositório:
+1. Clique em **Compare & pull request** (ou *Pull requests → New pull request*)
+2. Base: **`main`** ← compare: **`develop`**
+3. Preencha o **título** e a **descrição** abaixo (deixe copiados antes de gravar)
+4. Na aba **Files changed**, aponte o `login.html`. Se aparecerem outros arquivos em `docs/`,
+   diga que são documentação (os roteiros)
+5. **Create pull request** → **Merge pull request** → **Confirm merge**
 
-Azure DevOps → *Pipelines*: o run do `petflow-ci` aparece sozinho. Mostre o gatilho
-(*Individual CI*) e o commit do merge.
+**Título:**
 
-Abra o run e clique em cada etapa enquanto ela roda:
+```
+feat: destaca a Sprint 4 na tela de login
+```
 
-- *Checkout*: baixa o código do GitHub
-- *Restaura o cache do Maven*
-- *Build e testes automáticos*: no log, aponte as linhas `Tests run:`
-- *Separa o JAR executável*
-- *Publica o artefato petflow-jar*
+**Descrição:**
 
-O CI leva ~2 min.
+```markdown
+## Alteração
 
-### Cena 9 · Artefato e resultado dos testes (~1 min)
+Subtítulo da tela de login (`src/main/resources/templates/login.html`):
 
-No resumo do run do CI:
-- Aba **Tests**: **128 aprovados e 40 pulados**. Explique os pulados: "são testes de
-  integração que precisam do Oracle e não rodam no agente do CI; os de unidade, segurança e
-  renderização das telas rodam todos".
-- **Artefato publicado**: *1 published* → `petflow-jar` → o `.jar`.
+- **Antes:** "Entre com seu e-mail e senha"
+- **Depois:** "Entre com seu e-mail e senha · Sprint 4 CI/CD"
 
-### Cena 10 · O CD dispara sozinho (~3 min) 🔵 explicar cada etapa
+## O que acontece no merge
 
-Em *Pipelines*, o `petflow-cd` aparece sozinho logo depois do CI. O gatilho é o run do CI
-(*Triggered by petflow-ci*).
+O merge na `main` dispara automaticamente:
 
-- *Baixa o artefato gerado pelo CI*
-- *Publica o JAR e aplica as app settings*: mostre no log os segredos como `***`
-- *Verifica a saúde da aplicação*: as tentativas até o `UP`. A primeira subida leva uns
-  3 minutos; pode cortar a espera, mas mostre o resultado.
+1. **CI (`petflow-ci`):** build com Maven, testes automáticos e publicação do artefato `petflow-jar`
+2. **CD (`petflow-cd`):** deploy do artefato no Azure Web App e verificação de saúde da aplicação
 
-O CD leva ~6 min.
+Também leva para a `main` os roteiros dos vídeos da Sprint 4 (DevOps e Compliance), já revisados na `develop`.
+```
 
-### Cena 11 · Recursos no Portal (~1 min)
+> "O merge é a alteração de código na `main`. A partir daqui, nada mais é manual."
 
-No grupo `rg-petflow-s4-rm561940`:
-- **Web App** `rm561940-petflow-api-s4b`: *Overview* em `Running` e *Deployment Center* ou
-  *Activity log* com o deploy que acabou de acontecer
-- **ACI** `rm561940-aci-db`: o Oracle em `Running`, porta 1521
-- **ACR**, **Key Vault** e **Managed Identity**: uma frase sobre cada um
+### Cena 6 · O CI dispara sozinho (~3 min) 🔵 itens 4 e 5
 
-### Cena 12 · O app com a alteração (~30 s)
+> **Enunciado:** *"Mostre o início automático da pipeline após o commit"* e *"Explique cada etapa
+> do CI/CD durante a execução - Abra os detalhes do fluxo de execução da sua pipeline e comente
+> no vídeo"*.
 
-Recarregue `/login`: o subtítulo agora é **"Entre com seu e-mail e senha · Sprint 4 CI/CD"**.
+**Passo 1. O disparo automático.** Vá ao Azure DevOps → **Pipelines** (recarregue a página se
+preciso). Em alguns segundos aparece um run novo do `petflow-ci`. Clique nele e aponte no
+topo:
+- **"Individual CI"**: o disparo foi automático, por alteração no repositório
+- o **commit**: é o commit de merge do PR, na `main`
 
-### Cena 13 · SELECT inicial no banco (~1 min)
+> "Ninguém clicou em executar: o merge na `main` disparou o CI."
 
-SQL Developer, na seção *ESTADO INICIAL* do [`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql):
-- A primeira consulta prova que o banco é o container na Azure (`SandboxHost-...`), e não um
-  banco local
-- O total de tabelas criadas pelo Flyway
-- Os tutores da carga inicial
+**Passo 2. Cada etapa.** Clique no job **"Build, testes e publicacao do artefato"**. À
+esquerda aparece a lista de etapas; clique em cada uma **enquanto roda** e comente:
 
-### Cena 14 · CRUD do tutor (~4 min) 🔵 cada operação com SELECT
+| Etapa | O que falar |
+|---|---|
+| *Checkout olavoneves/clyvo-vet_api-java@main* | "Baixa o código da `main` do GitHub" |
+| *Restaura o cache do Maven* | "Recupera as dependências guardadas da execução anterior" |
+| *Build e testes automaticos (mvn clean verify)* | "Compila e roda os testes". No log, role até as linhas **`Tests run:`** e aponte uma |
+| *Separa o JAR executavel* | "Separa o JAR gerado" |
+| *Publica o artefato petflow-jar* | "Publica o artefato no Azure DevOps" |
 
-Duas janelas lado a lado: terminal e SQL Developer. Os comandos estão no
-[`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql), na ordem; este roteiro só narra.
+O CI leva uns 2 minutos. **Pode cortar a espera**, mas cada etapa precisa aparecer comentada.
 
-| Operação | No terminal | No SQL Developer |
-|---|---|---|
-| **Inserir** | `POST /tutores` → **201**. Anote o `id` (`ID=...`) | A linha do `video.sprint4@exemplo.com` aparece |
-| **Consultar** | `GET /tutores/$ID` → **200** | Os mesmos dados |
-| **Atualizar** | `PUT /tutores/$ID` → **200** | Nome e telefone novos |
-| **Deletar** | `DELETE /tutores/$ID` → **204** | A consulta volta **vazia** |
+### Cena 7 · Artefato e resultado dos testes (~1 min) 🔵 item 6
+
+> **Enunciado:** *"Mostre o artefato criado e os resultados dos testes"*.
+
+Volte ao **resumo do run** do CI (a seta de voltar no topo):
+
+**Passo 1. Os testes.** Clique na aba **Tests**. Aponte: **130 aprovados** e **40 pulados**
+(confira os números do dia).
+
+> "Os 40 pulados são testes de integração que precisam do banco Oracle e não rodam no agente
+> do CI. Os de unidade, segurança e telas rodam todos, e nenhum falhou."
+
+**Passo 2. O artefato.** Volte à aba **Summary**. Em *Related*, clique em **1 published** →
+expanda **`petflow-jar`** → aponte o arquivo **`.jar`**.
+
+> "Este é o artefato gerado pelo CI: o JAR que o CD vai publicar."
+
+### Cena 8 · O CD dispara sozinho (~3 min) 🔵 item 5
+
+> **Enunciado:** *"Explique cada etapa do CI/CD durante a execução - Abra os detalhes do fluxo de
+> execução da sua pipeline e comente no vídeo"*.
+
+**Passo 1. O disparo.** Em **Pipelines**, o `petflow-cd` aparece rodando logo depois do CI.
+Clique nele e aponte no resumo que foi disparado **pelo `petflow-ci`**, e não manualmente.
+
+> "O CD começou sozinho quando o CI publicou o artefato novo."
+
+**Passo 2. Cada etapa.** Clique no job **"Deploy do JAR no Web App"** e em cada etapa:
+
+| Etapa | O que falar |
+|---|---|
+| *Baixa o artefato gerado pelo CI* | "Baixa o mesmo JAR que acabamos de ver no CI" |
+| *Publica o JAR e aplica as app settings* | "Publica no Web App". No log, procure o `appSettings` e aponte os valores como **`***`**: "as senhas não aparecem" |
+| *Verifica a saude da aplicacao (smoke test)* | "Espera a aplicação subir". Aponte as tentativas e a última linha, **"Aplicacao no ar ... UP"** |
+
+O CD leva uns 6 minutos, a maior parte esperando a aplicação subir. **Corte a espera**, mas
+mostre a linha final do `UP` e o run **verde**.
+
+### Cena 9 · Recursos no Portal (~1 min) 🔵 item 7
+
+> **Enunciado:** *"Demonstre no Portal do Azure os recursos atualizados pelo deploy (Web App ou
+> Azure Container Instance)"*. O recurso que o deploy atualizou é o **Web App**.
+
+No Portal do Azure, no grupo `rg-petflow-s4-rm561940`:
+
+**Passo 1. O Web App.** Clique em **`rm561940-petflow-api-s4b`**:
+- **Overview**: *Status* **Running** e o *Default domain*
+- Menu lateral **Deployment Center** → aba **Logs**: o deploy que acabou de acontecer, com a
+  data e a hora de agora
+
+> "Este é o deploy que o CD acabou de fazer."
+
+**Passo 2. O banco.** Volte ao grupo e clique em **`rm561940-aci-db`**: *Status* **Running**,
+porta **1521**.
+
+> "E aqui o banco Oracle em container, onde a aplicação grava os dados."
+
+### Cena 10 · O app com a alteração (~30 s) 🔵 itens 3 e 8
+
+> **Enunciado:** *"Acesse a aplicação no Web App"*. Aqui aparece a alteração da Cena 5 já
+> publicada pelo CD (sem isso, -30).
+
+No navegador, recarregue `/login` (**Ctrl+F5**). O subtítulo agora é **"Entre com seu e-mail e
+senha · Sprint 4 CI/CD"**.
+
+> "A alteração está no ar, publicada pelo CD, sem nenhum passo manual."
+
+### ⏸ Pausa: gere o token (fora do vídeo)
+
+**Pause a gravação.** O token de acesso expira em 15 minutos, e a esta altura o vídeo já tem
+mais do que isso. No terminal, rode o comando do `TOKEN` do preparo do
+[`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) (linhas 39 a 46), confira que o `echo ${#TOKEN}`
+mostra ~250 e rode `clear`. **Retome a gravação.**
+
+### Cena 11 · CRUD do tutor com SELECT (~4 min) 🔵 itens 8 e 9
+
+> **Enunciado:** *"execute o CRUD completo, mostrando no banco cada operação (inserir, consultar,
+> atualizar, deletar)"* e *"O CRUD pode ser feito via interface da aplicação ou via chamadas
+> REST [...], porém as evidências de persistência devem ser efetuadas através de SELECT dentro
+> do Banco"*.
+>
+> O CRUD é por **chamadas REST** (`curl`), e **cada uma das 4 operações** é seguida do seu
+> `SELECT`. A resposta da API não conta como evidência; o `SELECT`, sim.
+
+Deixe **duas janelas lado a lado**: o terminal à esquerda e o SQL Developer à direita, com o
+`EVIDENCIAS_VIDEO.sql` aberto. Para rodar uma consulta, clique nela e aperte **Ctrl+Enter**.
+
+**Passo 1. O banco é o da nuvem.** No SQL Developer, rode a consulta da **linha 68**:
+
+> "O servidor aparece como `SandboxHost`: é o container no Azure, não um banco local."
+
+**Passo 2. INSERIR.** No terminal:
+
+```bash
+curl -i -X POST $API/tutores \
+  -H "Content-Type: application/json" \
+  -d "{\"nome\":\"Tutor Video Sprint 4\",\"email\":\"$EMAIL\",\"telefone\":\"11911112222\",\"senha\":\"$SENHA_TUTOR\",\"clinicaId\":1}"
+```
+
+Aponte o **`201 Created`** e o `"id"` na resposta. Guarde o id: `ID=<o número>`.
+No SQL Developer, rode a consulta da **linha 97**:
+
+> "A API respondeu 201, e o SELECT mostra a linha gravada no banco."
+
+**Passo 3. CONSULTAR.**
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" $API/tutores/$ID
+```
+
+Aponte os dados devolvidos. No SQL Developer, rode a consulta da **linha 106**: os mesmos
+dados no banco.
+
+**Passo 4. ATUALIZAR.**
+
+```bash
+curl -i -X PUT $API/tutores/$ID \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"nome\":\"Tutor Video ALTERADO\",\"email\":\"$EMAIL\",\"telefone\":\"11933334444\",\"senha\":\"$SENHA_TUTOR\",\"clinicaId\":1}"
+```
+
+Aponte o **`200 OK`**. No SQL Developer, rode a consulta da **linha 122**:
+
+> "Nome e telefone mudaram no banco."
+
+**Passo 5. DELETAR.**
+
+```bash
+curl -i -X DELETE $API/tutores/$ID -H "Authorization: Bearer $TOKEN"
+```
+
+Aponte o **`204 No Content`**. No SQL Developer, rode a consulta da **linha 132**: a consulta
+volta **vazia**.
+
+> "O registro saiu do banco. As quatro operações foram feitas pela API e comprovadas por SELECT."
 
 > **Dois erros esperados, que não são bugs:**
 >
 > **422** no `PUT`: ele reusa o DTO do `POST`, então `senha` e `clinicaId` são obrigatórios
-> no corpo.
+> no corpo. Os comandos acima já os incluem.
 >
-> **401** com `"Token de acesso ausente ou invalido"`: o token expira em 15 minutos. Refaça
-> o `TOKEN` (fora do enquadramento, porque o comando busca a senha no Key Vault) e siga.
-
-### Cena 15 · Encerramento (~30 s)
-
-Recapitule: alteração de código na `main` → CI com build, testes e artefato → CD com deploy
-automático → aplicação atualizada → dados persistidos no Oracle em nuvem.
+> **401** com `"Token de acesso ausente ou invalido"`: o token expirou. Pause, refaça o `TOKEN`
+> e siga.
 
 ---
 
@@ -298,14 +461,16 @@ Com o link do YouTube:
 
 | Bloco | Tempo |
 |---|---|
-| Cenas 1–3 (abertura, ferramentas e projeto) | ~4 min |
-| Cenas 4–5 (configuração das pipelines) | ~4 min |
-| Cenas 6–7 (alteração no código) | ~3 min |
-| Cenas 8–10 (CI e CD rodando) | ~7 min com a espera cortada |
-| Cenas 11–12 (portal e app) | ~2 min |
-| Cenas 13–15 (banco, CRUD e fecho) | ~6 min |
+| Introdução | ~20 s |
+| Cena 1 (ferramentas) | ~1 min |
+| Cenas 2–3 (configuração das pipelines) | ~4 min |
+| Cenas 4–5 (alteração no código) | ~2,5 min |
+| Cenas 6–8 (CI e CD rodando) | ~7 min com a espera cortada |
+| Cenas 9–10 (portal e app) | ~1,5 min |
+| Cena 11 (CRUD com SELECT) | ~4 min |
 
-Total: **25 a 30 minutos**. O enunciado não impõe limite, mas pede para evitar excesso.
+Total: **cerca de 20 minutos**. As pausas das pipelines são o que mais pesa: corte a espera
+ociosa, mantendo cada etapa na tela enquanto é explicada.
 
 ---
 
@@ -315,12 +480,13 @@ Total: **25 a 30 minutos**. O enunciado não impõe limite, mas pede para evitar
 - [ ] Áudio audível do início ao fim
 - [ ] **Nenhuma legenda** ativada
 - [ ] Nenhuma senha visível em nenhum frame
-- [ ] A alteração é no **código** (`login.html`), não no README
-- [ ] O CI aparece disparando **sozinho** depois do merge na `main`
-- [ ] O CD aparece disparando **sozinho** depois do CI
-- [ ] Cada etapa do CI e do CD foi explicada
-- [ ] A aba Tests e o artefato aparecem
-- [ ] Os recursos aparecem no Portal
-- [ ] O app aparece com a alteração
-- [ ] Cada operação do CRUD tem o seu `SELECT`
+- [ ] **Item 1:** IDE, Azure DevOps, banco e Portal do Azure aparecem
+- [ ] **Item 2:** cada task do CI e do CD foi apresentada
+- [ ] **Item 3:** a alteração é no **código** (`login.html`), não no README, com o antes e o depois na tela
+- [ ] **Item 4:** o CI aparece disparando **sozinho** depois do merge na `main`, e o CD sozinho depois do CI
+- [ ] **Item 5:** cada etapa do CI e do CD foi explicada **enquanto rodava**, com os detalhes do run abertos
+- [ ] **Item 6:** a aba Tests e o artefato `petflow-jar` aparecem
+- [ ] **Item 7:** o Web App aparece no Portal com o deploy que acabou de acontecer
+- [ ] **Item 8:** o app aparece com a alteração, e as 4 operações do CRUD (inserir, consultar, atualizar, deletar) foram feitas
+- [ ] **Item 9:** cada uma das 4 operações tem o seu `SELECT` no banco
 - [ ] Publicado como **não listado** e o link testado numa janela anônima
