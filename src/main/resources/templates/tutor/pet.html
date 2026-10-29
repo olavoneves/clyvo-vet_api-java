@@ -50,7 +50,9 @@
                         não tem horário marcado.
                     </p>
 
-                    <ul class="pendencias" id="pendencias">
+                    <!-- fragmento: depois de um agendamento a tela troca so esta lista,
+                         por GET /tutor/pets/{id}/pendencias, e a conversa fica onde esta -->
+                    <ul class="pendencias" id="pendencias" th:fragment="pendencias">
                         <li class="pendencia" th:each="o : ${pendentes}">
                             <div>
                                 <strong th:text="${o.etapaNome}">Etapa</strong>
@@ -143,7 +145,8 @@
         const idPet = /*[[${pet.id}]]*/ 0;
         const token = /*[[${tokenApi}]]*/ '';
         const rota = /*[[@{/api/agente/mensagens}]]*/ '/api/agente/mensagens';
-        const recarregar = /*[[@{/tutor/pets/{id}(id=${pet.id})}]]*/ '/tutor';
+        const rotaHistorico = /*[[@{/api/agente/conversas/{id}(id=${pet.id})}]]*/ '/api/agente/conversas/0';
+        const rotaPendencias = /*[[@{/tutor/pets/{id}/pendencias(id=${pet.id})}]]*/ '/tutor';
 
         const conversa = document.getElementById('conversa');
         const envio = document.getElementById('envio');
@@ -158,6 +161,50 @@
             conversa.scrollTop = conversa.scrollHeight;
             return linha;
         }
+
+        /*
+          Troca so a lista de pendencias. Recarregar a pagina apagava a conversa,
+          e com ela a confirmacao que o tutor ainda estava lendo. Se o fragmento
+          falhar, a lista antiga fica: e informacao velha, nao errada, e o tutor
+          ve o agendamento confirmado no chat.
+        */
+        async function atualizarPendencias() {
+            try {
+                const resposta = await fetch(rotaPendencias, {headers: {'Accept': 'text/html'}});
+                if (!resposta.ok) return;
+                document.getElementById('pendencias').outerHTML = await resposta.text();
+            } catch (erro) {
+                // segue com a lista que ja estava na tela
+            }
+        }
+
+        /*
+          A conversa vive no servidor, nao no navegador. Se a pagina for aberta de
+          novo (o token expirou, o tutor apertou F5), os turnos voltam de la.
+        */
+        async function restaurarConversa() {
+            try {
+                const resposta = await fetch(rotaHistorico, {
+                    headers: {'Authorization': 'Bearer ' + token}
+                });
+                if (!resposta.ok) return;
+                const corpo = await resposta.json();
+                (corpo.turnos || []).forEach(function (turno) {
+                    falar(turno.autor === 'TUTOR' ? 'fala-tutor' : 'fala-agente', turno.texto);
+                });
+            } catch (erro) {
+                // sem historico a tela comeca do cumprimento, como numa conversa nova
+            }
+        }
+
+        // o envio espera o historico chegar, para a resposta nova nao aparecer
+        // antes dos turnos antigos
+        campo.disabled = true;
+        botao.disabled = true;
+        restaurarConversa().finally(function () {
+            campo.disabled = false;
+            botao.disabled = false;
+        });
 
         envio.addEventListener('submit', async function (evento) {
             evento.preventDefault();
@@ -202,14 +249,13 @@
                 pensando.remove();
                 falar('fala-agente', corpo.texto);
 
-                // a lista de pendências mudou no servidor; recarregar é honesto e
-                // barato, e evita manter dois estados da mesma informação na tela
+                // a lista de pendências mudou no servidor: busca a versão nova
+                // dela, e só dela — a confirmação continua no chat
                 const mudou = (corpo.acoes || []).some(function (a) {
                     return a.tipo === 'AGENDAMENTO_CRIADO' || a.tipo === 'AGENDAMENTO_REMARCADO';
                 });
                 if (mudou) {
-                    falar('fala-sistema', 'Atualizando seus cuidados pendentes...');
-                    setTimeout(function () { window.location.href = recarregar; }, 1600);
+                    await atualizarPendencias();
                 }
 
             } catch (erro) {
