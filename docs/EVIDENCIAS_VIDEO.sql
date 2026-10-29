@@ -2,143 +2,109 @@
 -- Clyvo Vet / PetFlow - Evidencias do CRUD para a gravacao do video
 -- FIAP - DevOps Tools & Cloud Computing - Sprint 4
 --
+-- CRUD nas duas tabelas relacionadas (TUTOR 1:N PET), com a integridade
+-- referencial e a exclusao na ordem correta. Cada operacao e feita pela
+-- API (curl no terminal) e comprovada por um SELECT aqui.
+--
 -- SQL Developer conectado ao ACI do banco:
 --   Tipo de conexao : Basico
 --   Hostname        : rm561940-s4b-db-petflow.brazilsouth.azurecontainer.io
 --   Porta           : 1521
 --   Nome do servico : PETFLOWDB      <- Servico, NAO SID
 --   Usuario         : petflow
---   Senha           : recupere do Key Vault antes de gravar:
---     az keyvault secret show --vault-name kv-petflow-s4b-rm561940 \
---       --name oracle-app-password --query value -o tsv
+--   Senha           : az keyvault secret show --vault-name kv-petflow-s4b-rm561940 \
+--                       --name oracle-app-password --query value -o tsv
 --
 -- COMO USAR
---   Terminal ao lado do SQL Developer. Onde houver "NO TERMINAL", rode o
---   curl ANTES do SELECT que vem abaixo. Uma consulta por vez: Ctrl+Enter.
+--   Os comandos do terminal estao no roteiro (docs/ROTEIRO_VIDEO.md, Cena 11).
+--   Depois de cada comando, clique no SELECT indicado e aperte Ctrl+Enter.
 --
---   Conecte ANTES de comecar a gravar, para a senha nao aparecer na tela.
---
--- As consultas filtram pelo E-MAIL do tutor, nao pelo id: o id depende de
--- quantos tutores ja foram criados (a colecao do Postman, rodada antes no
--- video de Compliance, tambem cria e apaga um).
---
--- A ordem e sempre a mesma: a API altera o dado, o SELECT prova.
+--   As consultas filtram pelo E-MAIL do tutor, nao pelo id: o id depende de
+--   quantos registros ja foram criados (o Newman do video de Compliance
+--   tambem cria e apaga um tutor e um pet).
 -- =====================================================================
-
--- ---------------------------------------------------------------------
--- PREPARO NO TERMINAL (Git Bash, ANTES de gravar - nada disto vai ao video)
---
---   export MSYS_NO_PATHCONV=1
---   API="https://rm561940-petflow-api-s4b.azurewebsites.net/api"
---   EMAIL="video.sprint4@exemplo.com"
---
---   # Senha do tutor do video: gerada agora, nao fica em arquivo nenhum.
---   SENHA_TUTOR="video-$(openssl rand -hex 4)"
---
---   # Token do master. A senha vem do Key Vault direto para o login.
---   TOKEN=$(curl -s -X POST $API/auth/login \
---     -H "Content-Type: application/json" \
---     -d "{\"email\":\"master@clyvovet.com\",\"senha\":\"$(az keyvault secret show \
---          --vault-name kv-petflow-s4b-rm561940 --name master-password \
---          --query value -o tsv | tr -d '\r')\",\"tipo\":\"COLABORADOR\"}" \
---     | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
---
---   echo ${#TOKEN}          # deve imprimir ~250, nao 0
---   clear                   # limpa a tela antes de gravar
---
--- O token expira em 15 MINUTOS. Se um curl responder 401 no meio da
--- gravacao, isso nao e bug: rode o comando do TOKEN de novo.
--- No maximo 5 logins por minuto por IP: nao repita o TOKEN em sequencia.
--- ---------------------------------------------------------------------
 
 
 -- =====================================================================
--- FORMATACAO (rode uma vez, deixa a saida legivel em video)
--- =====================================================================
-SET LINESIZE 200
-SET PAGESIZE 50
-
-
--- =====================================================================
--- ESTADO INICIAL
+-- 0. O BANCO E O DA NUVEM
 -- =====================================================================
 
--- Confirma que a conexao e com o container na Azure, e nao com um banco
--- local: o host aparece como "SandboxHost-...".
+-- O host aparece como "SandboxHost-...": e o container no Azure.
 SELECT SYS_CONTEXT('USERENV','SERVER_HOST') AS servidor,
-       SYS_CONTEXT('USERENV','DB_NAME')     AS banco,
        SYS_CONTEXT('USERENV','CON_NAME')    AS pdb,
        USER                                  AS usuario
   FROM dual;
 
--- As tabelas criadas pelo Flyway na subida da aplicacao publicada pelo CD.
-SELECT COUNT(*) AS total_tabelas FROM user_tables;
-
--- A carga que o 08_bootstrap.sh criou pela API.
-SELECT id_tutor, nm_tutor, ds_email, nr_telefone
-  FROM TB_CLV_TUTOR
- ORDER BY id_tutor;
-
 
 -- =====================================================================
--- CRUD DO TUTOR
+-- 1. INSERIR o TUTOR   (curl POST /tutores -> 201)
 -- =====================================================================
-
--- --- INSERIR ---------------------------------------------------------
--- NO TERMINAL (mostre o 201 e anote o "id" da resposta):
---   curl -i -X POST $API/tutores \
---     -H "Content-Type: application/json" \
---     -d "{\"nome\":\"Tutor Video Sprint 4\",\"email\":\"$EMAIL\",
---          \"telefone\":\"11911112222\",\"senha\":\"$SENHA_TUTOR\",\"clinicaId\":1}"
---
--- POST /api/tutores e rota PUBLICA: nao precisa de token.
--- Depois, guarde o id:   ID=<id da resposta>
-
 SELECT id_tutor, nm_tutor, ds_email, nr_telefone, dt_cadastro
   FROM TB_CLV_TUTOR
  WHERE ds_email = 'video.sprint4@exemplo.com';
 
 
--- --- CONSULTAR -------------------------------------------------------
--- NO TERMINAL (200 OK):
---   curl -s -H "Authorization: Bearer $TOKEN" $API/tutores/$ID
-
-SELECT id_tutor, nm_tutor, ds_email, nr_telefone, id_clinica
-  FROM TB_CLV_TUTOR
- WHERE ds_email = 'video.sprint4@exemplo.com';
-
-
--- --- ATUALIZAR -------------------------------------------------------
--- NO TERMINAL (200 OK):
---   curl -i -X PUT $API/tutores/$ID \
---     -H "Authorization: Bearer $TOKEN" \
---     -H "Content-Type: application/json" \
---     -d "{\"nome\":\"Tutor Video ALTERADO\",\"email\":\"$EMAIL\",
---          \"telefone\":\"11933334444\",\"senha\":\"$SENHA_TUTOR\",\"clinicaId\":1}"
---
--- O PUT reusa o DTO do POST: "senha" e "clinicaId" sao obrigatorios no
--- corpo, alem dos campos alterados. Sem eles a resposta e 422.
-
-SELECT id_tutor, nm_tutor, nr_telefone
-  FROM TB_CLV_TUTOR
- WHERE ds_email = 'video.sprint4@exemplo.com';
+-- =====================================================================
+-- 2. INSERIR o PET do tutor   (curl POST /pets -> 201)
+-- =====================================================================
+-- O pet aponta para o tutor pela FK id_tutor: o relacionamento 1:N.
+SELECT p.id_pet, p.nm_pet, p.ds_porte, p.ds_status_pet, t.nm_tutor
+  FROM TB_CLV_PET   p
+  JOIN TB_CLV_TUTOR t ON t.id_tutor = p.id_tutor
+ WHERE t.ds_email = 'video.sprint4@exemplo.com';
 
 
--- --- DELETAR ---------------------------------------------------------
--- NO TERMINAL (204 No Content):
---   curl -i -X DELETE $API/tutores/$ID -H "Authorization: Bearer $TOKEN"
+-- =====================================================================
+-- 3. CONSULTAR   (curl GET /tutores/$ID_TUTOR e GET /pets/$ID_PET -> 200)
+-- =====================================================================
+-- Os mesmos dados que a API devolveu, lidos do banco.
+SELECT t.id_tutor, t.nm_tutor, t.nr_telefone,
+       p.id_pet, p.nm_pet, p.ds_porte
+  FROM TB_CLV_TUTOR t
+  JOIN TB_CLV_PET   p ON p.id_tutor = t.id_tutor
+ WHERE t.ds_email = 'video.sprint4@exemplo.com';
 
--- A consulta volta vazia: essa e a evidencia da exclusao.
+
+-- =====================================================================
+-- 4. ATUALIZAR o TUTOR e o PET   (curl PUT /tutores e PUT /pets -> 200)
+-- =====================================================================
+-- Nome e telefone do tutor, nome e porte do pet: os valores novos.
+SELECT t.id_tutor, t.nm_tutor, t.nr_telefone,
+       p.id_pet, p.nm_pet, p.ds_porte
+  FROM TB_CLV_TUTOR t
+  JOIN TB_CLV_PET   p ON p.id_tutor = t.id_tutor
+ WHERE t.ds_email = 'video.sprint4@exemplo.com';
+
+
+-- =====================================================================
+-- 5. INTEGRIDADE   (curl DELETE /tutores/$ID_TUTOR -> 409, nunca 500)
+-- =====================================================================
+-- O tutor tem pet: o banco recusa a exclusao. Nada foi apagado.
+SELECT t.id_tutor, t.nm_tutor, p.id_pet, p.nm_pet
+  FROM TB_CLV_TUTOR t
+  JOIN TB_CLV_PET   p ON p.id_tutor = t.id_tutor
+ WHERE t.ds_email = 'video.sprint4@exemplo.com';
+
+-- A chave estrangeira que garante isso:
+SELECT constraint_name, table_name, delete_rule
+  FROM user_constraints
+ WHERE constraint_name = 'FK_PET_TUTOR';
+
+
+-- =====================================================================
+-- 6. DELETAR o PET   (curl DELETE /pets/$ID_PET -> 204)
+-- =====================================================================
+-- Volta vazia: o pet saiu do banco.
+SELECT p.id_pet, p.nm_pet
+  FROM TB_CLV_PET   p
+  JOIN TB_CLV_TUTOR t ON t.id_tutor = p.id_tutor
+ WHERE t.ds_email = 'video.sprint4@exemplo.com';
+
+
+-- =====================================================================
+-- 7. DELETAR o TUTOR   (curl DELETE /tutores/$ID_TUTOR -> 204)
+-- =====================================================================
+-- Agora funciona: sem pet vinculado, a exclusao e aceita. Volta vazia.
 SELECT id_tutor, nm_tutor
   FROM TB_CLV_TUTOR
  WHERE ds_email = 'video.sprint4@exemplo.com';
-
-
--- =====================================================================
--- ESTADO FINAL
--- =====================================================================
-
--- Sobram so os tutores da carga inicial.
-SELECT id_tutor, nm_tutor, ds_email
-  FROM TB_CLV_TUTOR
- ORDER BY id_tutor;
