@@ -38,6 +38,7 @@ import br.com.clyvovet.server.pet.web.PetWebController;
 import br.com.clyvovet.server.auth.web.LoginWebController;
 import br.com.clyvovet.server.atendimento.AtendimentoForm;
 import br.com.clyvovet.server.atendimento.AtendimentoRegistrado;
+import br.com.clyvovet.server.atendimento.CatalogoDeContextos;
 import br.com.clyvovet.server.atendimento.RegistroDeAtendimentoService;
 import br.com.clyvovet.server.atendimento.web.AtendimentoWebController;
 import br.com.clyvovet.server.exception.ConflitoDeEstadoException;
@@ -146,6 +147,9 @@ class PaginasRenderizamTest {
 
     @MockitoBean
     private RegistroDeAtendimentoService registroDeAtendimentoService;
+
+    @MockitoBean
+    private CatalogoDeContextos catalogoDeContextos;
 
     @Test
     void loginRenderizaSemAutenticacao() throws Exception {
@@ -934,6 +938,67 @@ class PaginasRenderizamTest {
     }
 
     /** Erro de validacao volta para a tela, no campo, e nao chega ao motor. */
+    @Test
+    void contextoEUmSelectAlimentadoPeloCatalogo() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(veterinarioService.findAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(veterinarioDeExemplo())));
+        given(catalogoDeContextos.porGatilho()).willReturn(catalogoDeExemplo());
+
+        mockMvc.perform(get("/pets/9/atendimentos/novo").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("<select id=\"contexto\""),
+                        org.hamcrest.Matchers.containsString("<option value=\"\">Nenhum</option>"),
+                        // a opcao diz de que gatilho e: e por isso que o script a filtra
+                        org.hamcrest.Matchers.containsString("data-gatilho=\"PROCEDIMENTO_REALIZADO\""),
+                        org.hamcrest.Matchers.containsString("Castracao (CIR_CASTRACAO)"),
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("<input type=\"text\" id=\"contexto\"")))));
+    }
+
+    /** Um codigo que o gatilho nao le daria zero obrigacoes sem explicar por que. */
+    @Test
+    void contextoQueOGatilhoNaoAceitaVoltaComErroNoCampo() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(veterinarioService.findAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(veterinarioDeExemplo())));
+        given(catalogoDeContextos.porGatilho()).willReturn(catalogoDeExemplo());
+
+        mockMvc.perform(post("/pets/9/atendimentos").with(user(COLABORADOR)).with(csrf())
+                        .param("veterinarioId", "21")
+                        .param("dtConsulta", "2026-10-28")
+                        .param("eventoGatilho", "CONSULTA_REGISTRADA")
+                        .param("contexto", "CIR_CASTRACAO"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("Este contexto não se aplica ao gatilho escolhido")));
+
+        org.mockito.Mockito.verifyNoInteractions(registroDeAtendimentoService);
+    }
+
+    @Test
+    void contextoDoCatalogoPassa() throws Exception {
+        given(catalogoDeContextos.porGatilho()).willReturn(catalogoDeExemplo());
+        given(registroDeAtendimentoService.registrar(eq(9L), any(AtendimentoForm.class)))
+                .willReturn(new AtendimentoRegistrado(77L, 2, List.of(LocalDate.of(2026, 11, 7))));
+
+        mockMvc.perform(post("/pets/9/atendimentos").with(user(COLABORADOR)).with(csrf())
+                        .param("veterinarioId", "21")
+                        .param("dtConsulta", "2026-10-28")
+                        .param("eventoGatilho", "PROCEDIMENTO_REALIZADO")
+                        .param("contexto", "CIR_CASTRACAO"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/pets/9"));
+    }
+
+    private static java.util.Map<br.com.clyvovet.server.enums.EventoGatilho,
+            List<CatalogoDeContextos.OpcaoDeContexto>> catalogoDeExemplo() {
+        return java.util.Map.of(br.com.clyvovet.server.enums.EventoGatilho.PROCEDIMENTO_REALIZADO, List.of(
+                new CatalogoDeContextos.OpcaoDeContexto("CIR_CASTRACAO", "Castracao (CIR_CASTRACAO)"),
+                new CatalogoDeContextos.OpcaoDeContexto("CIR_GERAL", "CIR_GERAL")));
+    }
+
     @Test
     void formularioInvalidoVoltaComOErroNoCampo() throws Exception {
         given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());

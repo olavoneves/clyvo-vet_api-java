@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{layout :: pagina('Registrar atendimento', ~{::main}, ~{})}">
+      th:replace="~{layout :: pagina('Registrar atendimento', ~{::main}, ~{::script})}">
 <head><title>Registrar atendimento</title></head>
 <body>
 
@@ -95,16 +95,29 @@
                        th:errors="*{eventoGatilho}">Escolha o gatilho</p>
                 </div>
 
+                <!--
+                  As opcoes vem do catalogo do banco: os codigos que as regras de
+                  ativacao de cada gatilho aceitam. Cada uma diz de que gatilho e;
+                  o script abaixo esconde as dos outros. Sem script, todas
+                  aparecem e o servidor recusa a combinacao que nao casa.
+                -->
                 <div class="campo campo-largo">
-                    <label for="contexto">Contexto <span class="opcional">opcional</span></label>
-                    <input type="text" id="contexto" th:field="*{contexto}" maxlength="200"
-                           aria-describedby="ajuda-contexto">
+                    <label for="contexto">Contexto</label>
+                    <select id="contexto" th:field="*{contexto}" aria-describedby="ajuda-contexto"
+                            th:attr="aria-invalid=${#fields.hasErrors('contexto')}">
+                        <option value="">Nenhum</option>
+                        <th:block th:each="grupo : ${contextos}">
+                            <option th:each="opcao : ${grupo.value}"
+                                    th:value="${opcao.codigo}" th:text="${opcao.rotulo}"
+                                    th:attr="data-gatilho=${grupo.key}">Castracao (CIR_CASTRACAO)</option>
+                        </th:block>
+                    </select>
                     <p class="campo-ajuda" id="ajuda-contexto">
-                        Lido pelo gatilho “Procedimento realizado”: o código do procedimento,
-                        como CIR_CASTRACAO, CIR_GERAL ou ODONTO_PROF.
+                        <span id="ajuda-com-contexto">O procedimento feito neste atendimento. Sem ele, os protocolos que dependem do procedimento não se aplicam.</span>
+                        <span id="ajuda-sem-contexto" hidden>Este gatilho não usa contexto.</span>
                     </p>
                     <p class="campo-erro" th:if="${#fields.hasErrors('contexto')}"
-                       th:errors="*{contexto}">Contexto longo demais</p>
+                       th:errors="*{contexto}">Este contexto não se aplica ao gatilho escolhido</p>
                 </div>
             </div>
         </section>
@@ -116,6 +129,41 @@
     </form>
 
 </main>
+
+<script>
+    // mostra so os contextos do gatilho escolhido; o que nao serve volta a "Nenhum"
+    (function () {
+        var gatilho = document.getElementById('eventoGatilho');
+        var contexto = document.getElementById('contexto');
+        var comContexto = document.getElementById('ajuda-com-contexto');
+        var semContexto = document.getElementById('ajuda-sem-contexto');
+        if (!gatilho || !contexto) {
+            return;
+        }
+
+        function filtrar() {
+            var algum = false;
+            Array.prototype.forEach.call(contexto.options, function (opcao) {
+                if (!opcao.dataset.gatilho) {
+                    return; // "Nenhum" serve para todo gatilho
+                }
+                var serve = opcao.dataset.gatilho === gatilho.value;
+                opcao.hidden = !serve;
+                opcao.disabled = !serve;
+                algum = algum || serve;
+            });
+            if (contexto.selectedOptions.length && contexto.selectedOptions[0].disabled) {
+                contexto.value = '';
+            }
+            contexto.disabled = !algum;
+            comContexto.hidden = !algum;
+            semContexto.hidden = algum;
+        }
+
+        gatilho.addEventListener('change', filtrar);
+        filtrar();
+    })();
+</script>
 
 </body>
 </html>

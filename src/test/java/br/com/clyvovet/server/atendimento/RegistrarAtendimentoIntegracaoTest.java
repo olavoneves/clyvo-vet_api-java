@@ -58,6 +58,9 @@ class RegistrarAtendimentoIntegracaoTest {
     @Autowired
     private EntityManager entityManager;
 
+    @Autowired
+    private CatalogoDeContextos catalogoDeContextos;
+
     private CenarioClinico fixture;
     private Long clinica;
     private Long veterinario;
@@ -148,6 +151,73 @@ class RegistrarAtendimentoIntegracaoTest {
                 .setParameter("pet", filhote)
                 .getSingleResult();
         assertThat(consultas.longValue()).isZero();
+    }
+
+    /**
+     * O select oferece o que o motor le: cada codigo do catalogo esta na lista
+     * de alguma condicao PROCEDIMENTO do mesmo gatilho. Nenhum codigo fixo aqui
+     * — o teste confere a tela contra o banco, e nao contra uma lista copiada.
+     */
+    @Test
+    @DisplayName("os contextos do select saem das condicoes PROCEDIMENTO do catalogo")
+    void contextosSaemDoCatalogo() {
+        TenantContext.set(clinica);
+        var porGatilho = catalogoDeContextos.porGatilho();
+
+        assertThat(porGatilho)
+                .as("o catalogo da V9 tem ao menos uma regra que le o procedimento")
+                .isNotEmpty();
+        porGatilho.forEach((gatilho, opcoes) -> assertThat(opcoes).allSatisfy(opcao -> {
+            Number casa = (Number) entityManager.createNativeQuery("""
+                            select count(*) from TB_CLV_CONDICAO_PROT c
+                              join TB_CLV_REGRA_ATIVACAO r on r.id_regra_ativacao = c.id_regra_ativacao
+                             where c.ds_atributo = 'PROCEDIMENTO'
+                               and r.ds_evento_gatilho = :gatilho
+                               and instr(',' || upper(c.ds_valor_texto) || ',', ',' || :codigo || ',') > 0
+                            """)
+                    .setParameter("gatilho", gatilho.name())
+                    .setParameter("codigo", opcao.codigo())
+                    .getSingleResult();
+            assertThat(casa.longValue()).as("%s em %s", opcao.codigo(), gatilho).isPositive();
+            assertThat(opcao.rotulo()).isNotBlank();
+        }));
+    }
+
+    /**
+     * O caso da Bela: procedimento realizado num adulto. Sem contexto, zero;
+     * com o primeiro contexto que o select oferece, o motor gera.
+     */
+    @Test
+    @DisplayName("procedimento realizado com contexto do catalogo gera obrigacoes num adulto")
+    void contextoDoCatalogoFazOMotorGerar() throws Exception {
+        TenantContext.set(clinica);
+        String codigo = catalogoDeContextos.porGatilho()
+                .get(br.com.clyvovet.server.enums.EventoGatilho.PROCEDIMENTO_REALIZADO)
+                .getFirst().codigo();
+        TenantContext.clear();
+        Long adulto = fixture.novoPet(clinica, fixture.novoTutor(clinica));
+        entityManager.flush();
+
+        AtendimentoRegistrado semContexto = registrar(adulto, "");
+        assertThat(semContexto.qtdObrigacoes()).isZero();
+
+        AtendimentoRegistrado comContexto = registrar(adulto, codigo);
+        assertThat(comContexto.qtdObrigacoes())
+                .as("contexto %s oferecido pelo select tem que ativar alguma regra", codigo)
+                .isPositive();
+    }
+
+    private AtendimentoRegistrado registrar(Long pet, String contexto) throws Exception {
+        MvcResult resultado = mockMvc.perform(post("/pets/" + pet + "/atendimentos")
+                        .with(user(sessaoDoVeterinario()))
+                        .with(csrf())
+                        .param("veterinarioId", veterinario.toString())
+                        .param("dtConsulta", LocalDate.now().toString())
+                        .param("eventoGatilho", "PROCEDIMENTO_REALIZADO")
+                        .param("contexto", contexto))
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+        return (AtendimentoRegistrado) resultado.getFlashMap().get("atendimentoRegistrado");
     }
 
     private ClinicaUserDetails sessaoDoVeterinario() {
