@@ -1145,7 +1145,7 @@ develop   ← desenvolvimento
 
 - **Projeto no Azure DevOps:** https://dev.azure.com/RM563558/Sprint%204%20-%20Azure%20DevOps
 - **Aplicação publicada pelo CD:** https://rm561940-petflow-api-s4b.azurewebsites.net
-- **Vídeo da Sprint 4:** _(link do YouTube)_
+- **Vídeo da Sprint 4:** https://youtu.be/dNh6DBrqYBc
 
 ---
 
