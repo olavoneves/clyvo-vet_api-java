@@ -412,9 +412,9 @@ class AgenteServiceTest {
      * clinica.
      */
     @Test
-    @DisplayName("resposta ilegivel do provedor vira indisponibilidade, nunca 500")
+    @DisplayName("resposta ilegivel duas vezes seguidas vira indisponibilidade, nunca 500")
     void respostaIlegivelViraMensagemDeIndisponibilidade() {
-        api.expect(ExpectedCount.once(), requestTo(ROTA))
+        api.expect(ExpectedCount.twice(), requestTo(ROTA))
                 .andRespond(withSuccess("{\"candidates\":[{\"content\":{\"role\":\"mod",
                         MediaType.APPLICATION_JSON));
 
@@ -423,6 +423,24 @@ class AgenteServiceTest {
         api.verify();
         assertThat(resposta.texto()).isEqualTo(MensagensDoAgente.INDISPONIVEL);
         assertThat(resposta.escalado()).isTrue();
+    }
+
+    /**
+     * O caso da Camila no site, em 29/10: "Resposta ilegivel de gemini" na
+     * primeira mensagem, horarios na segunda. A nova tentativa faz o tutor nao
+     * precisar repetir o pedido.
+     */
+    @Test
+    @DisplayName("resposta ilegivel uma vez e retentada; a segunda tentativa vale")
+    void respostaIlegivelERetentada() {
+        api.expect(ExpectedCount.once(), requestTo(ROTA))
+                .andRespond(withSuccess("{\"candidates\":[{\"content\":{\"role\":\"mod",
+                        MediaType.APPLICATION_JSON));
+        api.expect(ExpectedCount.once(), requestTo(ROTA))
+                .andRespond(withSuccess(texto("Tudo certo."), MediaType.APPLICATION_JSON));
+
+        assertThat(agente.responder(PET, "quero marcar").texto()).isEqualTo("Tudo certo.");
+        api.verify();
     }
 
     /**
