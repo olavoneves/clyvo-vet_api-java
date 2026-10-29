@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: pagina('Registrar atendimento', ~{::main}, ~{})}">
+<head><title>Registrar atendimento</title></head>
+<body>
+
+<main class="conteudo">
+
+    <div class="cabecalho-tela">
+        <div>
+            <p class="migalha">
+                <a th:href="@{/pets}">Pets</a> /
+                <a th:href="@{/pets/{id}(id=${pet.id})}" th:text="${pet.nome}">Rex</a> /
+                atendimento
+            </p>
+            <h1>Registrar atendimento</h1>
+            <p class="subtitulo" th:text="|${pet.nome} · tutor ${pet.tutorNome}|">Rex · tutor Joana</p>
+        </div>
+    </div>
+
+    <form class="formulario" method="post" novalidate
+          th:action="@{/pets/{id}/atendimentos(id=${pet.id})}" th:object="${atendimento}">
+
+        <!-- a recusa do motor nao e de campo nenhum: vem no topo -->
+        <div class="aviso aviso-erro" role="alert" th:if="${#fields.hasGlobalErrors()}">
+            <p th:each="erro : ${#fields.globalErrors()}" th:text="${erro}">O motor recusou o gatilho.</p>
+        </div>
+
+        <section class="bloco">
+            <h2 class="titulo-bloco">Consulta</h2>
+            <p class="ajuda">Registra o atendimento como realizado.</p>
+
+            <div class="campos">
+                <div class="campo">
+                    <label for="veterinarioId">Veterinário</label>
+                    <select id="veterinarioId" th:field="*{veterinarioId}" required
+                            th:attr="aria-invalid=${#fields.hasErrors('veterinarioId')},aria-describedby=${#fields.hasErrors('veterinarioId')} ? 'erro-veterinarioId'">
+                        <option value="">Escolha</option>
+                        <option th:each="v : ${veterinarios}" th:value="${v.id}"
+                                th:text="|${v.nome} · ${v.crmv}|">Dra. Helena · SP-11001</option>
+                    </select>
+                    <p class="campo-erro" id="erro-veterinarioId" th:if="${#fields.hasErrors('veterinarioId')}"
+                       th:errors="*{veterinarioId}">Escolha o veterinário</p>
+                </div>
+
+                <div class="campo">
+                    <label for="dtConsulta">Data</label>
+                    <input type="date" id="dtConsulta" th:field="*{dtConsulta}" required
+                           th:attr="aria-invalid=${#fields.hasErrors('dtConsulta')},aria-describedby=${#fields.hasErrors('dtConsulta')} ? 'erro-dtConsulta'">
+                    <p class="campo-erro" id="erro-dtConsulta" th:if="${#fields.hasErrors('dtConsulta')}"
+                       th:errors="*{dtConsulta}">Informe a data</p>
+                </div>
+
+                <div class="campo">
+                    <label for="nrValor">Valor (R$) <span class="opcional">opcional</span></label>
+                    <input type="number" id="nrValor" th:field="*{nrValor}" min="0" step="0.01" inputmode="decimal"
+                           th:attr="aria-invalid=${#fields.hasErrors('nrValor')},aria-describedby=${#fields.hasErrors('nrValor')} ? 'erro-nrValor'">
+                    <p class="campo-erro" id="erro-nrValor" th:if="${#fields.hasErrors('nrValor')}"
+                       th:errors="*{nrValor}">Valor inválido</p>
+                </div>
+
+                <div class="campo campo-largo">
+                    <label for="motivo">Motivo <span class="opcional">opcional</span></label>
+                    <input type="text" id="motivo" th:field="*{motivo}" maxlength="500"
+                           th:attr="aria-invalid=${#fields.hasErrors('motivo')},aria-describedby=${#fields.hasErrors('motivo')} ? 'erro-motivo'">
+                    <p class="campo-erro" id="erro-motivo" th:if="${#fields.hasErrors('motivo')}"
+                       th:errors="*{motivo}">Motivo longo demais</p>
+                </div>
+
+                <div class="campo campo-largo">
+                    <label for="diagnostico">Diagnóstico <span class="opcional">opcional</span></label>
+                    <textarea id="diagnostico" th:field="*{diagnostico}" rows="3" maxlength="1000"
+                              th:attr="aria-invalid=${#fields.hasErrors('diagnostico')},aria-describedby=${#fields.hasErrors('diagnostico')} ? 'erro-diagnostico'"></textarea>
+                    <p class="campo-erro" id="erro-diagnostico" th:if="${#fields.hasErrors('diagnostico')}"
+                       th:errors="*{diagnostico}">Diagnóstico longo demais</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="bloco">
+            <h2 class="titulo-bloco">Protocolo</h2>
+            <p class="ajuda">
+                O gatilho é o evento clínico deste atendimento. O motor de protocolo decide, a partir
+                dele, quais cuidados futuros este pet passa a dever, e com que datas.
+            </p>
+
+            <div class="campos">
+                <div class="campo">
+                    <label for="eventoGatilho">Gatilho</label>
+                    <select id="eventoGatilho" th:field="*{eventoGatilho}" required
+                            th:attr="aria-invalid=${#fields.hasErrors('eventoGatilho')},aria-describedby=${#fields.hasErrors('eventoGatilho')} ? 'erro-eventoGatilho'">
+                        <option th:each="g : ${gatilhos}" th:value="${g.key}" th:text="${g.value}">Consulta registrada</option>
+                    </select>
+                    <p class="campo-erro" id="erro-eventoGatilho" th:if="${#fields.hasErrors('eventoGatilho')}"
+                       th:errors="*{eventoGatilho}">Escolha o gatilho</p>
+                </div>
+
+                <div class="campo campo-largo">
+                    <label for="contexto">Contexto <span class="opcional">opcional</span></label>
+                    <input type="text" id="contexto" th:field="*{contexto}" maxlength="200"
+                           aria-describedby="ajuda-contexto">
+                    <p class="campo-ajuda" id="ajuda-contexto">
+                        Lido pelo gatilho “Procedimento realizado”: o código do procedimento,
+                        como CIR_CASTRACAO, CIR_GERAL ou ODONTO_PROF.
+                    </p>
+                    <p class="campo-erro" th:if="${#fields.hasErrors('contexto')}"
+                       th:errors="*{contexto}">Contexto longo demais</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="formulario-acoes">
+            <a class="botao-secundario" th:href="@{/pets/{id}(id=${pet.id})}">Cancelar</a>
+            <button type="submit" class="botao-principal botao-enviar">Registrar atendimento</button>
+        </div>
+    </form>
+
+</main>
+
+</body>
+</html>

@@ -506,6 +506,68 @@ a { color: var(--cor-primaria-escura); }
 .aviso-erro { background: #fbe9e7; border: 1px solid #f2c6c1; color: var(--cor-erro); }
 .aviso-ok { background: var(--cor-sucesso-tenue); border: 1px solid var(--cor-sucesso-tenue-borda); color: var(--cor-sucesso); }
 
+/* ---------- formulario (registrar atendimento) ---------- */
+
+.cabecalho-acoes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* a acao principal da ficha: mesma forma do secundario, cor da marca */
+.botao-destaque {
+    background: var(--cor-primaria);
+    border-color: var(--cor-primaria);
+    color: #fff;
+}
+
+.botao-destaque:hover { background: var(--cor-primaria-escura); border-color: var(--cor-primaria-escura); color: #fff; }
+
+.confirmacao { margin-bottom: 18px; }
+.confirmacao span { margin-left: 4px; }
+
+.campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px 18px;
+}
+
+.campo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.campo-largo { grid-column: 1 / -1; }
+
+.campo label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cor-texto-suave);
+}
+
+.opcional { font-weight: 400; }
+
+.campo input,
+.campo select,
+.campo textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--cor-borda);
+    border-radius: 8px;
+    font: inherit;
+    background: var(--cor-superficie);
+    color: var(--cor-texto);
+}
+
+.campo textarea { resize: vertical; }
+
+.campo input:focus,
+.campo select:focus,
+.campo textarea:focus { border-color: var(--cor-primaria); }
+
+.campo [aria-invalid="true"] { border-color: var(--cor-erro); }
+
+.campo-erro { margin: 0; font-size: 13px; color: var(--cor-erro); }
+.campo-ajuda { margin: 0; font-size: 12.5px; color: var(--cor-texto-suave); }
+
+.formulario .aviso-erro { margin-bottom: 18px; }
+.formulario .aviso-erro p { margin: 0; }
+
+.formulario-acoes { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.formulario-acoes .botao-enviar { width: auto; margin: 0; padding: 10px 22px; }
+
 /* ---------- rodape ---------- */
 
 .rodape {

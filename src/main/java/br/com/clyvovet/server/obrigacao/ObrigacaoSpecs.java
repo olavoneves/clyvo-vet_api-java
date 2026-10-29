@@ -55,6 +55,11 @@ public final class ObrigacaoSpecs {
                 : cb.equal(root.get("pet").get("id"), petId);
     }
 
+    /** As obrigacoes que o motor gerou a partir desta consulta. */
+    public static Specification<Obrigacao> daConsultaDeOrigem(Long consultaId) {
+        return (root, query, cb) -> cb.equal(root.get("consultaOrigem").get("id"), consultaId);
+    }
+
     public static Specification<Obrigacao> filtro(ObrigacaoStatus status, LocalDate de,
                                                   LocalDate ate, Long petId) {
         return Specification.allOf(
