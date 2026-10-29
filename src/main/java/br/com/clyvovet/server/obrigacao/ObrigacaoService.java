@@ -52,6 +52,21 @@ public class ObrigacaoService {
                 .getContent();
     }
 
+    /**
+     * Obrigacoes que uma consulta originou, a partir de uma data.
+     *
+     * <p>Serve a confirmacao da tela de atendimento: o motor devolve so quantas
+     * criou, e a tela quer mostrar quando elas vencem.
+     */
+    @Transactional(readOnly = true)
+    public List<ObrigacaoResponse> geradasPelaConsulta(Long consultaId, LocalDate de, Pageable pageable) {
+        return repository.findAll(
+                        ObrigacaoSpecs.daConsultaDeOrigem(consultaId).and(ObrigacaoSpecs.previstaDe(de)),
+                        pageable)
+                .map(ObrigacaoResponse::from)
+                .getContent();
+    }
+
     @Transactional(readOnly = true)
     public ObrigacaoDetalheResponse findById(Long id) {
         Obrigacao obrigacao = buscarEntidade(id);

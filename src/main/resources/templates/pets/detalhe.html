@@ -13,9 +13,26 @@
             <p class="subtitulo"
                th:text="|${pet.especieNome} · ${pet.racaNome} · ${pet.porte}|">Espécie · raça</p>
         </div>
-        <span class="etiqueta etiqueta-grande"
-              th:classappend="'etiqueta-' + ${#strings.toLowerCase(pet.status)}"
-              th:text="${pet.status}">STATUS</span>
+        <div class="cabecalho-acoes">
+            <span class="etiqueta etiqueta-grande"
+                  th:classappend="'etiqueta-' + ${#strings.toLowerCase(pet.status)}"
+                  th:text="${pet.status}">STATUS</span>
+            <a class="botao-secundario botao-destaque"
+               th:href="@{/pets/{id}/atendimentos/novo(id=${pet.id})}">Registrar atendimento</a>
+        </div>
+    </div>
+
+    <!-- volta do "Registrar atendimento": quantas o motor criou e quando vencem -->
+    <div class="aviso aviso-ok confirmacao" role="status" th:if="${atendimentoRegistrado}"
+         th:with="r=${atendimentoRegistrado}">
+        <strong>Atendimento registrado.</strong>
+        <span th:if="${r.qtdObrigacoes == 0}">
+            O motor não gerou obrigação para este gatilho: nenhum protocolo se aplica a este pet agora.
+        </span>
+        <span th:if="${r.qtdObrigacoes == 1}">1 obrigação criada.</span>
+        <span th:if="${r.qtdObrigacoes > 1}" th:text="|${r.qtdObrigacoes} obrigações criadas.|">3 obrigações criadas.</span>
+        <span th:unless="${#lists.isEmpty(r.proximasDatas)}"
+              th:text="|Próximas: ${#strings.listJoin(#temporals.listFormat(r.proximasDatas, 'dd/MM/yyyy'), ', ')}.|">Próximas: 12/11/2026.</span>
     </div>
 
     <section class="bloco">
