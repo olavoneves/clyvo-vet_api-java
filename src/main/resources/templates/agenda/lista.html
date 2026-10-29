@@ -10,32 +10,55 @@
         <div>
             <h1>Agenda de atendimentos</h1>
             <p class="subtitulo"
-               th:text="|Hoje é ${#temporals.format(hoje, 'dd/MM/yyyy')}|">Hoje</p>
+               th:text="|${#temporals.format(inicio, 'dd/MM')} a ${#temporals.format(fim, 'dd/MM/yyyy')} · hoje é ${#temporals.format(hoje, 'dd/MM')}|">Semana</p>
+            <!--
+              O contador so aparece quando ha o que contar. Um "0 recuperados" fixo
+              no cabecalho vira ruido e a clinica para de ler a linha.
+            -->
+            <p class="subtitulo" th:if="${recuperadosNaSemana > 0}">
+                <span class="etiqueta etiqueta-recuperada">Em atraso</span>
+                <span th:text="|${recuperadosNaSemana} atendimento(s) recuperam obrigação vencida|">—</span>
+            </p>
         </div>
-        <!--
-          O contador so aparece quando ha o que contar. Um "0 recuperados" fixo
-          no cabecalho vira ruido e a clinica para de ler a linha.
-        -->
-        <p class="subtitulo" th:if="${recuperadosNaSemana > 0}">
-            <span class="etiqueta etiqueta-recuperada">Em atraso</span>
-            <span th:text="|${recuperadosNaSemana} atendimento(s) recuperam obrigação vencida|">—</span>
-        </p>
+        <div class="cabecalho-acoes">
+            <!--
+              Os links carregam o filtro: andar de semana nao pode desligar o
+              recorte por veterinario que acabou de ser escolhido.
+            -->
+            <nav class="navegacao-mes" aria-label="Semanas">
+                <a class="botao-secundario"
+                   th:href="${ehVeterinario} ? @{/agenda(inicio=${semanaAnterior},minha=${minhaAgenda})} : @{/agenda(inicio=${semanaAnterior})}">&larr; Semana anterior</a>
+                <a class="botao-secundario"
+                   th:href="${ehVeterinario} ? @{/agenda(minha=${minhaAgenda})} : @{/agenda}">Hoje</a>
+                <a class="botao-secundario"
+                   th:href="${ehVeterinario} ? @{/agenda(inicio=${proximaSemana},minha=${minhaAgenda})} : @{/agenda(inicio=${proximaSemana})}">Próxima semana &rarr;</a>
+            </nav>
+            <nav class="alternancia" aria-label="De quem é a agenda" th:if="${ehVeterinario}">
+                <a th:href="@{/agenda(inicio=${inicio},minha=true)}"
+                   th:classappend="${minhaAgenda} ? 'ativo'"
+                   th:attr="aria-current=${minhaAgenda} ? 'true'">Minha agenda</a>
+                <a th:href="@{/agenda(inicio=${inicio},minha=false)}"
+                   th:classappend="${!minhaAgenda} ? 'ativo'"
+                   th:attr="aria-current=${!minhaAgenda} ? 'true'">Clínica inteira</a>
+            </nav>
+        </div>
     </div>
 
-    <!--
-      Dois blocos com a mesma tabela. O fragmento evita que a coluna de hoje e a
-      da semana divirjam quando uma das duas for ajustada.
-    -->
-    <section class="bloco">
-        <h2 class="titulo-bloco">Hoje</h2>
-        <div th:replace="~{agenda/lista :: tabelaCompromissos(${doDia}, 'Nenhum atendimento marcado para hoje.')}"></div>
+    <section class="bloco" th:if="${vazia}">
+        <p class="tabela-vazia"
+           th:text="${minhaAgenda} ? 'Nenhum atendimento seu marcado nestes sete dias.' : 'Nenhum atendimento marcado nestes sete dias.'">Nada marcado.</p>
     </section>
 
-    <section class="bloco">
-        <h2 class="titulo-bloco"
-            th:text="|Próximos dias — até ${#temporals.format(fimDaSemana, 'dd/MM')}|">Próximos dias</h2>
-        <div th:replace="~{agenda/lista :: tabelaCompromissos(${daSemana}, 'Nenhum atendimento marcado para os próximos sete dias.')}"></div>
-    </section>
+    <!--
+      Um bloco por dia, com a mesma tabela. O fragmento evita que os dias
+      divirjam quando a tabela for ajustada.
+    -->
+    <th:block th:unless="${vazia}">
+        <section class="bloco" th:each="dia : ${dias}" th:classappend="${dia.hoje} ? 'bloco-hoje'">
+            <h2 class="titulo-bloco" th:text="${dia.rotulo}">Dia</h2>
+            <div th:replace="~{agenda/lista :: tabelaCompromissos(${dia.compromissos}, 'Nada marcado neste dia.')}"></div>
+        </section>
+    </th:block>
 
 </main>
 
@@ -45,6 +68,7 @@
         <tr>
             <th>Quando</th>
             <th>Pet</th>
+            <th>Veterinário</th>
             <th>Motivo</th>
             <th>Origem</th>
             <th>Situação</th>
@@ -57,6 +81,8 @@
             <td th:text="|${#temporals.format(c.data, 'dd/MM')} às ${c.hora}|">—</td>
 
             <td><a th:href="@{/pets/{id}(id=${c.petId})}" th:text="${c.petNome}">Pet</a></td>
+
+            <td th:text="${c.veterinarioNome}">Veterinário</td>
 
             <!--
               Sem obrigacao atras, o compromisso veio do balcao: dizer isso e
@@ -85,7 +111,7 @@
             </td>
         </tr>
         <tr th:if="${#lists.isEmpty(compromissos)}">
-            <td colspan="5" class="tabela-vazia" th:text="${vazio}">Nada marcado.</td>
+            <td colspan="6" class="tabela-vazia" th:text="${vazio}">Nada marcado.</td>
         </tr>
         </tbody>
     </table>

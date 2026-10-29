@@ -65,10 +65,16 @@ Na ordem. Tudo isso fica **fora** do vídeo.
       em `/login`
 - [ ] **SQL Developer conectado** (tabela abaixo), com o
       [`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) aberto
-- [ ] Terminal Git Bash **na raiz do repositório**, na branch `develop`, com o **preparo** do
-      `EVIDENCIAS_VIDEO.sql` (linhas 31 a 36, copiadas **sem** o `--` do início) já executado: `MSYS_NO_PATHCONV`, `API`, `EMAIL` e
-      `SENHA_TUTOR`. O `TOKEN` **não**: ele expira em 15 minutos e é gerado na pausa antes da
-      Cena 11. Tela limpa (`clear`)
+- [ ] Terminal Git Bash **na raiz do repositório**, na branch `develop`, com o preparo executado.
+      O `TOKEN` fica para a pausa antes da Cena 10, porque expira em 15 minutos:
+
+      ```bash
+      export MSYS_NO_PATHCONV=1
+      API="https://rm561940-petflow-api-s4b.azurewebsites.net/api"
+      EMAIL="video.sprint4@exemplo.com"
+      SENHA_TUTOR="video-$(openssl rand -hex 4)"
+      clear
+      ```
 - [ ] Fonte grande no terminal e na IDE, notificações desligadas, microfone testado
 - [ ] Este roteiro aberto numa segunda tela
 
@@ -352,41 +358,60 @@ porta **1521**.
 
 > "E aqui o banco Oracle em container, onde a aplicação grava os dados."
 
+### ⏸ Pausa: token e senha do master (fora do vídeo)
+
+**Pause a gravação.** O token de acesso da API expira em 15 minutos, e a esta altura o vídeo já
+tem mais do que isso. No terminal:
+
+```bash
+TOKEN=$(curl -s -X POST $API/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"master@clyvovet.com\",\"senha\":\"$(az keyvault secret show \
+       --vault-name kv-petflow-s4b-rm561940 --name master-password \
+       --query value -o tsv | tr -d '\r')\",\"tipo\":\"COLABORADOR\"}" \
+  | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
+echo ${#TOKEN}        # deve imprimir ~250, não 0
+
+# Copia a senha do master para a área de transferência, para o login na tela (Cena 11, Passo 4)
+az keyvault secret show --vault-name kv-petflow-s4b-rm561940 --name master-password \
+  --query value -o tsv | tr -d '\r\n' | clip
+
+clear
+```
+
+**Retome a gravação.**
+
 ### Cena 10 · O app com a alteração (~30 s) 🔵 itens 3 e 8
 
 > **Enunciado:** *"Acesse a aplicação no Web App"*. Aqui aparece a alteração da Cena 5 já
 > publicada pelo CD (sem isso, -30).
 
-No navegador, recarregue `/login` (**Ctrl+F5**). O subtítulo agora é **"Entre com seu e-mail e
-senha · Sprint 4 · CI/CD no Azure DevOps"**.
+No navegador, recarregue `/login` (**Ctrl+F5**). O subtítulo agora é
+**"Entre com seu e-mail e senha · Sprint 4 · CI/CD no Azure DevOps"**.
 
 > "A alteração está no ar, publicada pelo CD, sem nenhum passo manual."
 
-### ⏸ Pausa: gere o token (fora do vídeo)
-
-**Pause a gravação.** O token de acesso expira em 15 minutos, e a esta altura o vídeo já tem
-mais do que isso. No terminal, rode o comando do `TOKEN` do preparo do
-[`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) (linhas 39 a 46), confira que o `echo ${#TOKEN}`
-mostra ~250 e rode `clear`. **Retome a gravação.**
-
-### Cena 11 · CRUD do tutor com SELECT (~4 min) 🔵 itens 8 e 9
+### Cena 11 · CRUD de tutor e pet com SELECT (~7 min) 🔵 itens 8 e 9
 
 > **Enunciado:** *"execute o CRUD completo, mostrando no banco cada operação (inserir, consultar,
 > atualizar, deletar)"* e *"O CRUD pode ser feito via interface da aplicação ou via chamadas
 > REST [...], porém as evidências de persistência devem ser efetuadas através de SELECT dentro
 > do Banco"*.
 >
-> O CRUD é por **chamadas REST** (`curl`), e **cada uma das 4 operações** é seguida do seu
-> `SELECT`. A resposta da API não conta como evidência; o `SELECT`, sim.
+> As telas do PetFlow só exibem dados: cadastro, edição e exclusão existem só na API. Por isso
+> o CRUD é por **chamadas REST** (`curl`), nas **duas tabelas relacionadas** (tutor 1:N pet),
+> e **cada operação** é seguida do seu `SELECT`. A resposta da API não conta como evidência; o
+> `SELECT`, sim. A tela `/pets` mostra o efeito na aplicação.
 
 Deixe **duas janelas lado a lado**: o terminal à esquerda e o SQL Developer à direita, com o
-`EVIDENCIAS_VIDEO.sql` aberto. Para rodar uma consulta, clique nela e aperte **Ctrl+Enter**.
+[`EVIDENCIAS_VIDEO.sql`](EVIDENCIAS_VIDEO.sql) aberto. O arquivo está numerado na mesma ordem
+desta cena: para rodar uma consulta, clique nela e aperte **Ctrl+Enter**.
 
-**Passo 1. O banco é o da nuvem.** No SQL Developer, rode a consulta da **linha 68**:
+**Passo 1. O banco é o da nuvem.** Rode a consulta da seção **0** (linha 33):
 
 > "O servidor aparece como `SandboxHost`: é o container no Azure, não um banco local."
 
-**Passo 2. INSERIR.** No terminal:
+**Passo 2. INSERIR o tutor.**
 
 ```bash
 curl -i -X POST $API/tutores \
@@ -394,51 +419,101 @@ curl -i -X POST $API/tutores \
   -d "{\"nome\":\"Tutor Video Sprint 4\",\"email\":\"$EMAIL\",\"telefone\":\"11911112222\",\"senha\":\"$SENHA_TUTOR\",\"clinicaId\":1}"
 ```
 
-Aponte o **`201 Created`** e o `"id"` na resposta. Guarde o id: `ID=<o número>`.
-No SQL Developer, rode a consulta da **linha 97**:
+Aponte o **`201 Created`** e o `"id"` na resposta. Guarde: `ID_TUTOR=<o número>`.
+SQL Developer, seção **1** (linha 42): a linha do tutor no banco.
 
-> "A API respondeu 201, e o SELECT mostra a linha gravada no banco."
-
-**Passo 3. CONSULTAR.**
+**Passo 3. INSERIR o pet desse tutor.**
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" $API/tutores/$ID
+curl -i -X POST $API/pets \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"nome\":\"Thor\",\"dtNascimento\":\"2021-06-10\",\"sexo\":\"M\",\"porte\":\"GRANDE\",\"castrado\":true,\"status\":\"ATIVO\",\"tutorId\":$ID_TUTOR,\"racaId\":1}"
 ```
 
-Aponte os dados devolvidos. No SQL Developer, rode a consulta da **linha 106**: os mesmos
-dados no banco.
+Aponte o **`201 Created`** e o `"id"`. Guarde: `ID_PET=<o número>`.
+SQL Developer, seção **2** (linha 51): o pet ligado ao tutor.
 
-**Passo 4. ATUALIZAR.**
+> "O pet aponta para o tutor pela chave estrangeira: são duas tabelas relacionadas."
+
+**Passo 4. Na aplicação.** Na aba do navegador, ainda em `/login`, entre como colaborador:
+- E-mail: `master@clyvovet.com`
+- Senha: **Ctrl+V** (a senha copiada na pausa; o campo a mascara)
+
+Clique em **Entrar**. No menu, abra **Pets** (`/pets`): o **Thor** aparece, com o tutor
+**Tutor Video Sprint 4**, ao lado dos pets da carga inicial (Luna e Mingau).
+
+> "O pet que acabei de cadastrar pela API já aparece na aplicação."
+
+Deixe esta aba aberta: nos Passos 6 e 9 basta recarregar.
+
+**Passo 5. CONSULTAR.**
 
 ```bash
-curl -i -X PUT $API/tutores/$ID \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
+curl -s -H "Authorization: Bearer $TOKEN" $API/tutores/$ID_TUTOR
+curl -s -H "Authorization: Bearer $TOKEN" $API/pets/$ID_PET
+```
+
+SQL Developer, seção **3** (linha 61): os mesmos dados no banco.
+
+**Passo 6. ATUALIZAR o tutor e o pet.**
+
+```bash
+curl -i -X PUT $API/tutores/$ID_TUTOR \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d "{\"nome\":\"Tutor Video ALTERADO\",\"email\":\"$EMAIL\",\"telefone\":\"11933334444\",\"senha\":\"$SENHA_TUTOR\",\"clinicaId\":1}"
+
+curl -i -X PUT $API/pets/$ID_PET \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"nome\":\"Thor do Vale\",\"dtNascimento\":\"2021-06-10\",\"sexo\":\"M\",\"porte\":\"GIGANTE\",\"castrado\":true,\"status\":\"ATIVO\",\"tutorId\":$ID_TUTOR,\"racaId\":1}"
 ```
 
-Aponte o **`200 OK`**. No SQL Developer, rode a consulta da **linha 122**:
+Aponte os dois **`200 OK`**. SQL Developer, seção **4** (linha 72): nome e telefone do tutor,
+nome e porte do pet, todos novos. Na aba `/pets`, recarregue: agora é **Thor do Vale**.
 
-> "Nome e telefone mudaram no banco."
-
-**Passo 5. DELETAR.**
+**Passo 7. A integridade: excluir o tutor que tem pet.**
 
 ```bash
-curl -i -X DELETE $API/tutores/$ID -H "Authorization: Bearer $TOKEN"
+curl -i -X DELETE $API/tutores/$ID_TUTOR -H "Authorization: Bearer $TOKEN"
 ```
 
-Aponte o **`204 No Content`**. No SQL Developer, rode a consulta da **linha 132**: a consulta
-volta **vazia**.
+Aponte o **`409 Conflict`**, e **não** um 500.
 
-> "O registro saiu do banco. As quatro operações foram feitas pela API e comprovadas por SELECT."
+> "O banco não deixa apagar um tutor que tem pet: a chave estrangeira impede registros órfãos,
+> e a aplicação devolve um erro legível."
 
-> **Dois erros esperados, que não são bugs:**
+SQL Developer, seção **5** (linhas 83 e 89): o tutor e o pet continuam lá, e a constraint
+`FK_PET_TUTOR` que garante isso.
+
+**Passo 8. DELETAR, na ordem certa: primeiro o pet.**
+
+```bash
+curl -i -X DELETE $API/pets/$ID_PET -H "Authorization: Bearer $TOKEN"
+```
+
+**`204 No Content`**. SQL Developer, seção **6** (linha 98): volta **vazia**.
+
+**Passo 9. Depois o tutor.**
+
+```bash
+curl -i -X DELETE $API/tutores/$ID_TUTOR -H "Authorization: Bearer $TOKEN"
+```
+
+**`204 No Content`**: agora funciona, porque o tutor não tem mais pet. SQL Developer, seção
+**7** (linha 108): volta **vazia**. Na aba `/pets`, recarregue: o Thor sumiu.
+
+> "As quatro operações foram feitas pela API, nas duas tabelas, e cada uma foi comprovada por
+> SELECT no banco."
+
+> **Erros esperados, que não são bugs:**
 >
-> **422** no `PUT`: ele reusa o DTO do `POST`, então `senha` e `clinicaId` são obrigatórios
-> no corpo. Os comandos acima já os incluem.
+> **422** num `PUT`: ele reusa o DTO do `POST`, então os campos obrigatórios precisam ir no
+> corpo. Os comandos acima já os incluem.
 >
 > **401** com `"Token de acesso ausente ou invalido"`: o token expirou. Pause, refaça o `TOKEN`
 > e siga.
+>
+> **409 no POST do tutor**: sobrou um tutor com o mesmo e-mail de uma tentativa anterior.
+> Apague-o (`DELETE /tutores/<id>`, depois de apagar o pet dele) e repita.
 
 ---
 
@@ -466,10 +541,11 @@ Com o link do YouTube:
 | Cenas 2–3 (configuração das pipelines) | ~4 min |
 | Cenas 4–5 (alteração no código) | ~2,5 min |
 | Cenas 6–8 (CI e CD rodando) | ~7 min com a espera cortada |
-| Cenas 9–10 (portal e app) | ~1,5 min |
-| Cena 11 (CRUD com SELECT) | ~4 min |
+| Cena 9 (portal) | ~1 min |
+| Cena 10 (app com a alteração) | ~30 s |
+| Cena 11 (CRUD de tutor e pet com SELECT) | ~7 min |
 
-Total: **cerca de 20 minutos**. As pausas das pipelines são o que mais pesa: corte a espera
+Total: **cerca de 23 minutos**. As pausas das pipelines são o que mais pesa: corte a espera
 ociosa, mantendo cada etapa na tela enquanto é explicada.
 
 ---
@@ -487,6 +563,6 @@ ociosa, mantendo cada etapa na tela enquanto é explicada.
 - [ ] **Item 5:** cada etapa do CI e do CD foi explicada **enquanto rodava**, com os detalhes do run abertos
 - [ ] **Item 6:** a aba Tests e o artefato `petflow-jar` aparecem
 - [ ] **Item 7:** o Web App aparece no Portal com o deploy que acabou de acontecer
-- [ ] **Item 8:** o app aparece com a alteração, e as 4 operações do CRUD (inserir, consultar, atualizar, deletar) foram feitas
-- [ ] **Item 9:** cada uma das 4 operações tem o seu `SELECT` no banco
+- [ ] **Item 8:** o app aparece com a alteração, e as 4 operações do CRUD (inserir, consultar, atualizar, deletar) foram feitas no tutor e no pet, com o 409 da integridade
+- [ ] **Item 9:** cada operação tem o seu `SELECT` no banco
 - [ ] Publicado como **não listado** e o link testado numa janela anônima

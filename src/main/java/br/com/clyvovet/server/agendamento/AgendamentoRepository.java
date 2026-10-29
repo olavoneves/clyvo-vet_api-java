@@ -81,6 +81,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
      *
      * <p>Cancelado fica de fora pelo mesmo motivo de {@code ocupadosEntre}: nao
      * ocupa nada, e listar cancelamento na agenda do dia so gera telefonema.
+     *
+     * <p>{@code idVeterinario} nulo devolve a clinica inteira; preenchido, so os
+     * compromissos daquele profissional — a "Minha agenda" do veterinario.
      */
     @Query("""
             select new br.com.clyvovet.server.agendamento.CompromissoDaAgenda(
@@ -95,8 +98,35 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
               left join o.versaoProtocolo vp
               left join vp.protocolo pr
              where a.dtAgendamento between :de and :ate
+               and (:idVeterinario is null or v.id = :idVeterinario)
                and (a.status is null or a.status <> br.com.clyvovet.server.enums.AgendamentoStatus.CANCELADO)
              order by a.dtAgendamento asc, a.hrAgendamento asc
             """)
-    List<CompromissoDaAgenda> agendaEntre(@Param("de") LocalDate de, @Param("ate") LocalDate ate);
+    List<CompromissoDaAgenda> agendaEntre(@Param("de") LocalDate de, @Param("ate") LocalDate ate,
+                                          @Param("idVeterinario") Long idVeterinario);
+
+    /**
+     * Os compromissos de um pet a partir de uma data, sem teto de janela.
+     *
+     * <p>Mesma linha de {@link #agendaEntre}, recortada pelo pet: a ficha mostra
+     * o que ainda vai acontecer com ele, seja daqui a dois dias ou daqui a um ano.
+     */
+    @Query("""
+            select new br.com.clyvovet.server.agendamento.CompromissoDaAgenda(
+                     a.id, a.dtAgendamento, a.hrAgendamento, a.status, a.canalOrigem,
+                     p.id, p.nome, v.nome,
+                     e.nmEtapa, pr.nmProtocolo, o.dtPrevista, o.dsStatus)
+              from Agendamento a
+              join a.pet p
+              join a.veterinario v
+              left join Obrigacao o on o.agendamento = a
+              left join o.etapa e
+              left join o.versaoProtocolo vp
+              left join vp.protocolo pr
+             where p.id = :idPet
+               and a.dtAgendamento >= :desde
+               and (a.status is null or a.status <> br.com.clyvovet.server.enums.AgendamentoStatus.CANCELADO)
+             order by a.dtAgendamento asc, a.hrAgendamento asc
+            """)
+    List<CompromissoDaAgenda> agendaDoPetDesde(@Param("idPet") Long idPet, @Param("desde") LocalDate desde);
 }
