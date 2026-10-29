@@ -8,6 +8,14 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 
 Vídeo de demonstração: https://youtu.be/asLs3qNrzvs
 
+| | |
+|---|---|
+| **Online** | https://clyvo-vet-api-java.onrender.com (login em `/login`) |
+| **Swagger** | https://clyvo-vet-api-java.onrender.com/swagger-ui.html |
+| **Logins de demonstração** | senha `Clyvo@2026` para todos — equipe: `helena@vidaanimal.com.br` (veterinária), `patricia@vidaanimal.com.br` e `diego@petcare.com.br` (colaboradores); tutores: `camila.ferreira@exemplo.com` e `roberto.almeida@exemplo.com`. Detalhes em [Logins de demonstração](#logins-de-demonstração) |
+
+> Plano gratuito do Render: depois de 15 min parado, a primeira requisição leva ~30 s.
+
 ---
 
 ## 📋 Índice
@@ -24,6 +32,7 @@ Vídeo de demonstração: https://youtu.be/asLs3qNrzvs
 - [Lembrete Automático](#-lembrete-automático)
 - [Agente de Agendamento](#-agente-de-agendamento)
 - [Mapa dos Requisitos](#-mapa-dos-requisitos)
+- [Integração multidisciplinar](#-integração-multidisciplinar)
 - [Decisões de Arquitetura](#-decisões-de-arquitetura)
 - [Uso de IA no Desenvolvimento](#-uso-de-ia-no-desenvolvimento)
 - [Deploy — Render](#-deploy--render)
@@ -240,15 +249,17 @@ inteiros, porque ele é de outra clínica.
 A cadeia inteira, sem passo manual no meio. O fluxo atravessa duas telas e dois logins —
 use uma janela anônima para a segunda sessão, senão uma derruba a outra.
 
-1. **Helena** (veterinária) registra a consulta → o **motor de protocolo** materializa as
-   obrigações futuras de cuidado daquele pet
+1. **Helena** (veterinária) abre a ficha do pet em `/pets/{id}` e clica em **Registrar
+   atendimento** → a consulta é gravada e o **motor de protocolo** materializa, na mesma
+   transação, as obrigações futuras de cuidado daquele pet; a ficha volta dizendo quantas
+   nasceram e as próximas datas
 2. A **varredura diária** encontra a obrigação cuja janela de antecedência abriu e a leva
    a `NOTIFICADA` — e a transição faz nascer o lembrete
 3. **Camila** (tutora) abre `/tutor/caixa`, vê o lembrete, e daí vai para `/tutor/pets/{id}`
 4. Escreve pedindo horário → o **agente** consulta a agenda real, propõe, ela escolhe e
    confirma
-5. De volta como Helena, o agendamento aparece na **agenda** (`/agenda`), com a obrigação
-   atrás
+5. De volta como Helena, o agendamento aparece na **agenda** (`/agenda`, já em "Minha
+   agenda"), com a obrigação atrás, e nos **Próximos agendamentos** da ficha do pet
 6. O **painel de receita recuperada** (`/painel/receita`) sobe, e o card de coorte mostra
    quanto disso o produto causou
 
@@ -394,6 +405,7 @@ mesmo que editá-lo, e o CRUD dele continua fechado na API de gestão.
 | `/painel/receita` | equipe | Funil do mês, receita recuperada e coorte tratado × controle |
 | `/agenda?inicio=AAAA-MM-DD&minha=true` | equipe | Sete dias de compromissos a partir de `inicio` (padrão hoje), com a obrigação atrás; "Minha agenda" para o veterinário, ligada por padrão |
 | `/pets`, `/pets/{id}` | equipe | Lista e ficha, com os próximos agendamentos e as obrigações do protocolo |
+| `/pets/{id}/atendimentos/novo`, `POST /pets/{id}/atendimentos` | equipe | Registrar atendimento: grava a consulta e gera as obrigações numa transação só |
 | `POST /obrigacoes/{id}/lembrete` | equipe | Antecipa o lembrete de uma obrigação |
 | `/tutor` | tutor | Entrada do tutor |
 | `/tutor/pets/{id}` | tutor | Ficha do pet e a conversa com o agente |
@@ -509,6 +521,7 @@ rodam em cada banco.
 | `V13__antecedencia_do_lembrete.sql` | `nr_antecedencia_lembrete_dias` no protocolo: quantos dias antes o lembrete sai |
 | `V14__pet_status_inativo.sql` | `INATIVO` em `chk_pet_status`: o estado que o tutor grava ao remover o pet |
 | `V15__empacotamento_plsql.sql` | Empacota as 19 rotinas soltas da V7 e da V8 em quatro pacotes e apaga as soltas — os corpos são cópia, a regra não muda |
+| `V16__detalhe_obrigacao_e_limpar.sql` | `VW_CLV_OBRIGACAO_DETALHE` — contrato de 15 colunas lido pelo serviço .NET — e o `LIMPAR` do seed apagando as tabelas filhas criadas depois da V8 |
 
 ### Pacotes PL/SQL
 
@@ -982,10 +995,11 @@ de protocolo em PL/SQL materializa as obrigações futuras de cuidado daquele pe
 catálogo clínico; a varredura diária encontra as que entraram na janela de antecedência e
 as leva a `NOTIFICADA`; a transição faz nascer o lembrete na caixa do tutor.
 
-> Telas: `/pets/{id}` (a ficha, onde as obrigações aparecem e onde fica o botão
-> **Antecipar lembrete**) → `/tutor/caixa` (o lembrete chegando).
-> Código: `obrigacao/MotorProtocolo`, `notificacao/VarreduraDeLembretes`,
-> `notificacao/EmissorDeLembretes`.
+> Telas: `/pets/{id}` → **Registrar atendimento** (`/pets/{id}/atendimentos/novo`: a
+> consulta e o gatilho do protocolo) → de volta à ficha, com as obrigações criadas e o
+> botão **Antecipar lembrete** → `/tutor/caixa` (o lembrete chegando).
+> Código: `atendimento/RegistroDeAtendimentoService`, `obrigacao/MotorProtocolo`,
+> `notificacao/VarreduraDeLembretes`, `notificacao/EmissorDeLembretes`.
 
 **Fluxo 2 — Do lembrete à consulta marcada.** O tutor abre o lembrete, conversa em
 linguagem natural com o agente de agendamento; o agente consulta a disponibilidade real,
@@ -993,7 +1007,7 @@ propõe horários, o tutor escolhe, e o agendamento é gravado — o que devolve
 trilho e faz o compromisso aparecer na agenda do veterinário.
 
 > Telas: `/tutor/caixa` → `/tutor/pets/{id}` (a conversa) → `/agenda` (o compromisso na
-> agenda da clínica).
+> agenda da clínica, semana a semana) e `/pets/{id}` (os próximos agendamentos do pet).
 > Código: `agente/AgenteService`, `agente/ferramentas/*`, `agendamento/AgendaService`.
 
 Nenhum dos dois é cadastro: o primeiro é uma máquina de estados com disparo automático, o
@@ -1010,6 +1024,23 @@ recuperada mede o efeito dos dois.
 | Regra clínica | No banco: `PKG_CLV_MOTOR.TRANSITAR_OBRIGACAO` recusa salto ilegal de estado com `ORA-20010`, traduzido em `409` por `MotorProtocolo` |
 | Guardrail do agente | `agente/GuardrailClinico` barra dosagem, diagnóstico e prescrição na saída do modelo |
 | Integridade | Constraints no schema: `CHECK` de estado, `UNIQUE` de CNPJ, e-mail, CRMV e microchip |
+
+---
+
+## 🧩 Integração multidisciplinar
+
+O que cada disciplina da Sprint 4 aplicou neste projeto, e onde conferir. `—` marca o que
+ainda não tem link público.
+
+| Disciplina | O que foi aplicado | Evidência |
+|---|---|---|
+| **Java** (esta API) | Spring Boot 4 com JWT e multi-tenancy por clínica; telas Thymeleaf — painel, agenda navegável, ficha do pet e **Registrar atendimento**; agente de agendamento; suíte com integração contra Oracle real | [Online](https://clyvo-vet-api-java.onrender.com) · [Swagger](https://clyvo-vet-api-java.onrender.com/swagger-ui.html) · [Mapa dos Requisitos](#-mapa-dos-requisitos) |
+| **.NET** | `clyvo-insights`, ASP.NET Core: leitura e projeções sobre as views do Oracle — `VW_CLV_PAINEL_COORTE` e o contrato de 15 colunas da `VW_CLV_OBRIGACAO_DETALHE` (V16), sem HTTP entre os serviços | [clyvo-vet_api-.net](https://github.com/olavoneves/clyvo-vet_api-.net) |
+| **Banco de Dados** | Motor de protocolo em PL/SQL empacotado (`PKG_CLV_MOTOR`, `PKG_CLV_AUDITORIA`, `PKG_CLV_LOG`, `PKG_CLV_SEED`), auditoria encadeada por SHA-256, views de contrato, migrations Flyway V0–V16 e snapshot antes/depois de cada mudança de PL/SQL | [Banco de Dados](#-banco-de-dados) · [`db/migration`](src/main/resources/db/migration) · [`scripts/sql/v15_snapshot.sql`](scripts/sql/v15_snapshot.sql) · [`docs/v15-snapshot-fiap-depois.txt`](docs/v15-snapshot-fiap-depois.txt) |
+| **DevOps** (Pedro) | Azure DevOps com pipelines de CI/CD, build, testes e deploy no Azure App Service; scripts de provisionamento | [Projeto no Azure DevOps](https://dev.azure.com/RM563558/Sprint%204%20-%20Azure%20DevOps) · [App no Azure](https://rm561940-petflow-api-s4b.azurewebsites.net) · [seção DevOps](#️-devops-tools--cloud-computing--sprint-4) · vídeo — |
+| **Compliance & QA** | 16 casos de teste manuais no Azure Boards ligados ao backlog, dois bugs encontrados e corrigidos com teste automatizado | [`docs/compliance/ENTREGA.md`](docs/compliance/ENTREGA.md) · [Azure Boards](https://dev.azure.com/RM561940/PetFlow%20-%20Challenge) · vídeo — |
+| **Mobile** (PetFlow) | O contrato que o app consome: `/api/tutor/**`, com posse pelo token do tutor (404, e não 403, para pet alheio) | [API do tutor](#api-do-tutor-tutor) · app — |
+| **IA** | Agente de agendamento atrás da porta `ProvedorLlm` (Gemini ativo, Anthropic trocável por propriedade), ferramentas com escrita transacional e `GuardrailClinico` na saída do modelo | [Agente de Agendamento](#-agente-de-agendamento) · `agente/llm/ProvedorLlm` · `PortabilidadeDoProvedorTest` |
 
 ---
 
@@ -1084,6 +1115,10 @@ que exigem contexto que não está no repositório.
 3. Branch: `main`
 4. Configure no dashboard as variáveis de
    [Instalação e Execução](#-instalação-e-execução)
+
+> **O deploy é manual.** O auto-deploy está desligado: um merge em `main` não publica nada
+> e não aplica migration nenhuma no Oracle. Quem publica é o botão **Manual Deploy** no
+> painel do Render — e é nesse momento que o Flyway roda contra o banco.
 
 > `PORT` não precisa ser configurada — o Render injeta automaticamente.
 > Plano gratuito hiberna após 15 min de inatividade — a primeira requisição pode demorar
