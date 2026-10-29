@@ -137,7 +137,7 @@ class AgenteServiceTest {
                 new EscalarParaVeterinario()));
 
         agente = new AgenteService(propriedades, provedor, catalogo,
-                new MemoriaDeConversa(propriedades), new GuardrailClinico(), registro,
+                new MemoriaDeConversa(propriedades), new GuardrailClinico(), new FiltroDeIdsInternos(), registro,
                 petRepository);
     }
 
@@ -313,6 +313,24 @@ class AgenteServiceTest {
         agente.responder(PET, "e agora?");
 
         api.verify();
+    }
+
+    // ---------- ids internos ----------
+
+    @Test
+    @DisplayName("o id que o modelo deixou escapar nao chega ao tutor nem fica no historico")
+    void idInternoSaiDaRespostaEDoHistorico() {
+        // o caso visto no site em 29/10, com o texto que o modelo escreveu
+        esperarChamada(texto("Marcado: reavaliação renal trimestral (id 14273) em 03/11 às 09:00."));
+
+        RespostaDoAgenteResponse resposta = agente.responder(PET, "pode ser segunda às 9h");
+
+        api.verify();
+        assertThat(resposta.texto())
+                .isEqualTo("Marcado: reavaliação renal trimestral em 03/11 às 09:00.");
+        assertThat(resposta.escalado()).isFalse();
+        assertThat(agente.historico(PET).turnos()).extracting(ConversaResponse.Turno::texto)
+                .noneMatch(texto -> texto.contains("14273"));
     }
 
     @Test
