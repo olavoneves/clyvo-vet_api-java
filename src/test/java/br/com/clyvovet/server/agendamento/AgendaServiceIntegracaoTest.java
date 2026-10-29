@@ -253,6 +253,46 @@ class AgendaServiceIntegracaoTest {
                 .hasMessageContaining("30 minutos");
     }
 
+    /**
+     * "Minha agenda" contra o banco: o parametro opcional do JPQL tem que
+     * funcionar nos dois sentidos — nulo traz a clinica, preenchido recorta.
+     */
+    @Test
+    @DisplayName("o filtro por veterinario recorta a agenda, e sem ele vem a clinica inteira")
+    void filtroPorVeterinarioRecortaAAgenda() {
+        Long outroVeterinario = fixture.novoVeterinario(clinica);
+        Long meu = fixture.novoAgendamento(cenario.pet(), cenario.veterinario(), 3, "09:00", "CONFIRMADO");
+        Long doOutro = fixture.novoAgendamento(cenario.pet(), outroVeterinario, 3, "10:00", "CONFIRMADO");
+        LocalDate dia = LocalDate.now().plusDays(3);
+
+        assertThat(agendaService.compromissosEntre(dia, dia, cenario.veterinario()))
+                .extracting(CompromissoDaAgenda::idAgendamento)
+                .containsExactly(meu);
+
+        assertThat(agendaService.compromissosEntre(dia, dia, null))
+                .extracting(CompromissoDaAgenda::idAgendamento)
+                .containsExactly(meu, doOutro);
+    }
+
+    /**
+     * A ficha mostra o futuro inteiro do pet: hoje e daqui a um ano entram; o
+     * que ja passou e o cancelado, nao.
+     */
+    @Test
+    @DisplayName("proximos do pet: de hoje em diante, sem teto, sem cancelado")
+    void proximosDoPetSemTetoESemCancelado() {
+        Long vet = cenario.veterinario();
+        Long pet = cenario.pet();
+        fixture.novoAgendamento(pet, vet, -2, "09:00", "REALIZADO");
+        Long hoje = fixture.novoAgendamento(pet, vet, 0, "16:00", "CONFIRMADO");
+        fixture.novoAgendamento(pet, vet, 5, "10:00", "CANCELADO");
+        Long daquiAUmAno = fixture.novoAgendamento(pet, vet, 365, "11:00", "SOLICITADO");
+
+        assertThat(agendaService.proximosDoPet(pet))
+                .extracting(CompromissoDaAgenda::idAgendamento)
+                .containsExactly(hoje, daquiAUmAno);
+    }
+
     // ---------- fixture ----------
 
     private List<AgendaService.HorarioLivre> vagas() {

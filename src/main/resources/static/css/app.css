@@ -568,6 +568,32 @@ a { color: var(--cor-primaria-escura); }
 .formulario-acoes { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
 .formulario-acoes .botao-enviar { width: auto; margin: 0; padding: 10px 22px; }
 
+/* ---------- agenda: semana e "minha agenda" ---------- */
+
+/* o dia de hoje se destaca na semana sem virar outro tipo de bloco */
+.bloco-hoje { border-left: 4px solid var(--cor-primaria); }
+
+.alternancia {
+    display: inline-flex;
+    border: 1px solid var(--cor-borda);
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.alternancia a {
+    padding: 6px 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--cor-texto-suave);
+    text-decoration: none;
+    background: var(--cor-superficie);
+    white-space: nowrap;
+}
+
+.alternancia a + a { border-left: 1px solid var(--cor-borda); }
+.alternancia a:hover { color: var(--cor-primaria-escura); }
+.alternancia a.ativo { background: var(--cor-primaria-tenue); color: var(--cor-primaria-escura); }
+
 /* ---------- rodape ---------- */
 
 .rodape {

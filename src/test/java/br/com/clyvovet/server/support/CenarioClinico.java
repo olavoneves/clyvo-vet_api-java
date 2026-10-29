@@ -2,6 +2,7 @@ package br.com.clyvovet.server.support;
 
 import jakarta.persistence.EntityManager;
 
+import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -205,6 +206,31 @@ public final class CenarioClinico {
                 select max(id_consulta) from TB_CLV_CONSULTA
                  where id_pet = %d and ds_motivo = 'Consulta do teste %s'
                 """.formatted(pet, id));
+    }
+
+    /**
+     * Um compromisso marcado pelo balcao, sem obrigacao atras.
+     *
+     * <p>A data vem do Java, e nao de {@code SYSDATE}: o relogio do container
+     * Oracle e UTC, e a noite o "hoje" do banco ja e o amanha da aplicacao — um
+     * compromisso para "daqui a tres dias" caia um dia fora da janela consultada.
+     *
+     * @param diasAPartirDeHoje negativo para compromisso que ja passou
+     */
+    public Long novoAgendamento(Long pet, Long veterinario, int diasAPartirDeHoje,
+                                String hora, String status) {
+        LocalDate data = LocalDate.now().plusDays(diasAPartirDeHoje);
+        String motivo = "teste-" + sufixo();
+        executar("""
+                insert into TB_CLV_AGENDAMENTO (dt_agendamento, hr_agendamento, ds_status,
+                                                ds_canal_origem, ds_motivo_cancelamento,
+                                                id_pet, id_veterinario)
+                values (DATE '%s', '%s', '%s', 'WEB', '%s', %d, %d)
+                """.formatted(data, hora, status, motivo, pet, veterinario));
+        entityManager.flush();
+
+        return id("select max(id_agendamento) from TB_CLV_AGENDAMENTO where ds_motivo_cancelamento = '%s'"
+                .formatted(motivo));
     }
 
     /** Varias obrigacoes iguais, para quando o teste precisa de volume. */
