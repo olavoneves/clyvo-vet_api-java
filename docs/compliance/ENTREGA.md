@@ -16,7 +16,7 @@
 | Item | Link |
 |---|---|
 | Azure Boards — backlog, release plan e plano de testes manuais | https://dev.azure.com/RM561940/PetFlow%20-%20Challenge |
-| Vídeo — configuração e execução dos testes automatizados | _(link do YouTube)_ |
+| Vídeo — configuração e execução dos testes automatizados | https://youtu.be/rdeeNv42WJY |
 
 O professor está cadastrado na organização `RM561940` com acesso **Basic** e como
 **administrador** do projeto *PetFlow - Challenge*.
