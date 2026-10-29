@@ -71,31 +71,48 @@ else
     exit 1
 fi
 
-titulo "PASSO 2 - RESTART DO WEB APP"
-echo "O DataInitializer roda no startup: sem restart, o master nao nasce."
+# Tenta o login uma vez antes de reiniciar: se o master ja existe (bootstrap
+# reexecutado, ou o app ja reiniciado depois da clinica), o restart so custaria
+# minutos de espera.
+STATUS=$(curl -s -o "${CORPO}" -w "%{http_code}" --max-time 20 \
+    -X POST "${API}/auth/login" \
+    -H "Content-Type: application/json" \
+    -d "${LOGIN_MASTER}" || true)
 
-az webapp restart --resource-group "${RESOURCE_GROUP}" \
-                  --name "${WEBAPP_NAME}" \
-                  --output none
+if [[ "${STATUS}" == "200" ]]; then
+    titulo "PASSOS 2 E 3 - DISPENSADOS"
+    echo "O login do master ja responde 200: nao e preciso reiniciar o Web App."
+    PRONTO=1
+else
+    titulo "PASSO 2 - RESTART DO WEB APP"
+    echo "O DataInitializer roda no startup: sem restart, o master nao nasce."
 
-titulo "PASSO 3 - CONFIRMACAO DO LOGIN"
-echo "Aguardando a aplicacao voltar e o login do master responder 200."
-echo "Timeout: 5 minutos."
+    az webapp restart --resource-group "${RESOURCE_GROUP}" \
+                      --name "${WEBAPP_NAME}" \
+                      --output none
 
-PRONTO=0
-for tentativa in $(seq 1 30); do
+    titulo "PASSO 3 - CONFIRMACAO DO LOGIN"
+    echo "Aguardando a aplicacao voltar e o login do master responder 200."
+    # Com a V15 a subida no B1 passou de 4 minutos. Uma tentativa a cada 15 s
+    # fica abaixo do limite de 5 logins por minuto por IP (o 429 do rate limit).
+    echo "Timeout: 10 minutos."
+    PRONTO=0
+fi
+
+for tentativa in $(seq 1 40); do
+    [[ "${PRONTO}" -eq 1 ]] && break
     STATUS=$(curl -s -o "${CORPO}" -w "%{http_code}" --max-time 20 \
         -X POST "${API}/auth/login" \
         -H "Content-Type: application/json" \
         -d "${LOGIN_MASTER}" || true)
     if [[ "${STATUS}" == "200" ]]; then
         echo ""
-        echo "  login OK apos aproximadamente $((tentativa * 10)) segundos - token emitido"
+        echo "  login OK apos aproximadamente $((tentativa * 15)) segundos - token emitido"
         PRONTO=1
         break
     fi
     printf "."
-    sleep 10
+    sleep 15
 done
 
 if [[ "${PRONTO}" -eq 0 ]]; then
