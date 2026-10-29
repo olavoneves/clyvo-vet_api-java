@@ -372,7 +372,7 @@ TOKEN=$(curl -s -X POST $API/auth/login \
   | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
 echo ${#TOKEN}        # deve imprimir ~250, não 0
 
-# Copia a senha do master para a área de transferência, para o login na tela da Cena 10
+# Copia a senha do master para a área de transferência, para o login na tela (Cena 11, Passo 4)
 az keyvault secret show --vault-name kv-petflow-s4b-rm561940 --name master-password \
   --query value -o tsv | tr -d '\r\n' | clip
 
@@ -381,27 +381,15 @@ clear
 
 **Retome a gravação.**
 
-### Cena 10 · O app com a alteração (~1 min) 🔵 itens 3 e 8
+### Cena 10 · O app com a alteração (~30 s) 🔵 itens 3 e 8
 
 > **Enunciado:** *"Acesse a aplicação no Web App"*. Aqui aparece a alteração da Cena 5 já
 > publicada pelo CD (sem isso, -30).
 
-**Passo 1. A alteração.** No navegador, recarregue `/login` (**Ctrl+F5**). O subtítulo agora é
+No navegador, recarregue `/login` (**Ctrl+F5**). O subtítulo agora é
 **"Entre com seu e-mail e senha · Sprint 4 · CI/CD no Azure DevOps"**.
 
 > "A alteração está no ar, publicada pelo CD, sem nenhum passo manual."
-
-**Passo 2. Entrar na aplicação.** Na mesma tela, entre como colaborador:
-- E-mail: `master@clyvovet.com`
-- Senha: **Ctrl+V** (fica mascarada)
-
-Clique em **Entrar**. No menu, abra **Pets** (`/pets`): aparecem os pets da carga inicial,
-**Luna** e **Mingau**.
-
-> "Esta é a lista de pets da clínica. Vou cadastrar um tutor e um pet pela API, e eles vão
-> aparecer aqui."
-
-Deixe esta aba aberta: ela volta nos Passos 4, 6 e 9 da próxima cena.
 
 ### Cena 11 · CRUD de tutor e pet com SELECT (~7 min) 🔵 itens 8 e 9
 
@@ -447,8 +435,16 @@ SQL Developer, seção **2** (linha 51): o pet ligado ao tutor.
 
 > "O pet aponta para o tutor pela chave estrangeira: são duas tabelas relacionadas."
 
-**Passo 4. Na aplicação.** Na aba do navegador, recarregue **`/pets`**: o **Thor** aparece, com o
-tutor **Tutor Video Sprint 4**.
+**Passo 4. Na aplicação.** Na aba do navegador, ainda em `/login`, entre como colaborador:
+- E-mail: `master@clyvovet.com`
+- Senha: **Ctrl+V** (a senha copiada na pausa; o campo a mascara)
+
+Clique em **Entrar**. No menu, abra **Pets** (`/pets`): o **Thor** aparece, com o tutor
+**Tutor Video Sprint 4**, ao lado dos pets da carga inicial (Luna e Mingau).
+
+> "O pet que acabei de cadastrar pela API já aparece na aplicação."
+
+Deixe esta aba aberta: nos Passos 6 e 9 basta recarregar.
 
 **Passo 5. CONSULTAR.**
 
@@ -546,7 +542,7 @@ Com o link do YouTube:
 | Cenas 4–5 (alteração no código) | ~2,5 min |
 | Cenas 6–8 (CI e CD rodando) | ~7 min com a espera cortada |
 | Cena 9 (portal) | ~1 min |
-| Cena 10 (app com a alteração e login) | ~1 min |
+| Cena 10 (app com a alteração) | ~30 s |
 | Cena 11 (CRUD de tutor e pet com SELECT) | ~7 min |
 
 Total: **cerca de 23 minutos**. As pausas das pipelines são o que mais pesa: corte a espera
