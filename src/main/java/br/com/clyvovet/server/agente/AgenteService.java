@@ -50,6 +50,7 @@ public class AgenteService {
     private final CatalogoDeFerramentas catalogo;
     private final MemoriaDeConversa memoria;
     private final GuardrailClinico guardrail;
+    private final FiltroDeIdsInternos filtroDeIds;
     private final RegistroDeConversa registro;
     private final PetRepository petRepository;
 
@@ -139,6 +140,16 @@ public class AgenteService {
             conversa.substituirUltimaRespostaDoAgente(resposta);
             acoes.add(new AcaoDoAgente(AcaoDoAgente.ESCALONAMENTO, contexto.idPet(),
                     "Pergunta clínica encaminhada para a equipe"));
+        } else {
+            String semIds = filtroDeIds.limpar(resposta);
+            if (!semIds.equals(resposta)) {
+                // a conversa guarda o que o tutor leu: com o id no historico, o
+                // modelo o tomaria como precedente e repetiria na volta seguinte
+                log.info("Filtro de ids internos limpou a resposta do agente: clinica={} pet={}",
+                        contexto.idClinica(), contexto.idPet());
+                resposta = semIds;
+                conversa.substituirUltimaRespostaDoAgente(resposta);
+            }
         }
 
         if (escalado) {
@@ -287,6 +298,7 @@ public class AgenteService {
                 7. Se o agendamento devolver conflito, o horário foi ocupado por outra pessoa: \
                 consulte a disponibilidade de novo e ofereça outras opções, sem alarme.
                 8. Ao confirmar, repita data e hora e diga o que será feito na consulta.
+                9. Ids, códigos e nomes técnicos são só para as ferramentas. Nunca escreva                 para o tutor um id de obrigação, de agendamento ou de pet, nem entre                 parênteses, nem o nome de uma ferramenta ou de um status interno. Chame                 cada cuidado pelo nome e pela data.
 
                 TOM
                 Direto e cordial. Frases curtas. Trate o pet pelo nome. Sem emoji, sem \
