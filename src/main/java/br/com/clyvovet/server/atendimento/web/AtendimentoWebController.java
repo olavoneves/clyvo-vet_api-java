@@ -2,6 +2,7 @@ package br.com.clyvovet.server.atendimento.web;
 
 import br.com.clyvovet.server.atendimento.AtendimentoForm;
 import br.com.clyvovet.server.atendimento.AtendimentoRegistrado;
+import br.com.clyvovet.server.atendimento.CatalogoDeContextos;
 import br.com.clyvovet.server.atendimento.RegistroDeAtendimentoService;
 import br.com.clyvovet.server.auth.AuthenticatedUser;
 import br.com.clyvovet.server.enums.EventoGatilho;
@@ -25,6 +26,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -60,6 +63,7 @@ public class AtendimentoWebController {
     private final PetService petService;
     private final VeterinarioService veterinarioService;
     private final RegistroDeAtendimentoService registroService;
+    private final CatalogoDeContextos catalogoDeContextos;
 
     @GetMapping("/pets/{id}/atendimentos/novo")
     public String novo(@PathVariable Long id, Model model) {
@@ -80,6 +84,14 @@ public class AtendimentoWebController {
                             BindingResult erros,
                             Model model,
                             RedirectAttributes redirect) {
+        // o select so oferece o que o gatilho aceita; um POST montado a mao com
+        // outro codigo daria zero obrigacoes sem explicar por que
+        if (form.getEventoGatilho() != null
+                && !CatalogoDeContextos.aceita(catalogoDeContextos.porGatilho(),
+                        form.getEventoGatilho(), form.getContexto())) {
+            erros.rejectValue("contexto", "contexto.naoAceito",
+                    "Este contexto não se aplica ao gatilho escolhido");
+        }
         if (erros.hasErrors()) {
             return formulario(id, form, model);
         }
@@ -104,6 +116,11 @@ public class AtendimentoWebController {
         model.addAttribute("atendimento", form);
         model.addAttribute("veterinarios", veterinarioService.findAll(VETERINARIOS).getContent());
         model.addAttribute("gatilhos", GATILHOS);
+        // pelo nome do gatilho, que e o value do select: o template e o script
+        // da pagina casam as duas listas por ele
+        Map<String, List<CatalogoDeContextos.OpcaoDeContexto>> contextos = new LinkedHashMap<>();
+        catalogoDeContextos.porGatilho().forEach((gatilho, opcoes) -> contextos.put(gatilho.name(), opcoes));
+        model.addAttribute("contextos", contextos);
         return "atendimentos/novo";
     }
 }
