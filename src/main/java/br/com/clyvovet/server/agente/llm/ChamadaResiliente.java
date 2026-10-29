@@ -7,6 +7,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.function.Supplier;
 
@@ -18,7 +19,7 @@ import java.util.function.Supplier;
  * uma resposta e a mesma independentemente de quem esta atras. Deixar cada
  * adaptador com a sua copia garantiria que o segundo divergisse do primeiro.
  *
- * <p>Duas politicas, deliberadamente diferentes:
+ * <p>Tres politicas, deliberadamente diferentes:
  *
  * <ul>
  *   <li><b>429 e 5xx</b> — a mesma requisicao pode dar certo daqui a pouco.
@@ -27,7 +28,14 @@ import java.util.function.Supplier;
  *       duas.
  *   <li><b>Timeout</b> — nao e retentado. O limite ja e o teto do que o tutor
  *       aceita esperar; uma segunda tentativa transformaria uma espera ruim numa
- *       inaceitavel. Escala direto.
+ *       inaceitavel. Escala direto. Vale tambem para o timeout que estoura
+ *       durante a leitura do corpo, que chega embrulhado em
+ *       {@link RestClientException}, e nao em {@link ResourceAccessException}.
+ *   <li><b>Resposta ilegivel</b> — HTTP 200 com JSON truncado, malformado ou sem
+ *       conteudo. Uma nova tentativa, e so uma: a primeira vez pode ser um
+ *       soluco do provedor; a segunda seguida ja e padrao, e insistir so
+ *       aumentaria a espera. Foi o que a Camila viu no site em 29/10 — fallback
+ *       na primeira mensagem, horarios na segunda.
  * </ul>
  *
  * <p>4xx que nao seja 429 tambem nao e retentado: requisicao malformada ou chave
@@ -59,6 +67,7 @@ final class ChamadaResiliente {
     static <T> T executar(String provedor, int maxRetentativas, Duration timeout,
                           Supplier<T> chamada) {
         RuntimeException ultimaFalha = null;
+        boolean ilegivelJaRetentada = false;
 
         for (int tentativa = 0; tentativa <= maxRetentativas; tentativa++) {
             if (tentativa > 0) {
@@ -86,14 +95,32 @@ final class ChamadaResiliente {
                 throw new FalhaNaApiException("Tempo esgotado em " + provedor, ex);
 
             } catch (RestClientException ex) {
+                if (tempoEsgotado(ex)) {
+                    log.warn("{} nao respondeu em {}s (durante a leitura)", provedor, timeout.toSeconds());
+                    throw new FalhaNaApiException("Tempo esgotado em " + provedor, ex);
+                }
                 // resposta truncada, corpo ilegivel, content-type ausente: o
                 // formato varia, a consequencia para o tutor nao pode variar
-                log.warn("{} falhou na leitura da resposta: {}", provedor, ex.getMessage());
-                throw new FalhaNaApiException("Resposta ilegivel de " + provedor, ex);
+                log.warn("{} falhou na leitura da resposta, tentativa {}: {}",
+                        provedor, tentativa + 1, ex.getMessage());
+                if (ilegivelJaRetentada || tentativa == maxRetentativas) {
+                    throw new FalhaNaApiException("Resposta ilegivel de " + provedor, ex);
+                }
+                ilegivelJaRetentada = true;
+                ultimaFalha = ex;
             }
         }
 
         throw new FalhaNaApiException(provedor + " indisponivel apos as retentativas", ultimaFalha);
+    }
+
+    private static boolean tempoEsgotado(Throwable falha) {
+        for (Throwable causa = falha; causa != null; causa = causa.getCause()) {
+            if (causa instanceof SocketTimeoutException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Excesso de requisicoes e falha do lado deles: os dois passam. */
