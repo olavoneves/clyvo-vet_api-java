@@ -391,6 +391,27 @@ class PaginasRenderizamTest {
                 LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 16), null);
     }
 
+    /**
+     * O menu da clinica e de quem atende: Painel, Agenda, Pets.
+     *
+     * <p>O Swagger saiu do menu porque veterinario e colaborador nao o usam; a
+     * rota continua de pe e documentada no README.
+     */
+    @Test
+    void menuDaClinicaNaoLevaAoSwagger() throws Exception {
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class), any()))
+                .willReturn(List.of());
+
+        mockMvc.perform(get("/agenda").with(user(VETERINARIO)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString(">Painel</a>"),
+                        org.hamcrest.Matchers.containsString(">Agenda</a>"),
+                        org.hamcrest.Matchers.containsString(">Pets</a>"),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("swagger-ui")),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(">API</a>")))));
+    }
+
     @Test
     void agendaSemInicioComecaHoje() throws Exception {
         LocalDate hoje = LocalDate.now();
@@ -583,7 +604,46 @@ class PaginasRenderizamTest {
                         org.hamcrest.Matchers.containsString("Carteirinha de vacinas"),
                         // o campo de conversa e o token que o faz funcionar
                         org.hamcrest.Matchers.containsString("Falar com a clínica"),
-                        org.hamcrest.Matchers.containsString("/api/agente/mensagens"))));
+                        org.hamcrest.Matchers.containsString("/api/agente/mensagens"),
+                        // a conversa volta do servidor ao abrir, e o agendamento
+                        // troca so a lista: a pagina nao se recarrega sozinha
+                        // (o inline de JavaScript do Thymeleaf escapa a barra)
+                        org.hamcrest.Matchers.containsString("\\/api\\/agente\\/conversas\\/9"),
+                        org.hamcrest.Matchers.containsString("\\/tutor\\/pets\\/9\\/pendencias"),
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("window.location")))));
+    }
+
+    /**
+     * Depois do agendamento a tela troca so a lista de pendencias.
+     *
+     * <p>A resposta e o fragmento, nao a pagina: sem cabecalho nem conversa. Se
+     * viesse a pagina inteira, o {@code outerHTML} do script enfiaria uma tela
+     * dentro da outra.
+     */
+    @Test
+    void pendenciasDoTutorVoltamComoFragmento() throws Exception {
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(petDeExemplo())));
+        given(obrigacaoService.doPetComStatus(eq(9L), any(), any(Pageable.class)))
+                .willReturn(List.of(obrigacaoDeExemplo()));
+
+        mockMvc.perform(get("/tutor/pets/9/pendencias").with(user(TUTOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.startsWith("<ul class=\"pendencias\" id=\"pendencias\""),
+                        org.hamcrest.Matchers.containsString("Reforço anual"),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Falar com a clínica")),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("<html")))));
+    }
+
+    @Test
+    void pendenciasDePetDeOutroDonoDao404() throws Exception {
+        given(petService.findAtivosDoTutor(eq(3L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(petDeExemplo())));
+
+        mockMvc.perform(get("/tutor/pets/4242/pendencias").with(user(TUTOR)))
+                .andExpect(status().isNotFound());
     }
 
     /**
