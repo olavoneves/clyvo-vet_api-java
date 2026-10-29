@@ -36,6 +36,13 @@ import br.com.clyvovet.server.pet.PetResponse;
 import br.com.clyvovet.server.pet.PetService;
 import br.com.clyvovet.server.pet.web.PetWebController;
 import br.com.clyvovet.server.auth.web.LoginWebController;
+import br.com.clyvovet.server.atendimento.AtendimentoForm;
+import br.com.clyvovet.server.atendimento.AtendimentoRegistrado;
+import br.com.clyvovet.server.atendimento.RegistroDeAtendimentoService;
+import br.com.clyvovet.server.atendimento.web.AtendimentoWebController;
+import br.com.clyvovet.server.exception.ConflitoDeEstadoException;
+import br.com.clyvovet.server.veterinario.VeterinarioResponse;
+import br.com.clyvovet.server.veterinario.VeterinarioService;
 import br.com.clyvovet.server.tutor.web.TutorWebController;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -87,7 +94,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AgendaWebController.class,
         TutorWebController.class,
         NotificacaoWebController.class,
-        LembreteWebController.class
+        LembreteWebController.class,
+        AtendimentoWebController.class
 })
 @Import({SecurityConfig.class, WebMvcConfig.class, JwtService.class})
 @TestPropertySource(properties = {
@@ -126,6 +134,12 @@ class PaginasRenderizamTest {
 
     @MockitoBean
     private NotificacaoService notificacaoService;
+
+    @MockitoBean
+    private VeterinarioService veterinarioService;
+
+    @MockitoBean
+    private RegistroDeAtendimentoService registroDeAtendimentoService;
 
     @Test
     void loginRenderizaSemAutenticacao() throws Exception {
@@ -742,6 +756,161 @@ class PaginasRenderizamTest {
         org.mockito.Mockito.verify(obrigacaoService).transitar(eq(101L), pedido.capture());
         org.assertj.core.api.Assertions.assertThat(pedido.getValue().novoStatus())
                 .isEqualTo(ObrigacaoStatus.NOTIFICADA);
+    }
+
+    // ---------- registrar atendimento ----------
+
+    @Test
+    void fichaOfereceRegistrarAtendimento() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Registrar atendimento"),
+                        org.hamcrest.Matchers.containsString("/pets/9/atendimentos/novo"))));
+    }
+
+    /**
+     * O formulario mostra para quem e o atendimento e fala a lingua da clinica:
+     * o gatilho aparece pelo rotulo, e nao pelo nome da constante.
+     */
+    @Test
+    void formularioDeAtendimentoRenderiza() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(veterinarioService.findAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(veterinarioDeExemplo())));
+
+        mockMvc.perform(get("/pets/9/atendimentos/novo").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Rex · tutor Joana Ribeiro"),
+                        org.hamcrest.Matchers.containsString("Dra. Helena Prado · SP-11001"),
+                        org.hamcrest.Matchers.containsString("Consulta registrada"),
+                        org.hamcrest.Matchers.containsString("Procedimento realizado"),
+                        // o formulario passa pelo th:action, que injeta o token
+                        org.hamcrest.Matchers.containsString("name=\"_csrf\""),
+                        // a data padrao e hoje
+                        org.hamcrest.Matchers.containsString(
+                                "value=\"" + LocalDate.now() + "\""),
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString(">CONSULTA_REGISTRADA<")))));
+    }
+
+    /** Veterinario logado ja vem escolhido; colaborador escolhe. */
+    @Test
+    void veterinarioLogadoVemEscolhido() throws Exception {
+        ClinicaUserDetails veterinario = new ClinicaUserDetails(
+                new AuthenticatedUser(21L, "helena@vidaanimal.com.br", "Dra. Helena Prado",
+                        TipoUsuario.VETERINARIO, 47L),
+                "irrelevante");
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(veterinarioService.findAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(veterinarioDeExemplo())));
+
+        mockMvc.perform(get("/pets/9/atendimentos/novo").with(user(veterinario)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("value=\"21\" selected=\"selected\"")));
+
+        mockMvc.perform(get("/pets/9/atendimentos/novo").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("selected=\"selected\">Dra."))));
+    }
+
+    /** Erro de validacao volta para a tela, no campo, e nao chega ao motor. */
+    @Test
+    void formularioInvalidoVoltaComOErroNoCampo() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(veterinarioService.findAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(veterinarioDeExemplo())));
+
+        mockMvc.perform(post("/pets/9/atendimentos").with(user(COLABORADOR)).with(csrf())
+                        .param("eventoGatilho", "CONSULTA_REGISTRADA")
+                        .param("nrValor", "-10")
+                        .param("motivo", "Retorno"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Escolha o veterinário"),
+                        org.hamcrest.Matchers.containsString("Informe a data do atendimento"),
+                        org.hamcrest.Matchers.containsString("O valor não pode ser negativo"),
+                        org.hamcrest.Matchers.containsString("aria-invalid=\"true\""),
+                        // o que foi digitado continua la
+                        org.hamcrest.Matchers.containsString("value=\"Retorno\""))));
+
+        org.mockito.Mockito.verifyNoInteractions(registroDeAtendimentoService);
+    }
+
+    @Test
+    void registroVoltaParaAFicha() throws Exception {
+        given(registroDeAtendimentoService.registrar(eq(9L), any(AtendimentoForm.class)))
+                .willReturn(new AtendimentoRegistrado(500L, 3,
+                        List.of(LocalDate.of(2026, 11, 12), LocalDate.of(2026, 11, 26))));
+
+        mockMvc.perform(post("/pets/9/atendimentos").with(user(COLABORADOR)).with(csrf())
+                        .param("veterinarioId", "21")
+                        .param("dtConsulta", "2026-10-28")
+                        .param("eventoGatilho", "VACINA_APLICADA")
+                        .param("nrValor", "180.00"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/pets/9"));
+
+        ArgumentCaptor<AtendimentoForm> form = ArgumentCaptor.forClass(AtendimentoForm.class);
+        org.mockito.Mockito.verify(registroDeAtendimentoService).registrar(eq(9L), form.capture());
+        org.assertj.core.api.Assertions.assertThat(form.getValue().getEventoGatilho())
+                .isEqualTo(br.com.clyvovet.server.enums.EventoGatilho.VACINA_APLICADA);
+        org.assertj.core.api.Assertions.assertThat(form.getValue().getDtConsulta())
+                .isEqualTo(LocalDate.of(2026, 10, 28));
+    }
+
+    /** A confirmacao que a ficha mostra na volta: quantas e quando. */
+    @Test
+    void fichaMostraAConfirmacaoDoAtendimento() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(obrigacaoDeExemplo())));
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR))
+                        .flashAttr("atendimentoRegistrado", new AtendimentoRegistrado(500L, 3,
+                                List.of(LocalDate.of(2026, 11, 12), LocalDate.of(2026, 11, 26)))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Atendimento registrado."),
+                        org.hamcrest.Matchers.containsString("3 obrigações criadas."),
+                        org.hamcrest.Matchers.containsString("Próximas: 12/11/2026, 26/11/2026."))));
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR))
+                        .flashAttr("atendimentoRegistrado", new AtendimentoRegistrado(501L, 0, List.of())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("O motor não gerou obrigação")));
+    }
+
+    /** A recusa do motor aparece na tela, com o que foi digitado, e nao como 409 cru. */
+    @Test
+    void recusaDoMotorVoltaParaOFormulario() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(veterinarioService.findAll(any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(veterinarioDeExemplo())));
+        given(registroDeAtendimentoService.registrar(eq(9L), any(AtendimentoForm.class)))
+                .willThrow(new ConflitoDeEstadoException("Pet inativo não gera obrigação"));
+
+        mockMvc.perform(post("/pets/9/atendimentos").with(user(COLABORADOR)).with(csrf())
+                        .param("veterinarioId", "21")
+                        .param("dtConsulta", "2026-10-28")
+                        .param("eventoGatilho", "CONSULTA_REGISTRADA"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("role=\"alert\""),
+                        org.hamcrest.Matchers.containsString("Pet inativo não gera obrigação"))));
+    }
+
+    private static VeterinarioResponse veterinarioDeExemplo() {
+        return new VeterinarioResponse(21L, "Dra. Helena Prado", "SP-11001", "Clinica geral",
+                47L, "Clinica Vida Animal");
     }
 
     /** A mesma obrigacao de exemplo, sorteada para o grupo de controle. */
