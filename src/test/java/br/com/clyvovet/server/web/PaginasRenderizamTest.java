@@ -68,6 +68,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -107,6 +108,11 @@ class PaginasRenderizamTest {
     private static final ClinicaUserDetails COLABORADOR = new ClinicaUserDetails(
             new AuthenticatedUser(1L, "master@clyvovet.com", "Master da Clinica",
                     TipoUsuario.COLABORADOR, 47L),
+            "irrelevante-nao-ha-autenticacao-por-senha-aqui");
+
+    private static final ClinicaUserDetails VETERINARIO = new ClinicaUserDetails(
+            new AuthenticatedUser(21L, "helena@clinica.com", "Dra. Helena",
+                    TipoUsuario.VETERINARIO, 47L),
             "irrelevante-nao-ha-autenticacao-por-senha-aqui");
 
     private static final ClinicaUserDetails TUTOR = new ClinicaUserDetails(
@@ -356,16 +362,122 @@ class PaginasRenderizamTest {
     }
 
     @Test
-    void agendaRenderizaOsDoisBlocos() throws Exception {
-        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class)))
+    void agendaRenderizaASemanaPedida() throws Exception {
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class), any()))
                 .willReturn(List.of(compromissoEmDia()));
+
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("10/09 a 16/09/2026"),
+                        // o dia em portugues mesmo com o navegador em ingles, que e o do MockMvc
+                        org.hamcrest.Matchers.containsString("quinta-feira, 10/09"),
+                        // fim de semana vazio nao vira bloco
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("12/09")),
+                        org.hamcrest.Matchers.containsString("Rex"),
+                        org.hamcrest.Matchers.containsString("Dra. Ana"),
+                        // os tres botoes, com a semana vizinha de cada lado
+                        org.hamcrest.Matchers.containsString("/agenda?inicio=2026-09-03"),
+                        org.hamcrest.Matchers.containsString("/agenda?inicio=2026-09-17"),
+                        org.hamcrest.Matchers.containsString("Próxima semana"),
+                        // colaborador nao tem agenda propria: nada de alternancia
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Minha agenda")))));
+
+        verify(agendaService).compromissosEntre(
+                LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 16), null);
+    }
+
+    @Test
+    void agendaSemInicioComecaHoje() throws Exception {
+        LocalDate hoje = LocalDate.now();
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class), any()))
+                .willReturn(List.of(new CompromissoDaAgenda(4L, hoje, "10:00",
+                        AgendamentoStatus.CONFIRMADO, CanalPreferencial.WEB, 9L, "Rex", "Dra. Ana",
+                        null, null, null, null)));
 
         mockMvc.perform(get("/agenda").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Hoje ·")));
+
+        verify(agendaService).compromissosEntre(hoje, hoje.plusDays(6), null);
+    }
+
+    /** Sem nada marcado, uma frase so — e nao sete tabelas vazias. */
+    @Test
+    void agendaVaziaDizIssoUmaVez() throws Exception {
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.allOf(
-                        org.hamcrest.Matchers.containsString("Hoje"),
-                        org.hamcrest.Matchers.containsString("Próximos dias"),
-                        org.hamcrest.Matchers.containsString("Rex"))));
+                        org.hamcrest.Matchers.containsString("Nenhum atendimento marcado nestes sete dias."),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Nada marcado neste dia.")))));
+    }
+
+    /**
+     * O veterinario abre a tela ja na propria agenda, e os botoes de semana
+     * mantem o filtro.
+     */
+    @Test
+    void veterinarioVeASuaAgendaPorPadrao() throws Exception {
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").with(user(VETERINARIO)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Minha agenda"),
+                        org.hamcrest.Matchers.containsString("Clínica inteira"),
+                        org.hamcrest.Matchers.containsString("Nenhum atendimento seu marcado"),
+                        org.hamcrest.Matchers.containsString("/agenda?inicio=2026-09-17&amp;minha=true"))));
+
+        verify(agendaService).compromissosEntre(
+                LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 16), 21L);
+    }
+
+    @Test
+    void veterinarioPodeVerAClinicaInteira() throws Exception {
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").param("minha", "false")
+                        .with(user(VETERINARIO)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("/agenda?inicio=2026-09-17&amp;minha=false")));
+
+        verify(agendaService).compromissosEntre(
+                LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 16), null);
+    }
+
+    /** O parametro nao da agenda propria a quem nao e veterinario. */
+    @Test
+    void colaboradorIgnoraOFiltroMinhaAgenda() throws Exception {
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").param("minha", "true")
+                        .with(user(COLABORADOR)))
+                .andExpect(status().isOk());
+
+        verify(agendaService).compromissosEntre(
+                LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 16), null);
+    }
+
+    @Test
+    void fichaMostraOsProximosAgendamentos() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
+                .willReturn(Page.empty());
+        given(agendaService.proximosDoPet(9L)).willReturn(List.of(compromissoEmDia()));
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("Próximos agendamentos"),
+                        org.hamcrest.Matchers.containsString("10/09 às 09:00"),
+                        org.hamcrest.Matchers.containsString("Dra. Ana"))));
+    }
+
+    @Test
+    void fichaSemAgendamentoFuturoDizIsso() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
+                .willReturn(Page.empty());
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("Nenhum agendamento futuro para este pet.")));
     }
 
     /**
@@ -378,10 +490,10 @@ class PaginasRenderizamTest {
      */
     @Test
     void agendaMarcaOCompromissoQueRecuperaObrigacaoVencida() throws Exception {
-        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class)))
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class), any()))
                 .willReturn(List.of(compromissoAtrasado()));
 
-        mockMvc.perform(get("/agenda").with(user(COLABORADOR)))
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.containsString("linha-recuperada"),
@@ -392,10 +504,10 @@ class PaginasRenderizamTest {
     /** Compromisso do balcao: sem obrigacao atras, nao pode ser marcado como atraso. */
     @Test
     void agendaNaoMarcaAtrasoNoQueVeioDoBalcao() throws Exception {
-        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class)))
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class), any()))
                 .willReturn(List.of(compromissoDeBalcao()));
 
-        mockMvc.perform(get("/agenda").with(user(COLABORADOR)))
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").with(user(COLABORADOR)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.containsString("Marcado pela clínica"),

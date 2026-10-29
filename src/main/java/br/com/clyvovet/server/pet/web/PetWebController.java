@@ -1,5 +1,6 @@
 package br.com.clyvovet.server.pet.web;
 
+import br.com.clyvovet.server.agendamento.AgendaService;
 import br.com.clyvovet.server.obrigacao.ObrigacaoService;
 import br.com.clyvovet.server.pet.PetService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class PetWebController {
 
     private final PetService petService;
     private final ObrigacaoService obrigacaoService;
+    private final AgendaService agendaService;
 
     @GetMapping("/pets")
     public String lista(@PageableDefault(size = 20, sort = "nome") Pageable pageable, Model model) {
@@ -43,6 +45,9 @@ public class PetWebController {
         model.addAttribute("pet", petService.getFichaTecnica(id));
         model.addAttribute("obrigacoes",
                 obrigacaoService.buscar(null, null, null, id, OBRIGACOES_DA_FICHA).getContent());
+        // sem teto, ao contrario das obrigacoes: o que esta marcado e pouco, e
+        // esconder a consulta de daqui a dois meses e o tutor ligando para perguntar
+        model.addAttribute("proximosAgendamentos", agendaService.proximosDoPet(id));
         return "pets/detalhe";
     }
 }

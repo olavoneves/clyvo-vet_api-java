@@ -87,7 +87,28 @@ public class AgendaService {
      */
     @Transactional(readOnly = true)
     public List<CompromissoDaAgenda> compromissosEntre(LocalDate de, LocalDate ate) {
-        return repository.agendaEntre(de, ate);
+        return compromissosEntre(de, ate, null);
+    }
+
+    /**
+     * O mesmo recorte, so com os compromissos de um veterinario.
+     *
+     * @param idVeterinario nulo para a clinica inteira
+     */
+    @Transactional(readOnly = true)
+    public List<CompromissoDaAgenda> compromissosEntre(LocalDate de, LocalDate ate, Long idVeterinario) {
+        return repository.agendaEntre(de, ate, idVeterinario);
+    }
+
+    /**
+     * Tudo o que esta marcado para o pet de hoje em diante, sem limite de data.
+     *
+     * <p>Hoje entra: a consulta das 16h ainda nao aconteceu as 10h, e a ficha e
+     * onde o balcao confere isso com o tutor no telefone.
+     */
+    @Transactional(readOnly = true)
+    public List<CompromissoDaAgenda> proximosDoPet(Long idPet) {
+        return repository.agendaDoPetDesde(idPet, LocalDate.now());
     }
 
     /**

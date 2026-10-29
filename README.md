@@ -392,8 +392,8 @@ mesmo que editá-lo, e o CRUD dele continua fechado na API de gestão.
 | Rota | Perfil | Tela |
 |---|---|---|
 | `/painel/receita` | equipe | Funil do mês, receita recuperada e coorte tratado × controle |
-| `/agenda` | equipe | Compromissos por data do compromisso, com a obrigação atrás |
-| `/pets`, `/pets/{id}` | equipe | Lista e ficha, com as obrigações do protocolo |
+| `/agenda?inicio=AAAA-MM-DD&minha=true` | equipe | Sete dias de compromissos a partir de `inicio` (padrão hoje), com a obrigação atrás; "Minha agenda" para o veterinário, ligada por padrão |
+| `/pets`, `/pets/{id}` | equipe | Lista e ficha, com os próximos agendamentos e as obrigações do protocolo |
 | `POST /obrigacoes/{id}/lembrete` | equipe | Antecipa o lembrete de uma obrigação |
 | `/tutor` | tutor | Entrada do tutor |
 | `/tutor/pets/{id}` | tutor | Ficha do pet e a conversa com o agente |
@@ -717,6 +717,10 @@ nome antigo dizia que sem ele nada saía — era verdade e deixou de ser.
 Ele **não aparece** para pet do grupo de controle, e a rota `POST
 /obrigacoes/{id}/lembrete` recusa o pedido mesmo assim: esconder o botão não fecha a
 rota, e um POST direto notificaria o controle sem deixar rastro de intenção.
+
+> **Notificação ao veterinário (e-mail) é projetada, não implementada.** O ponto de extensão
+> é a porta `CanalDeNotificacao`: um canal novo é uma classe que a implementa, sem tocar no
+> motor nem no emissor.
 
 ### Configuração
 
