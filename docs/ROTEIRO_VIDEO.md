@@ -196,7 +196,7 @@ Clique em **Cancel**. Depois: **Pipelines → Library → `petflow-secrets`**. A
 > alterado"*. Mostrar o **antes** é o que torna a alteração visível na Cena 10.
 
 No navegador, abra `https://rm561940-petflow-api-s4b.azurewebsites.net/login`. Aponte o
-subtítulo embaixo do logo: **"Entre com seu e-mail e senha"**.
+subtítulo embaixo do logo: **"Entre com seu e-mail e senha · Sprint 4 CI/CD"**.
 
 > "Esta é a tela de login publicada agora. Vou alterar este subtítulo no código."
 
@@ -209,13 +209,13 @@ subtítulo embaixo do logo: **"Entre com seu e-mail e senha"**.
 **linha 20**:
 
 ```html
-<p class="login-sub">Entre com seu e-mail e senha</p>
+<p class="login-sub">Entre com seu e-mail e senha · Sprint 4 CI/CD</p>
 ```
 
 Troque por:
 
 ```html
-<p class="login-sub">Entre com seu e-mail e senha · Sprint 4 CI/CD</p>
+<p class="login-sub">Entre com seu e-mail e senha · Sprint 4 · CI/CD no Azure DevOps</p>
 ```
 
 Salve (**Ctrl+S**).
@@ -225,7 +225,7 @@ Salve (**Ctrl+S**).
 ```bash
 git status                       # mostra o login.html modificado
 git add src/main/resources/templates/login.html
-git commit -m "feat: destaca a Sprint 4 na tela de login"
+git commit -m "feat: destaca o CI/CD no Azure DevOps na tela de login"
 git push
 ```
 
@@ -243,7 +243,7 @@ git push
 **Título:**
 
 ```
-feat: destaca a Sprint 4 na tela de login
+feat: destaca o CI/CD no Azure DevOps na tela de login
 ```
 
 **Descrição:**
@@ -253,8 +253,8 @@ feat: destaca a Sprint 4 na tela de login
 
 Subtítulo da tela de login (`src/main/resources/templates/login.html`):
 
-- **Antes:** "Entre com seu e-mail e senha"
-- **Depois:** "Entre com seu e-mail e senha · Sprint 4 CI/CD"
+- **Antes:** "Entre com seu e-mail e senha · Sprint 4 CI/CD"
+- **Depois:** "Entre com seu e-mail e senha · Sprint 4 · CI/CD no Azure DevOps"
 
 ## O que acontece no merge
 
@@ -358,7 +358,7 @@ porta **1521**.
 > publicada pelo CD (sem isso, -30).
 
 No navegador, recarregue `/login` (**Ctrl+F5**). O subtítulo agora é **"Entre com seu e-mail e
-senha · Sprint 4 CI/CD"**.
+senha · Sprint 4 · CI/CD no Azure DevOps"**.
 
 > "A alteração está no ar, publicada pelo CD, sem nenhum passo manual."
 
