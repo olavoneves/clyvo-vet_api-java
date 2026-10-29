@@ -1,6 +1,7 @@
 package br.com.clyvovet.server.config;
 
 import br.com.clyvovet.server.anamnese.AnamneseService;
+import br.com.clyvovet.server.atendimento.CatalogoDeContextos;
 import br.com.clyvovet.server.atendimento.RegistroDeAtendimentoService;
 import br.com.clyvovet.server.atendimento.web.AtendimentoWebController;
 import br.com.clyvovet.server.auth.AuthenticatedUser;
@@ -84,6 +85,9 @@ class RegistrarAtendimentoAutorizacaoTest {
 
     @MockitoBean
     private RegistroDeAtendimentoService registroService;
+
+    @MockitoBean
+    private CatalogoDeContextos catalogoDeContextos;
 
     @MockitoBean
     private ConsultaService consultaService;

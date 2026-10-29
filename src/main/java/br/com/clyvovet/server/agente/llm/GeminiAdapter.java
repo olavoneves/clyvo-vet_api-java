@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -37,6 +39,8 @@ public class GeminiAdapter implements ProvedorLlm {
 
     /** Conectar e barato; o que demora e o modelo pensar. */
     private static final Duration TIMEOUT_DE_CONEXAO = Duration.ofSeconds(10);
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final RestClient rest;
     private final AgenteProperties propriedades;
@@ -98,14 +102,38 @@ public class GeminiAdapter implements ProvedorLlm {
 
         ProtocoloGemini.Resposta resposta = ChamadaResiliente.executar(
                 NOME, propriedades.maxRetentativas(), propriedades.timeout(),
-                () -> rest.post()
+                () -> ler(rest.post()
                         .uri(CAMINHO, propriedades.gemini().modelo())
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(requisicao)
                         .retrieve()
-                        .body(ProtocoloGemini.Resposta.class));
+                        .body(byte[].class)));
 
         return interpretar(resposta);
+    }
+
+    /**
+     * O corpo convertido aqui, e nao pelo conversor do RestClient, para que a
+     * falha possa dizer o que veio: o conversor so informa que nao conseguiu ler.
+     * Lancar dentro da chamada faz a resposta ilegivel passar pela politica de
+     * retentativa do {@link ChamadaResiliente}.
+     */
+    private static ProtocoloGemini.Resposta ler(byte[] corpo) {
+        if (corpo == null) {
+            return null;
+        }
+        ProtocoloGemini.Resposta resposta;
+        try {
+            resposta = JSON.readValue(corpo, ProtocoloGemini.Resposta.class);
+        } catch (JacksonException ex) {
+            throw new RespostaIlegivelException("JSON invalido", corpo);
+        }
+        // bloqueio do prompt, MALFORMED_FUNCTION_CALL, SAFETY: o candidato vem
+        // sem partes, e um turno vazio nao tem o que dizer ao tutor
+        if (resposta == null || resposta.partes().isEmpty()) {
+            throw new RespostaIlegivelException("Resposta sem conteudo", corpo);
+        }
+        return resposta;
     }
 
     /**
