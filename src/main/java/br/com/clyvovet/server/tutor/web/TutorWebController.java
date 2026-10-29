@@ -66,13 +66,31 @@ public class TutorWebController {
         return pagina(id, model);
     }
 
+    /**
+     * So a lista de cuidados pendentes, para a tela trocar no lugar.
+     *
+     * <p>Depois que o agente agenda, a pendencia sai da lista. Recarregar a
+     * pagina inteira para mostrar isso apagava a conversa — inclusive a
+     * confirmacao que o tutor ainda estava lendo. Com o fragmento, a tela troca
+     * so o bloco que mudou e o chat fica onde estava.
+     */
+    @GetMapping("/tutor/pets/{id}/pendencias")
+    public String pendencias(@PathVariable Long id, Model model) {
+        AuthenticatedUser tutor = AuthenticatedUser.atual()
+                .orElseThrow(() -> new UnauthorizedException("Sessão sem usuário autenticado"));
+
+        PetResponse pet = escolher(petsDo(tutor), id);
+        model.addAttribute("pet", pet);
+        model.addAttribute("pendentes",
+                obrigacaoService.doPetComStatus(pet.id(), EM_ABERTO, PENDENTES));
+        return "tutor/pet :: pendencias";
+    }
+
     private String pagina(Long idPedido, Model model) {
         AuthenticatedUser tutor = AuthenticatedUser.atual()
                 .orElseThrow(() -> new UnauthorizedException("Sessão sem usuário autenticado"));
 
-        List<PetResponse> pets = petService
-                .findAtivosDoTutor(tutor.id(), PageRequest.of(0, 50, Sort.by("nome")))
-                .getContent();
+        List<PetResponse> pets = petsDo(tutor);
 
         model.addAttribute("tutor", tutor);
         model.addAttribute("pets", pets);
@@ -101,6 +119,12 @@ public class TutorWebController {
                 tutor.id(), tutor.email(), tutor.nome(), tutor.tipo(), tutor.idClinica()));
 
         return "tutor/pet";
+    }
+
+    private List<PetResponse> petsDo(AuthenticatedUser tutor) {
+        return petService
+                .findAtivosDoTutor(tutor.id(), PageRequest.of(0, 50, Sort.by("nome")))
+                .getContent();
     }
 
     /**

@@ -275,7 +275,7 @@ class PortabilidadeDoProvedorTest {
                 new EscalarParaVeterinario()));
 
         AgenteService agente = new AgenteService(fixture.propriedades, provedor, catalogo,
-                new MemoriaDeConversa(fixture.propriedades), new GuardrailClinico(), registro,
+                new MemoriaDeConversa(fixture.propriedades), new GuardrailClinico(), new FiltroDeIdsInternos(), registro,
                 petRepository);
 
         return new Montagem(api, agente, fixture.rota);

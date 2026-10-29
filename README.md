@@ -14,7 +14,8 @@ Vídeo de demonstração: https://youtu.be/asLs3qNrzvs
 | **Swagger** | https://clyvo-vet-api-java.onrender.com/swagger-ui.html |
 | **Logins de demonstração** | senha `Clyvo@2026` para todos — equipe: `helena@vidaanimal.com.br` (veterinária), `patricia@vidaanimal.com.br` e `diego@petcare.com.br` (colaboradores); tutores: `camila.ferreira@exemplo.com` e `roberto.almeida@exemplo.com`. Detalhes em [Logins de demonstração](#logins-de-demonstração) |
 
-> Plano gratuito do Render: depois de 15 min parado, a primeira requisição leva ~30 s.
+> Plano gratuito do Render: depois de 15 min parado, a instância hiberna e a primeira
+> requisição pode levar até ~4 min. Veja [Deploy — Render](#-deploy--render).
 
 ---
 
@@ -179,7 +180,7 @@ da aplicação o chama — semear é ato deliberado. **Só em banco descartável
 
 ### 7. Rodar os testes
 
-A suíte tem **160 testes** em 19 classes e passa inteira, **sem nenhum pulado**. Os testes
+A suíte tem **231 testes** em 27 classes e passa inteira, **sem nenhum pulado**. Os testes
 de integração exigem um Oracle alcançável pelas variáveis de ambiente.
 
 ```bash
@@ -409,6 +410,7 @@ mesmo que editá-lo, e o CRUD dele continua fechado na API de gestão.
 | `POST /obrigacoes/{id}/lembrete` | equipe | Antecipa o lembrete de uma obrigação |
 | `/tutor` | tutor | Entrada do tutor |
 | `/tutor/pets/{id}` | tutor | Ficha do pet e a conversa com o agente |
+| `/tutor/pets/{id}/pendencias` | tutor | Só a lista de cuidados pendentes (fragmento): a tela a troca depois de um agendamento, sem recarregar a conversa |
 | `/tutor/caixa` | tutor | Caixa de entrada dos lembretes |
 
 ### Exemplo de uso via curl
@@ -825,6 +827,10 @@ Duas camadas, e a segunda é a que importa na defesa:
 A segunda camada existe porque instrução em prompt não é controle. A resposta a "por que
 confiar no agente?" é que não confiamos — verificamos na saída.
 
+O mesmo desenho vale para ids internos: o prompt proíbe mencioná-los, e o
+`FiltroDeIdsInternos` remove da resposta final o que escapar (`(id 14273)`, `id 14273`,
+`#14273`) antes de ela chegar ao tutor e ao histórico. Hora, data e número solto ficam.
+
 ### Estado da conversa
 
 Caffeine com validade de 24h, chaveado por clínica, tutor e pet. Cada turno é gravado em
@@ -835,6 +841,10 @@ trabalho, o registro é o outbox.
 > que o projeto já tinha tomado em `CacheConfig` — a demonstração não pode depender de um
 > serviço externo de pé. O custo é conhecido e aceito: com mais de uma instância, o tutor
 > que cair em outra perde o fio da conversa (o histórico, esse, não se perde).
+
+A tela do tutor lê a conversa desse estado (`GET /api/agente/conversas/{idPet}`) ao abrir:
+se a página for aberta de novo dentro da validade, os turnos voltam renderizados. O
+navegador não guarda conversa.
 
 ### Resiliência
 
@@ -884,9 +894,10 @@ componentes é pequeno e cabe inteiro numa folha.
 |---|---|---|
 | Login (equipe e tutor) | `login.html` | `auth/web/LoginWebController` |
 | Painel de receita e coorte | `painel/receita.html` | `painel/web/PainelWebController` |
-| Agenda da clínica | `agenda/lista.html` | `obrigacao/web/AgendaWebController` |
+| Agenda da clínica, navegável por semana, com "Minha agenda" para o veterinário | `agenda/lista.html` | `obrigacao/web/AgendaWebController` |
 | Lista de pets | `pets/lista.html` | `pet/web/PetWebController` |
-| Ficha do pet | `pets/detalhe.html` | `pet/web/PetWebController` |
+| Ficha do pet, com próximos agendamentos | `pets/detalhe.html` | `pet/web/PetWebController` |
+| Registrar atendimento (consulta + obrigações do protocolo numa transação) | `atendimentos/novo.html` | `atendimento/web/AtendimentoWebController` |
 | Antecipar lembrete | — (só POST) | `obrigacao/web/LembreteWebController` |
 | Caixa de lembretes do tutor | `tutor/caixa.html` | `notificacao/web/NotificacaoWebController` |
 | Pet e conversa do tutor | `tutor/pet.html` | `tutor/web/TutorWebController` |
@@ -1121,8 +1132,12 @@ que exigem contexto que não está no repositório.
 > painel do Render — e é nesse momento que o Flyway roda contra o banco.
 
 > `PORT` não precisa ser configurada — o Render injeta automaticamente.
-> Plano gratuito hiberna após 15 min de inatividade — a primeira requisição pode demorar
-> ~30s.
+
+> **Hibernação do plano gratuito.** Depois de 15 minutos sem acesso a instância hiberna, e a
+> primeira requisição seguinte espera ela subir — até ~4 minutos. Para gravação e avaliação,
+> mantenha a instância acordada com um ping externo gratuito (cron-job.org ou UptimeRobot)
+> em `GET /actuator/health` a cada 10 minutos. A rota é pública e só responde `UP` com o
+> banco alcançável, então o ping também avisa se o Oracle cair.
 
 ---
 

@@ -59,7 +59,7 @@ public class ListarObrigacoesPendentes implements Ferramenta {
                 e que ainda não têm horário marcado. Cada item traz o id da obrigação, \
                 a data prevista e a janela aceitável para realizá-la. \
                 Use sempre esta ferramenta antes de propor horários, para saber sobre o que \
-                a conversa é e qual id usar ao agendar.""";
+                a conversa é e qual id usar ao agendar. O id é interno: nunca o mostre                 ao tutor; fale do cuidado pelo nome da etapa e pela data.""";
     }
 
     @Override
