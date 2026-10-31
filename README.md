@@ -6,7 +6,9 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 
 > Projeto acadêmico — FIAP 2TDSR · Challenge 2026
 
-Vídeo de demonstração: https://youtu.be/asLs3qNrzvs
+Vídeo da Sprint 3: https://youtu.be/asLs3qNrzvs
+
+Vídeo da Sprint 4 (Java): PREENCHER
 
 | | |
 |---|---|
@@ -34,6 +36,7 @@ Vídeo de demonstração: https://youtu.be/asLs3qNrzvs
 - [Agente de Agendamento](#-agente-de-agendamento)
 - [Mapa dos Requisitos](#-mapa-dos-requisitos)
 - [Integração multidisciplinar](#-integração-multidisciplinar)
+- [Mapa da ementa — Sprint 4](#-mapa-da-ementa--sprint-4)
 - [Decisões de Arquitetura](#-decisões-de-arquitetura)
 - [Uso de IA no Desenvolvimento](#-uso-de-ia-no-desenvolvimento)
 - [Deploy — Render](#-deploy--render)
@@ -1040,18 +1043,31 @@ recuperada mede o efeito dos dois.
 
 ## 🧩 Integração multidisciplinar
 
-O que cada disciplina da Sprint 4 aplicou neste projeto, e onde conferir. `—` marca o que
-ainda não tem link público.
+O que cada disciplina da Sprint 4 aplicou neste projeto, e onde conferir.
 
 | Disciplina | O que foi aplicado | Evidência |
 |---|---|---|
 | **Java** (esta API) | Spring Boot 4 com JWT e multi-tenancy por clínica; telas Thymeleaf — painel, agenda navegável, ficha do pet e **Registrar atendimento**; agente de agendamento; suíte com integração contra Oracle real | [Online](https://clyvo-vet-api-java.onrender.com) · [Swagger](https://clyvo-vet-api-java.onrender.com/swagger-ui.html) · [Mapa dos Requisitos](#-mapa-dos-requisitos) |
 | **.NET** | `clyvo-insights`, ASP.NET Core: leitura e projeções sobre as views do Oracle — `VW_CLV_PAINEL_COORTE` e o contrato de 15 colunas da `VW_CLV_OBRIGACAO_DETALHE` (V16), sem HTTP entre os serviços | [clyvo-vet_api-.net](https://github.com/olavoneves/clyvo-vet_api-.net) |
 | **Banco de Dados** | Motor de protocolo em PL/SQL empacotado (`PKG_CLV_MOTOR`, `PKG_CLV_AUDITORIA`, `PKG_CLV_LOG`, `PKG_CLV_SEED`), auditoria encadeada por SHA-256, views de contrato, migrations Flyway V0–V16 e snapshot antes/depois de cada mudança de PL/SQL | [Banco de Dados](#-banco-de-dados) · [`db/migration`](src/main/resources/db/migration) · [`scripts/sql/v15_snapshot.sql`](scripts/sql/v15_snapshot.sql) · [`docs/v15-snapshot-fiap-depois.txt`](docs/v15-snapshot-fiap-depois.txt) |
-| **DevOps** (Pedro) | Azure DevOps com pipelines de CI/CD, build, testes e deploy no Azure App Service; scripts de provisionamento | [Projeto no Azure DevOps](https://dev.azure.com/RM563558/Sprint%204%20-%20Azure%20DevOps) · [App no Azure](https://rm561940-petflow-api-s4b.azurewebsites.net) · [seção DevOps](#️-devops-tools--cloud-computing--sprint-4) · vídeo — |
-| **Compliance & QA** | 16 casos de teste manuais no Azure Boards ligados ao backlog, dois bugs encontrados e corrigidos com teste automatizado | [`docs/compliance/ENTREGA.md`](docs/compliance/ENTREGA.md) · [Azure Boards](https://dev.azure.com/RM561940/PetFlow%20-%20Challenge) · vídeo — |
-| **Mobile** (PetFlow) | O contrato que o app consome: `/api/tutor/**`, com posse pelo token do tutor (404, e não 403, para pet alheio) | [API do tutor](#api-do-tutor-tutor) · app — |
+| **DevOps** (Pedro) | Azure DevOps com pipelines de CI/CD, build, testes e deploy no Azure App Service; scripts de provisionamento | [Projeto no Azure DevOps](https://dev.azure.com/RM563558/Sprint%204%20-%20Azure%20DevOps) · [App no Azure](https://rm561940-petflow-api-s4b.azurewebsites.net) · [seção DevOps](#️-devops-tools--cloud-computing--sprint-4) · [vídeo](https://youtu.be/dNh6DBrqYBc) |
+| **Compliance & QA** | 16 casos de teste manuais no Azure Boards ligados ao backlog, dois bugs encontrados e corrigidos com teste automatizado | [`docs/compliance/ENTREGA.md`](docs/compliance/ENTREGA.md) · [Azure Boards](https://dev.azure.com/RM561940/PetFlow%20-%20Challenge) · [vídeo](https://youtu.be/rdeeNv42WJY) |
+| **Mobile** (PetFlow) | O contrato que o app consome: `/api/tutor/**`, com posse pelo token do tutor (404, e não 403, para pet alheio) | [API do tutor](#api-do-tutor-tutor) · [app PetFlow](https://github.com/FelipeConteFerreira/PetFlow.Sprint3) |
 | **IA** | Agente de agendamento atrás da porta `ProvedorLlm` (Gemini ativo, Anthropic trocável por propriedade), ferramentas com escrita transacional e `GuardrailClinico` na saída do modelo | [Agente de Agendamento](#-agente-de-agendamento) · `agente/llm/ProvedorLlm` · `PortabilidadeDoProvedorTest` |
+
+---
+
+## 🎯 Mapa da ementa — Sprint 4
+
+Onde conferir cada critério de avaliação da Sprint 4.
+
+| Critério | Peso | Onde está |
+|---|---|---|
+| **Demonstração técnica** | 40 | [Online](https://clyvo-vet-api-java.onrender.com) · [Swagger](https://clyvo-vet-api-java.onrender.com/swagger-ui.html) · [Roteiro da demonstração](#roteiro-da-demonstração) · [Logins de demonstração](#logins-de-demonstração) · [Mapa dos Requisitos](#-mapa-dos-requisitos) · Vídeo da Sprint 4 (Java), no topo |
+| **Narrativa** | 20 | [Descrição do Projeto](#-descrição-do-projeto) · [Painel — Receita Recuperada e Coorte](#-painel--receita-recuperada-e-coorte) (o que é real e o que é simulado) · [O que está construído e o que é projeção](#o-que-está-construído-e-o-que-é-projeção) |
+| **Integração multidisciplinar** | 20 | [Tabela de integração](#-integração-multidisciplinar) · [Arquitetura de Destino](#-arquitetura-de-destino--o-desenho-da-sprint-4) (a view como contrato entre core e insights) |
+| **Apresentação oral** | 10 | Ao vivo; apoio no Vídeo da Sprint 4 (Java), no topo, e no [Roteiro da demonstração](#roteiro-da-demonstração) |
+| **Organização e documentação** | 10 | Este README: [Instalação e Execução](#-instalação-e-execução) · [Rotas da API](#-rotas-da-api) · [Banco de Dados](#-banco-de-dados) · [Decisões de Arquitetura](#-decisões-de-arquitetura) · [Uso de IA](#-uso-de-ia-no-desenvolvimento) · [Git Flow](#-git-flow) |
 
 ---
 
