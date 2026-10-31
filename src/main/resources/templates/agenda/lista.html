@@ -44,6 +44,10 @@
         </div>
     </div>
 
+    <!-- volta dos botoes Confirmar e Recusar -->
+    <div class="aviso aviso-ok confirmacao" role="status" th:if="${avisoOk}" th:text="${avisoOk}">Pedido confirmado.</div>
+    <div class="aviso aviso-erro confirmacao" role="alert" th:if="${avisoErro}" th:text="${avisoErro}">Motivo obrigatório.</div>
+
     <section class="bloco" th:if="${vazia}">
         <p class="tabela-vazia"
            th:text="${minhaAgenda} ? 'Nenhum atendimento seu marcado nestes sete dias.' : 'Nenhum atendimento marcado nestes sete dias.'">Nada marcado.</p>
@@ -56,13 +60,13 @@
     <th:block th:unless="${vazia}">
         <section class="bloco" th:each="dia : ${dias}" th:classappend="${dia.hoje} ? 'bloco-hoje'">
             <h2 class="titulo-bloco" th:text="${dia.rotulo}">Dia</h2>
-            <div th:replace="~{agenda/lista :: tabelaCompromissos(${dia.compromissos}, 'Nada marcado neste dia.')}"></div>
+            <div th:replace="~{agenda/lista :: tabelaCompromissos(${dia.compromissos}, 'Nada marcado neste dia.', true)}"></div>
         </section>
     </th:block>
 
 </main>
 
-<div th:fragment="tabelaCompromissos(compromissos, vazio)" class="tabela-rolagem">
+<div th:fragment="tabelaCompromissos(compromissos, vazio, comAcoes)" class="tabela-rolagem">
     <table class="tabela">
         <thead>
         <tr>
@@ -108,6 +112,30 @@
                       class="etiqueta etiqueta-recuperada"
                       th:text="|em atraso · ${c.diasDeAtraso}d|"
                       th:title="|Vencia em ${#temporals.format(c.dtPrevista, 'dd/MM/yyyy')}|">em atraso</span>
+                <!--
+                  Pedido do aplicativo esperando a clinica. Os dois botoes fazem a
+                  transicao do PATCH da API; os campos ocultos devolvem a mesma
+                  semana e o mesmo recorte depois do clique. So na agenda: a ficha
+                  do pet reusa esta tabela, mas la nao ha semana para onde voltar.
+                -->
+                <div class="acoes-pedido" th:if="${comAcoes and c.aguardaAClinica}">
+                    <form th:action="@{/agenda/{id}/confirmar(id=${c.idAgendamento})}" method="post">
+                        <input type="hidden" name="inicio" th:value="${inicio}">
+                        <input type="hidden" name="minha" th:if="${ehVeterinario}" th:value="${minhaAgenda}">
+                        <button type="submit" class="botao-secundario botao-destaque">Confirmar</button>
+                    </form>
+                    <details class="recusa-pedido">
+                        <summary class="botao-secundario">Recusar</summary>
+                        <form th:action="@{/agenda/{id}/recusar(id=${c.idAgendamento})}" method="post">
+                            <input type="hidden" name="inicio" th:value="${inicio}">
+                            <input type="hidden" name="minha" th:if="${ehVeterinario}" th:value="${minhaAgenda}">
+                            <label th:for="|motivo-${c.idAgendamento}|">Motivo (o tutor lê no app)</label>
+                            <input type="text" name="motivo" th:id="|motivo-${c.idAgendamento}|"
+                                   required maxlength="300" placeholder="Ex.: veterinária de férias nesse dia">
+                            <button type="submit" class="botao-secundario">Recusar pedido</button>
+                        </form>
+                    </details>
+                </div>
             </td>
         </tr>
         <tr th:if="${#lists.isEmpty(compromissos)}">

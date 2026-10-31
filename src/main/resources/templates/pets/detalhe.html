@@ -65,7 +65,7 @@
     <section class="bloco">
         <h2 class="titulo-bloco">Próximos agendamentos</h2>
         <p class="ajuda">Tudo o que está marcado para este pet de hoje em diante, exceto os cancelados.</p>
-        <div th:replace="~{agenda/lista :: tabelaCompromissos(${proximosAgendamentos}, 'Nenhum agendamento futuro para este pet.')}"></div>
+        <div th:replace="~{agenda/lista :: tabelaCompromissos(${proximosAgendamentos}, 'Nenhum agendamento futuro para este pet.', false)}"></div>
     </section>
 
     <section class="bloco">

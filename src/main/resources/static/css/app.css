@@ -520,6 +520,16 @@ a { color: var(--cor-primaria-escura); }
 .botao-destaque:hover { background: var(--cor-primaria-escura); border-color: var(--cor-primaria-escura); color: #fff; }
 
 .confirmacao { margin-bottom: 18px; }
+
+/* Confirmar e Recusar na agenda: o pedido do app que espera a clinica */
+.acoes-pedido { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.acoes-pedido form { margin: 0; }
+.acoes-pedido button { font: inherit; font-size: 13.5px; cursor: pointer; }
+.recusa-pedido summary { list-style: none; cursor: pointer; }
+.recusa-pedido summary::-webkit-details-marker { display: none; }
+.recusa-pedido[open] form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; min-width: 220px; }
+.recusa-pedido label { font-size: 12.5px; color: var(--cor-texto-suave); }
+.recusa-pedido input[type="text"] { padding: 6px 8px; border: 1px solid var(--cor-borda); border-radius: 7px; font: inherit; font-size: 13.5px; }
 .confirmacao span { margin-left: 4px; }
 
 .campos {

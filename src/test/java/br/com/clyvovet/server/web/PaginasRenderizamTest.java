@@ -28,6 +28,10 @@ import br.com.clyvovet.server.obrigacao.ObrigacaoDetalheResponse;
 import br.com.clyvovet.server.obrigacao.ObrigacaoService;
 import br.com.clyvovet.server.obrigacao.TransicaoRequest;
 import br.com.clyvovet.server.obrigacao.web.AgendaWebController;
+import br.com.clyvovet.server.obrigacao.web.PedidoDoAppWebController;
+import br.com.clyvovet.server.agendamento.AgendamentoResponse;
+import br.com.clyvovet.server.agendamento.AgendamentoService;
+import br.com.clyvovet.server.agendamento.AgendamentoStatusRequest;
 import br.com.clyvovet.server.painel.PainelReceitaResponse;
 import br.com.clyvovet.server.painel.PainelReceitaService;
 import br.com.clyvovet.server.painel.web.PainelWebController;
@@ -97,7 +101,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         TutorWebController.class,
         NotificacaoWebController.class,
         LembreteWebController.class,
-        AtendimentoWebController.class
+        AtendimentoWebController.class,
+        PedidoDoAppWebController.class
 })
 @Import({SecurityConfig.class, WebMvcConfig.class, JwtService.class})
 @TestPropertySource(properties = {
@@ -150,6 +155,9 @@ class PaginasRenderizamTest {
 
     @MockitoBean
     private CatalogoDeContextos catalogoDeContextos;
+
+    @MockitoBean
+    private AgendamentoService agendamentoService;
 
     @Test
     void loginRenderizaSemAutenticacao() throws Exception {
@@ -538,6 +546,130 @@ class PaginasRenderizamTest {
                         org.hamcrest.Matchers.containsString("Marcado pela clínica"),
                         org.hamcrest.Matchers.not(
                                 org.hamcrest.Matchers.containsString("linha-recuperada")))));
+    }
+
+    /**
+     * O pedido feito pelo aplicativo, ainda sem resposta, ganha Confirmar e
+     * Recusar; o que ja foi respondido, e o que veio do balcao, nao.
+     */
+    @Test
+    void agendaOfereceConfirmarERecusarSoParaOPedidoDoApp() throws Exception {
+        given(agendaService.compromissosEntre(any(LocalDate.class), any(LocalDate.class), any()))
+                .willReturn(List.of(pedidoDoApp(), compromissoEmDia(), compromissoDeBalcao()));
+
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").with(user(VETERINARIO)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("action=\"/agenda/5/confirmar\""),
+                        org.hamcrest.Matchers.containsString("action=\"/agenda/5/recusar\""),
+                        org.hamcrest.Matchers.containsString("name=\"motivo\""),
+                        org.hamcrest.Matchers.containsString("maxlength=\"300\""),
+                        // a semana e o recorte vao junto, para o clique voltar ao mesmo lugar
+                        org.hamcrest.Matchers.containsString("name=\"inicio\" value=\"2026-09-10\""),
+                        org.hamcrest.Matchers.containsString("name=\"minha\" value=\"true\""),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/agenda/1/confirmar")),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/agenda/3/confirmar")))));
+    }
+
+    /** Status nulo e pedido, como no aplicativo; o que ja tem resposta, ou veio do balcao, nao. */
+    @Test
+    void pedidoSemStatusContaComoSolicitado() {
+        CompromissoDaAgenda semStatus = new CompromissoDaAgenda(6L, LocalDate.of(2026, 9, 10), "11:00",
+                null, CanalPreferencial.APP, 9L, "Rex", "Dra. Ana", null, null, null, null);
+        org.assertj.core.api.Assertions.assertThat(semStatus.aguardaAClinica()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(pedidoDoApp().aguardaAClinica()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(compromissoEmDia().aguardaAClinica()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(compromissoDeBalcao().aguardaAClinica()).isFalse();
+    }
+
+    /** A ficha reusa a tabela da agenda, mas sem os botoes: la nao ha semana para onde voltar. */
+    @Test
+    void fichaNaoOfereceConfirmarNemRecusar() throws Exception {
+        given(petService.getFichaTecnica(9L)).willReturn(fichaDeExemplo());
+        given(obrigacaoService.buscar(isNull(), isNull(), isNull(), eq(9L), any(Pageable.class)))
+                .willReturn(Page.empty());
+        given(agendaService.proximosDoPet(9L)).willReturn(List.of(pedidoDoApp()));
+
+        mockMvc.perform(get("/pets/9").with(user(COLABORADOR)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("SOLICITADO"),
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/agenda/5/confirmar")))));
+    }
+
+    /** Confirmar: a transicao do PATCH, e de volta para a mesma semana com o aviso. */
+    @Test
+    void confirmarFazATransicaoDoPatchEVoltaParaASemana() throws Exception {
+        given(agendamentoService.updateStatus(eq(5L), any())).willReturn(respostaDoPedido());
+
+        var resultado = mockMvc.perform(post("/agenda/5/confirmar").with(user(VETERINARIO)).with(csrf())
+                        .param("inicio", "2026-09-10").param("minha", "false"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/agenda?inicio=2026-09-10&minha=false"))
+                .andReturn();
+
+        verify(agendamentoService).updateStatus(5L,
+                new AgendamentoStatusRequest(AgendamentoStatus.CONFIRMADO, null));
+        org.assertj.core.api.Assertions.assertThat((String) resultado.getFlashMap().get("avisoOk"))
+                .contains("Rex", "10/09", "11:00", "confirmado");
+    }
+
+    @Test
+    void recusarSemMotivoNaoChamaOService() throws Exception {
+        var resultado = mockMvc.perform(post("/agenda/5/recusar").with(user(COLABORADOR)).with(csrf())
+                        .param("motivo", " ").param("inicio", "2026-09-10"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/agenda?inicio=2026-09-10"))
+                .andReturn();
+
+        org.mockito.Mockito.verifyNoInteractions(agendamentoService);
+        org.assertj.core.api.Assertions.assertThat(resultado.getFlashMap().get("avisoErro")).isNotNull();
+    }
+
+    /** O mesmo limite do corpo do PATCH: 300 caracteres. */
+    @Test
+    void recusarComMotivoLongoDemaisNaoChamaOService() throws Exception {
+        mockMvc.perform(post("/agenda/5/recusar").with(user(COLABORADOR)).with(csrf())
+                        .param("motivo", "x".repeat(301)))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/agenda"));
+
+        org.mockito.Mockito.verifyNoInteractions(agendamentoService);
+    }
+
+    @Test
+    void recusarComMotivoCancelaComOMotivo() throws Exception {
+        given(agendamentoService.updateStatus(eq(5L), any())).willReturn(respostaDoPedido());
+
+        mockMvc.perform(post("/agenda/5/recusar").with(user(COLABORADOR)).with(csrf())
+                        .param("motivo", "  Sem vaga nesse dia ").param("inicio", "2026-09-10"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/agenda?inicio=2026-09-10"));
+
+        verify(agendamentoService).updateStatus(5L,
+                new AgendamentoStatusRequest(AgendamentoStatus.CANCELADO, "Sem vaga nesse dia"));
+    }
+
+    /** O aviso de volta aparece no topo da agenda. */
+    @Test
+    void agendaMostraOAvisoDeVolta() throws Exception {
+        mockMvc.perform(get("/agenda").param("inicio", "2026-09-10").with(user(COLABORADOR))
+                        .flashAttr("avisoOk", "Pedido de Rex em 10/09 às 11:00 confirmado."))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("Pedido de Rex em 10/09 às 11:00 confirmado.")));
+    }
+
+    private static CompromissoDaAgenda pedidoDoApp() {
+        return new CompromissoDaAgenda(5L, LocalDate.of(2026, 9, 10), "11:00",
+                AgendamentoStatus.SOLICITADO, CanalPreferencial.APP, 9L, "Rex", "Dra. Ana",
+                null, null, null, null);
+    }
+
+    private static AgendamentoResponse respostaDoPedido() {
+        return new AgendamentoResponse(5L, LocalDate.of(2026, 9, 10), "11:00",
+                AgendamentoStatus.CONFIRMADO, CanalPreferencial.APP, null,
+                9L, "Rex", 21L, "Dra. Ana", null);
     }
 
     private static CompromissoDaAgenda compromissoEmDia() {
