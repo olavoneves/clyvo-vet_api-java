@@ -219,14 +219,23 @@ public final class CenarioClinico {
      */
     public Long novoAgendamento(Long pet, Long veterinario, int diasAPartirDeHoje,
                                 String hora, String status) {
+        return novoAgendamento(pet, veterinario, diasAPartirDeHoje, hora, status, "WEB");
+    }
+
+    /**
+     * O mesmo compromisso, pelo canal pedido — {@code APP} e o pedido que o
+     * tutor fez pelo aplicativo e que a agenda oferece para confirmar.
+     */
+    public Long novoAgendamento(Long pet, Long veterinario, int diasAPartirDeHoje,
+                                String hora, String status, String canal) {
         LocalDate data = LocalDate.now().plusDays(diasAPartirDeHoje);
         String motivo = "teste-" + sufixo();
         executar("""
                 insert into TB_CLV_AGENDAMENTO (dt_agendamento, hr_agendamento, ds_status,
                                                 ds_canal_origem, ds_motivo_cancelamento,
                                                 id_pet, id_veterinario)
-                values (DATE '%s', '%s', '%s', 'WEB', '%s', %d, %d)
-                """.formatted(data, hora, status, motivo, pet, veterinario));
+                values (DATE '%s', '%s', '%s', '%s', '%s', %d, %d)
+                """.formatted(data, hora, status, canal, motivo, pet, veterinario));
         entityManager.flush();
 
         return id("select max(id_agendamento) from TB_CLV_AGENDAMENTO where ds_motivo_cancelamento = '%s'"
