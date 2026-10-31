@@ -55,4 +55,16 @@ public record CompromissoDaAgenda(
     public boolean veioDeObrigacao() {
         return dtPrevista != null;
     }
+
+    /**
+     * O tutor pediu pelo aplicativo e a clinica ainda nao respondeu.
+     *
+     * <p>Status nulo conta como SOLICITADO, como no aplicativo: a API aceita
+     * gravar agendamento sem status, e o app le a ausencia como pedido. O que o
+     * assistente marca ja nasce CONFIRMADO e nao entra aqui.
+     */
+    public boolean aguardaAClinica() {
+        return canalOrigem == CanalPreferencial.APP
+                && (status == null || status == AgendamentoStatus.SOLICITADO);
+    }
 }
