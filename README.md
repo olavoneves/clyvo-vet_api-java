@@ -8,7 +8,7 @@ Plataforma de saúde animal que transforma a jornada do pet de um modelo episód
 
 Vídeo da Sprint 3: https://youtu.be/asLs3qNrzvs
 
-Vídeo da Sprint 4 (Java): PREENCHER
+Vídeo da Sprint 4 (Java): https://youtu.be/MedIk1lgZgU
 
 | | |
 |---|---|
@@ -1063,10 +1063,10 @@ Onde conferir cada critério de avaliação da Sprint 4.
 
 | Critério | Peso | Onde está |
 |---|---|---|
-| **Demonstração técnica** | 40 | [Online](https://clyvo-vet-api-java.onrender.com) · [Swagger](https://clyvo-vet-api-java.onrender.com/swagger-ui.html) · [Roteiro da demonstração](#roteiro-da-demonstração) · [Logins de demonstração](#logins-de-demonstração) · [Mapa dos Requisitos](#-mapa-dos-requisitos) · Vídeo da Sprint 4 (Java), no topo |
+| **Demonstração técnica** | 40 | [Online](https://clyvo-vet-api-java.onrender.com) · [Swagger](https://clyvo-vet-api-java.onrender.com/swagger-ui.html) · [Roteiro da demonstração](#roteiro-da-demonstração) · [Logins de demonstração](#logins-de-demonstração) · [Mapa dos Requisitos](#-mapa-dos-requisitos) · [Vídeo da Sprint 4 (Java)](https://youtu.be/MedIk1lgZgU) |
 | **Narrativa** | 20 | [Descrição do Projeto](#-descrição-do-projeto) · [Painel — Receita Recuperada e Coorte](#-painel--receita-recuperada-e-coorte) (o que é real e o que é simulado) · [O que está construído e o que é projeção](#o-que-está-construído-e-o-que-é-projeção) |
 | **Integração multidisciplinar** | 20 | [Tabela de integração](#-integração-multidisciplinar) · [Arquitetura de Destino](#-arquitetura-de-destino--o-desenho-da-sprint-4) (a view como contrato entre core e insights) |
-| **Apresentação oral** | 10 | Ao vivo; apoio no Vídeo da Sprint 4 (Java), no topo, e no [Roteiro da demonstração](#roteiro-da-demonstração) |
+| **Apresentação oral** | 10 | Ao vivo; apoio no [Vídeo da Sprint 4 (Java)](https://youtu.be/MedIk1lgZgU) e no [Roteiro da demonstração](#roteiro-da-demonstração) |
 | **Organização e documentação** | 10 | Este README: [Instalação e Execução](#-instalação-e-execução) · [Rotas da API](#-rotas-da-api) · [Banco de Dados](#-banco-de-dados) · [Decisões de Arquitetura](#-decisões-de-arquitetura) · [Uso de IA](#-uso-de-ia-no-desenvolvimento) · [Git Flow](#-git-flow) |
 
 ---
@@ -1421,13 +1421,13 @@ do que não ter diagrama.
 
 ## 👥 Equipe
 
-| Nome | RM |
-|---|---|
-| Altamir Lima | 562906 |
-| Felipe Conte | 562248 |
-| Luiz Gonçalves | 564495 |
-| Olavo Neves | 563558 |
-| Pedro França | 561940 |
+| RM | Nome | Turma |
+|---|---|---|
+| RM561940 | Pedro Henrique Dias França | 2TDSR |
+| RM562248 | Felipe Conte | 2TDSR |
+| RM562906 | Altamir Lima | 2TDSR |
+| RM563558 | Olavo Porto Neves | 2TDSR |
+| RM564495 | Luiz Gustavo Gonçalves | 2TDSR |
 
 **Equipe:** PetFlow  
 **Curso:** Tecnologia em Desenvolvimento de Sistemas — FIAP  
